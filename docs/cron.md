@@ -80,6 +80,17 @@ append logs to `/var/log/pmss/<script>.log`. Highlights include:
   start path. Remove the marker to turn off this reconciliation. Write failures
   leave the daemon running.
 
+  Enabled native accounts also receive a metadata-only scan of `*.fastresume`
+  in `BT_backup` under `~/.local/share/qBittorrent`, the legacy
+  `~/.local/share/data/qBittorrent`, and `~/.config/qBittorrent`. Files above
+  536,870,911 bytes produce a `qbittorrent_resume_oversized` warning carrying
+  the size and limit, without a torrent name or path. Private mode-0600 state at
+  `/run/pmss/qbittorrent-resume/<account>.json` stores only path digests and sizes
+  to suppress repeat warnings until the file recovers or disappears. Incomplete
+  scans retain prior state. Warnings recur after reboot. Linked paths are not
+  followed. This detects a resume size risk; it does not repair files, change
+  decode limits or restart the client.
+
   Before enabling a host, count configs lacking `WebUI\Password_PBKDF2` without
   printing account names or contents:
 

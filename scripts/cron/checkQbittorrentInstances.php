@@ -10,6 +10,7 @@ require_once __DIR__.'/../lib/user/watchdog.php';
 require_once __DIR__.'/../lib/user/torrentPort.php';
 require_once __DIR__.'/../lib/user/qbittorrentWebUiAuth.php';
 require_once __DIR__.'/../lib/user/qbittorrentWatchdog.php';
+require_once __DIR__.'/../lib/user/qbittorrentResume.php';
 require_once __DIR__.'/../lib/torrentClients/identity.php';
 require_once __DIR__.'/../lib/lighttpd/dockerClientProxy.php';
 
@@ -23,5 +24,6 @@ pmssUserWatchdogRunService('qBittorrent', 'qbittorrentEnable', ['qbittorrent-nox
     // A running, labelled Docker qBittorrent is this account's client; never start a native one beside it.
     if (pmssLighttpdDockerClientPort($thisUser, 'qbittorrent') !== null) return ['qbittorrent-nox' => true];
     $home = rtrim(pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home'), '/').'/'.$thisUser;
+    pmssQbittorrentResumeObserve($thisUser, $home);
     return ['qbittorrent-nox' => pmssQbittorrentWatchdogRunning($thisUser, $home)];
 }, __DIR__.'/../lib/user/qbittorrent.php', '/home', '/scripts/listUsers.php', true);
