@@ -67,12 +67,11 @@ echo json_encode(['ordinary' => $ordinary, 'rows' => $rows]);
 PHP;
         $data = $this->pmssRunInlinePhpJson($script);
         $this->assertSame(50, count($data['rows']));
-        foreach ($data['rows'] as [$case, $result, $sameFault, $open, $events, $payloads, $opened, $mode]) {
-            $this->assertSame($data['ordinary'][$case] ?? null, $result, $case);
-            $this->assertTrue($sameFault, $case);
-            $this->assertFalse($open, $case);
-            $this->assertSame(['/fixture/state/qbittorrentWebui-fixtur01.state', 'c+'], $opened, $case);
-            $this->assertSame($case === 'open-false' ? null : 0600, $mode, $case);
+        foreach ($data['rows'] as $row) {
+            [$case, , , , $events, $payloads] = $row;
+            $this->pmssAssertArraySubsetSame([1 => $data['ordinary'][$case] ?? null, 2 => true, 3 => false,
+                6 => ['/fixture/state/qbittorrentWebui-fixtur01.state', 'c+'], 7 => $case === 'open-false' ? null : 0600,
+            ], $row, $case.':');
             $this->assertSame($case === 'open-false' ? ['open'] : ['close'],
                 $case === 'open-false' ? $events : array_slice($events, -1), $case);
             $this->assertSame($case === 'open-false' ? 0 : 1, count(array_keys($events, 'close', true)), $case);

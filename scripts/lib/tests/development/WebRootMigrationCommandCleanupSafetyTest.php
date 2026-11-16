@@ -78,11 +78,9 @@ echo json_encode($results);
 PHP;
         $results = $this->pmssRunInlinePhpJson($script);
         $this->assertSame(40, count($results));
-        foreach ($results as [$case, $ok, $sameFault, $open, $events, $launch]) {
+        foreach ($results as $row) {
+            [$case, , , , , $launch] = $row;
             $fault = in_array($case, ['account', 'launch', 'reap', 'reaped'], true) || strpos($case, 'reap+') === 0;
-            $this->assertSame($fault ? null : in_array($case, ['success', 'account-success'], true), $ok, $case);
-            $this->assertTrue($sameFault, $case);
-            $this->assertSame(strpos($case, 'reap-retry') !== false, $open, $case);
             $expected = $case === 'root-refused' ? [] : ['account'];
             $launched = in_array($case, ['success', 'child-false', 'launch-false', 'launch', 'reap', 'reaped'], true)
                 || strpos($case, 'reap+') === 0;
@@ -95,7 +93,10 @@ PHP;
                 }
                 if (strpos($case, 'reap-retry') === false) $expected[] = 'reaped';
             }
-            $this->assertSame($expected, $events, $case);
+            $this->pmssAssertArraySubsetSame([
+                1 => $fault ? null : in_array($case, ['success', 'account-success'], true),
+                2 => true, 3 => strpos($case, 'reap-retry') !== false, 4 => $expected,
+            ], $row, $case.':');
             if ($launch !== null) $this->assertSame(["sh -c 'fixture-command'", [
                 0 => ['file', '/dev/null', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w'],
             ]], $launch, $case);

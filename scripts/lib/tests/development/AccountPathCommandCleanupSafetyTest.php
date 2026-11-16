@@ -95,19 +95,18 @@ echo json_encode($results);
 PHP;
         $results = $this->pmssRunInlinePhpJson($script);
         $this->assertSame(58, count($results));
-        foreach ($results as [$timeout, $case, $ok, $sameFault, $open, $failure, $timedOut, $events]) {
+        foreach ($results as $row) {
+            [$timeout, $case, , , , , , $events] = $row;
             $label = $timeout.':'.$case;
             $ordinary = in_array($case, ['success', 'child-false', 'launch-false', 'blocking-false', 'timeout'], true);
-            $this->assertSame([false, false, false], $open, $label);
-            $this->assertSame(!$ordinary, $sameFault, $label);
-            $this->assertSame($ordinary ? $case === 'success' : null, $ok, $label);
-            $this->assertSame(in_array($case, ['timeout', 'timeout-log'], true), $timedOut, $label);
+            $this->pmssAssertArraySubsetSame([4 => [false, false, false], 3 => !$ordinary,
+                2 => $ordinary ? $case === 'success' : null,
+                6 => in_array($case, ['timeout', 'timeout-log'], true),
+                5 => ['success' => '', 'child-false' => 'stage=child rc=23 stderr=diagnostic',
+                    'blocking-false' => 'stage=stdin rc=0 stderr=diagnostic', 'timeout' => 'stage=timeout rc=124 stderr=diagnostic',
+                ][$case] ?? 'stage=launch rc=not-started stderr=diagnostic',
+            ], $row, $label.':');
             $this->assertSame(['rewind', 'read', 'capture-close'], array_slice($events, -3), $label);
-            if ($case === 'success') $this->assertSame('', $failure, $label);
-            elseif ($case === 'child-false') $this->assertSame('stage=child rc=23 stderr=diagnostic', $failure, $label);
-            elseif ($case === 'blocking-false') $this->assertSame('stage=stdin rc=0 stderr=diagnostic', $failure, $label);
-            elseif ($case === 'timeout') $this->assertSame('stage=timeout rc=124 stderr=diagnostic', $failure, $label);
-            else $this->assertSame('stage=launch rc=not-started stderr=diagnostic', $failure, $label);
             $signals = array_values(array_intersect($events, ['terminate', 'group-terminate']));
             $shouldSignal = (!$ordinary && !in_array($case, ['launch', 'reaped', 'timeout-log'], true)) || in_array($case, ['blocking-false', 'timeout', 'timeout-log'], true);
             $this->assertSame($shouldSignal ? [$timeout > 0 ? 'group-terminate' : 'terminate'] : [], $signals, $label);

@@ -76,13 +76,10 @@ echo json_encode($results);
 PHP;
         $results = $this->pmssRunInlinePhpJson($script);
         $this->assertSame(48, count($results));
-        foreach ($results as [$case, $ok, $sameFault, $open, $failure, $events, $launch, $readLength]) {
+        foreach ($results as $row) {
+            [$case, , , , , , $launch] = $row;
             $ordinary = in_array($case, ['success', 'child-false', 'unlink-false', 'launch-false'], true);
-            $this->assertSame($ordinary ? $case === 'success' : null, $ok, $case);
-            $this->assertTrue($sameFault, $case);
             // Persistent cleanup faults are bounded; every later cleanup is still attempted.
-            $this->assertSame([strpos($case, 'reap-retry') !== false,
-                $case === 'capture-close' || strpos($case, '+capture-close') !== false], $open, $case);
             $early = in_array($case, ['metadata', 'unlink', 'unlink-false', 'launch', 'launch-false'], true);
             $cleanup = strpos($case, 'reap+') === 0 || $case === 'reap';
             $expected = ['metadata'];
@@ -102,7 +99,6 @@ PHP;
                 if ($case !== 'read' && $case !== 'reap+read') $expected[] = 'sanitize';
             }
             $expected[] = 'capture-close';
-            $this->assertSame($expected, $events, $case);
             // Preserve legacy stage text and the diagnostic byte budget on every path.
             $stage = in_array($case, ['metadata', 'unlink', 'unlink-false'], true) ? 'publish-stderr' : 'publish-launch';
             $reason = 'stage='.$stage.' rc=not-started';
@@ -111,8 +107,11 @@ PHP;
             elseif (in_array($case, ['rewind', 'read', 'sanitize', 'capture-close'], true)) $reason = '';
             if ($reason !== '' && !array_intersect(explode('+', $case), ['rewind', 'read', 'sanitize', 'capture-close']))
                 $reason .= ' stderr=diagnostic';
-            $this->assertSame($reason, $failure, $case);
-            $this->assertSame(in_array($case, ['rewind', 'reap+rewind'], true) ? null : 300, $readLength, $case);
+            $this->pmssAssertArraySubsetSame([1 => $ordinary ? $case === 'success' : null, 2 => true,
+                3 => [strpos($case, 'reap-retry') !== false,
+                    $case === 'capture-close' || strpos($case, '+capture-close') !== false],
+                5 => $expected, 4 => $reason, 7 => in_array($case, ['rewind', 'reap+rewind'], true) ? null : 300,
+            ], $row, $case.':');
             if ($launch !== null) $this->assertSame(['fixture-command', ['file', '/dev/null', 'r'], ['file', '/dev/null', 'w'], true], $launch, $case);
         }
     }

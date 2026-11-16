@@ -90,21 +90,19 @@ echo json_encode($rows);
 PHP;
         $rows = $this->pmssRunInlinePhpJson($script);
         $this->assertSame(count($cases) * 4 - 14, count($rows));
-        foreach ($rows as [$case, $scheduled, $result, $sameFault, $events, $removed, $opened, $size, $outOpen, $pipeOpen]) {
+        foreach ($rows as $row) {
+            [$case, $scheduled] = $row;
             $expected = $scheduled ? $cases[$case] : array_values(array_diff($cases[$case],
                 ['mode', 'exists', 'published-mode', 'stat', 'size', 'file', 'link']));
-            $this->assertSame($expected, $events, $case);
-            $this->assertTrue($sameFault, $case);
-            $this->assertSame(in_array('unlink', $expected, true) ? ['/fixture/archive.part'] : [], $removed, $case);
-            $this->assertSame(['/fixture/archive.part', $scheduled ? 'xb' : 'wb'], $opened);
-            $this->assertFalse($outOpen, $case);
-            $this->assertFalse($pipeOpen, $case);
             $error = $case === 'ok' ? '' : null;
             if ($case === 'open-false') $error = $scheduled ? 'Could not create the backup archive file.' : 'Could not create the pre-restore snapshot file.';
             if ($case === 'pipe-false') $error = $scheduled ? 'Could not start the backup archive process.' : 'Could not start the pre-restore snapshot.';
             if (in_array($case, ['copy-false', 'rename-false'], true)) $error = $scheduled ? 'Backup archive creation failed.' : 'Pre-restore snapshot failed; restore aborted.';
-            $this->assertSame($error, $result, $case);
-            $this->assertSame($scheduled && in_array($case, ['ok', 'file', 'link'], true) ? 42 : null, $size, $case);
+            $this->pmssAssertArraySubsetSame([4 => $expected, 3 => true,
+                5 => in_array('unlink', $expected, true) ? ['/fixture/archive.part'] : [],
+                6 => ['/fixture/archive.part', $scheduled ? 'xb' : 'wb'], 8 => false, 9 => false, 2 => $error,
+                7 => $scheduled && in_array($case, ['ok', 'file', 'link'], true) ? 42 : null,
+            ], $row, $case.':');
         }
     }
 }
