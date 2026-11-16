@@ -31,6 +31,8 @@ function pmssAiToolsCodexInstallNeeded(string $binary, string $launcher, string 
 /** Publish a small root-owned file from a same-directory temporary path. */
 function pmssAiToolsCodexAtomicWrite(string $path, string $content, int $mode, int $owner = 0, int $group = 0): bool
 {
+    // Reject malformed destinations before dirname() can select a staging directory.
+    if ($path === '' || pmssFilesystemPathHasNulByte($path)) return false;
     $temporary = @tempnam(dirname($path), '.pmss-codex-');
     if (!is_string($temporary)) {
         return false;

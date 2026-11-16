@@ -1367,6 +1367,13 @@ pin, collision, account-limit and failed-read contracts.
 
 ## Application Installers (Contracts)
 
+`pmssAiToolsCodexAtomicWrite()` rejects empty or NUL-containing destination paths
+before temporary allocation, returning `false`. Valid destination bytes, payloads,
+mode/owner/group ordering, same-directory publication and cleanup remain unchanged.
+`AiToolsAtomicWriteSafetyTest` intercepts filesystem operations to cover malformed
+inputs, ordinary failures and original throwables without installing any tool.
+Execution stays on testing machines; devbox verification checks changed PHP syntax.
+
 Pinned artifact checksum and installed-version readers reject empty or
 NUL-containing paths before filesystem calls, returning their existing empty
 checksum or non-matching-version result. Valid paths retain checksum bytes,
