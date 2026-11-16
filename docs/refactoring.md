@@ -1,5 +1,13 @@
 # Refactoring Guidelines
 
+Atomic managed-file replacement attempts unpublished staging-file removal even
+when stream closure throws. Successful publication clears the staging name before
+cleanup; close-before-unlink order and ordinary results remain unchanged. Lone
+throwables propagate unchanged, and combined cleanup faults retain PHP's normal
+`finally` precedence (ADR 0164). `ManagedFileReplacementCleanupSafetyTest` uses
+memory streams and intercepted filesystem operations; execution stays on testing
+machines, with changed-file PHP syntax checks on the devbox.
+
 Private managed-file staging attempts directory cleanup even when staging-file
 removal throws. The existing file-before-directory order and empty-directory
 removal remain; lone throwables propagate unchanged and combined cleanup faults

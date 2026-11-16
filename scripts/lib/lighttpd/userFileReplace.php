@@ -39,8 +39,12 @@ function pmssReplaceUserFile(string $path, string $content, ?callable $prepareTe
         return true;
     } finally {
         // Failed operations and thrown I/O errors must not strand staging files.
-        @fclose($handle);
-        if (is_string($tmp)) @unlink($tmp);
+        try {
+            @fclose($handle);
+        } finally {
+            // A close fault must still attempt removal of the unpublished name.
+            if (is_string($tmp)) @unlink($tmp);
+        }
     }
 }
 
