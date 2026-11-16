@@ -1,5 +1,14 @@
 # Refactoring Guidelines
 
+Customer backup creation and pre-restore snapshots attempt unpublished `.part`
+removal after output closure and pipe reaping, even when those operations or
+publication throw (ADR 0200). Successful rename ends part-file ownership;
+ordinary results, diagnostics and post-publication verification retain their
+contracts. Lone throwables propagate unchanged; combined cleanup faults retain
+PHP's `finally` precedence. `CustomerBackupPartCleanupSafetyTest` uses memory
+streams and intercepted I/O; execution stays on testing machines, with changed-file
+PHP syntax checks on the devbox.
+
 Root-stage publication attempts to restore a cleared old immutable inode through thrown
 command/publication failures before staging cleanup. Restoration retains the
 old inode guard; successful publication still protects the new inode. Ordinary

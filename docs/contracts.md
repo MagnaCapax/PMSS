@@ -1873,7 +1873,12 @@ rejection, extraction and retention policy remain at their original boundaries.
 Archive output closes and any started pipe is reaped even when setup or copying
 throws; a close exception still permits pipe reaping. Tar inspection closes its
 gzip stream on every return and on header, metadata or payload exceptions.
-Exceptions propagate without publishing an archive or changing partial-file policy.
+Unpublished `.part` removal runs after output closure and pipe reaping, including
+when setup, copying, cleanup or publication throws. A successful rename ends
+part-file ownership; post-publication verification keeps its existing policy.
+Lone throwables propagate unchanged; combined cleanup faults retain PHP's normal
+`finally` precedence. `CustomerBackupPartCleanupSafetyTest` uses intercepted I/O
+and memory streams on the testing machine.
 
 Failed gzip header reads discard any partial member list and use the existing
 restore member-list failure message before member selection or extraction.

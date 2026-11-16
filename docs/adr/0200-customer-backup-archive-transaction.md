@@ -44,7 +44,7 @@ only on testing machines; existing backup/restore integration tests remain.
 Stream lifetimes use `finally`: archive output closes after setup/copy exceptions,
 and a started pipe is reaped even if closing the output throws. Tar inspection
 closes its gzip stream on normal returns, malformed input and read exceptions.
-Exception identity, publication order and partial-file handling remain unchanged;
+Exception identity and publication order remain unchanged;
 isolated fixtures cover both exceptions and errors without launching tar.
 
 Archives can contain private tracker URLs and separate application credentials;
@@ -78,6 +78,29 @@ no primary/service credential separation, secret logging, archive permissions,
 authentication, public routes or listening ports. Integration fixtures cover
 GNU/PAX long paths, literal names, skipped links and conflicting member types;
 they run only on a testing machine.
+
+## Unpublished part cleanup follow-up (2026-11-16)
+
+The archive transaction owns its acquired `.part` name until rename succeeds.
+One outer `finally` attempts removal after output closure and pipe reaping on
+ordinary failures and throwables, including close/reap and publication faults.
+Failed output opens authorize no removal. Successful rename ends this cleanup
+obligation; final archive verification retains its existing behavior. Lone
+throwables propagate unchanged; combined cleanup faults follow PHP's normal
+`finally` precedence. No recursive or broader cleanup is introduced.
+
+`CustomerBackupPartCleanupSafetyTest` covers both policies with memory streams
+and intercepted operations, including combined faults and post-publication
+exceptions. Tests run only on testing machines; devbox verification checks
+changed-file PHP syntax and inspects ordering without executing an archive job.
+
+Security review retains the fixed allowlist, path/link guards, customer UID,
+private archive modes, credential separation, and payload-free diagnostics.
+Exposed archives can reveal account tracker URLs and separate service credentials;
+this change adds no credential storage, logging, permissions, listeners or routes.
+GNU tar's [CVE-2016-6321 pathname traversal history](https://security-tracker.debian.org/tracker/CVE-2016-6321)
+reinforces preserving those guards. PHP's [error-control documentation](https://www.php.net/manual/en/language.operators.errorcontrol.php)
+confirms custom handlers still run under `@`, so suppressed I/O can throw.
 
 ## References
 - [Customer backup contracts](../contracts.md#customer-torrent-state-backup--etcskelwwwscriptsincbackupphp-and-welcomephp)

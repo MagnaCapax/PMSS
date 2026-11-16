@@ -165,41 +165,46 @@ if (!function_exists('pmssCustomerBackupArchiveWrite')) {
   $tmpPath = $archivePath.'.part';
   $out = @fopen($tmpPath, $scheduled ? 'xb' : 'wb');
   if (!is_resource($out)) return $scheduled ? 'Could not create the backup archive file.' : 'Could not create the pre-restore snapshot file.';
-  $pipe = null;
+  $published = false;
   try {
-   if ($scheduled) @chmod($tmpPath, 0600);
-   $pipe = @popen($command, 'r');
-   if (is_resource($pipe)) $bytes = @stream_copy_to_stream($pipe, $out);
-  } finally {
-   // Closing the output must not prevent reaping an already-started archive process.
+   $pipe = null;
    try {
-    $closeOk = @fclose($out);
+    if ($scheduled) @chmod($tmpPath, 0600);
+    $pipe = @popen($command, 'r');
+    if (is_resource($pipe)) $bytes = @stream_copy_to_stream($pipe, $out);
    } finally {
-    if (is_resource($pipe)) $returnCode = @pclose($pipe);
+    // Closing the output must not prevent reaping an already-started archive process.
+    try {
+     $closeOk = @fclose($out);
+    } finally {
+     if (is_resource($pipe)) $returnCode = @pclose($pipe);
+    }
    }
-  }
-  if ($pipe === false) {
-   @unlink($tmpPath);
-   return $scheduled ? 'Could not start the backup archive process.' : 'Could not start the pre-restore snapshot.';
-  }
-
-  // Scheduled archives also require nonempty output and an unoccupied final name.
-  if ($bytes === false || ($scheduled && (int) $bytes <= 0) || !$closeOk || $returnCode !== 0
-      || ($scheduled && file_exists($archivePath)) || !@rename($tmpPath, $archivePath)) {
-   @unlink($tmpPath);
-   return $scheduled ? 'Backup archive creation failed.' : 'Pre-restore snapshot failed; restore aborted.';
-  }
-
-  if ($scheduled) {
-   @chmod($archivePath, 0600);
-   clearstatcache(true, $archivePath);
-   $size = @filesize($archivePath);
-   if (!is_file($archivePath) || is_link($archivePath) || !is_numeric($size) || (int) $size <= 0) {
-    @unlink($archivePath);
-    return 'Backup archive verification failed.';
+   if ($pipe === false) {
+    return $scheduled ? 'Could not start the backup archive process.' : 'Could not start the pre-restore snapshot.';
    }
+
+   // Scheduled archives also require nonempty output and an unoccupied final name.
+   if ($bytes === false || ($scheduled && (int) $bytes <= 0) || !$closeOk || $returnCode !== 0
+       || ($scheduled && file_exists($archivePath)) || !@rename($tmpPath, $archivePath)) {
+    return $scheduled ? 'Backup archive creation failed.' : 'Pre-restore snapshot failed; restore aborted.';
+   }
+   $published = true;
+
+   if ($scheduled) {
+    @chmod($archivePath, 0600);
+    clearstatcache(true, $archivePath);
+    $size = @filesize($archivePath);
+    if (!is_file($archivePath) || is_link($archivePath) || !is_numeric($size) || (int) $size <= 0) {
+     @unlink($archivePath);
+     return 'Backup archive verification failed.';
+    }
+   }
+   return '';
+  } finally {
+   // Close/reap and publication faults must still discard the unpublished part.
+   if (!$published) @unlink($tmpPath);
   }
-  return '';
  }
 }
 
