@@ -22,10 +22,14 @@ function pmssQbittorrentWebUiAuthStateActive(string $user, array $ops = []): boo
     if (!pmssPathTargetIsSafe($path, false, true, false)) return false;
     $handle = @fopen($path, 'r');
     if ($handle === false) return false;
-    if (!@flock($handle, LOCK_SH)) { fclose($handle); return false; }
-    $value = stream_get_contents($handle);
-    flock($handle, LOCK_UN);
-    fclose($handle);
+    try {
+        if (!@flock($handle, LOCK_SH)) return false;
+        $value = stream_get_contents($handle);
+        flock($handle, LOCK_UN);
+    } finally {
+        // Close also releases a held lock when acquisition, reading or unlocking throws.
+        fclose($handle);
+    }
     if (!is_string($value)) return false;
     $parts = explode("\n", trim($value));
     if (!ctype_digit($parts[0] ?? '')) return false;
@@ -42,19 +46,23 @@ function pmssQbittorrentWebUiAuthStateShouldLog(string $user, string $status, ar
     if (!pmssPathTargetIsSafe($path, false, true, false)) return $status === 'state-failed';
     $handle = @fopen($path, 'r+');
     if ($handle === false) return $status === 'state-failed';
-    if (!@flock($handle, LOCK_EX)) { fclose($handle); return $status === 'state-failed'; }
-    $stat = fstat($handle);
-    if (!is_array($stat) || $stat['uid'] !== posix_geteuid() || ($stat['mode'] & 0022) !== 0) {
-        flock($handle, LOCK_UN); fclose($handle); return $status === 'state-failed';
+    try {
+        if (!@flock($handle, LOCK_EX)) return $status === 'state-failed';
+        $stat = fstat($handle);
+        if (!is_array($stat) || $stat['uid'] !== posix_geteuid() || ($stat['mode'] & 0022) !== 0) {
+            flock($handle, LOCK_UN); return $status === 'state-failed';
+        }
+        $parts = explode("\n", (string) stream_get_contents($handle));
+        $prior = $parts[2] ?? '';
+        $shouldLog = $status === 'stop' || $prior !== $status;
+        $payload = ($parts[0] ?? '0')."\n".($parts[1] ?? '0')."\n".$status."\n";
+        $written = pmssQbittorrentWebUiAuthStateWrite($handle, $payload);
+        flock($handle, LOCK_UN);
+        return $written && $shouldLog;
+    } finally {
+        // Match the stop transaction's stream ownership through I/O and metadata faults.
+        fclose($handle);
     }
-    $parts = explode("\n", (string) stream_get_contents($handle));
-    $prior = $parts[2] ?? '';
-    $shouldLog = $status === 'stop' || $prior !== $status;
-    $payload = ($parts[0] ?? '0')."\n".($parts[1] ?? '0')."\n".$status."\n";
-    $written = pmssQbittorrentWebUiAuthStateWrite($handle, $payload);
-    flock($handle, LOCK_UN);
-    fclose($handle);
-    return $written && $shouldLog;
 }
 
 /** Keep a changed config pending until the daemon has stopped once. */

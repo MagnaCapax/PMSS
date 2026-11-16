@@ -79,3 +79,22 @@ mode and owner checks. Primary/service credential storage and separation,
 redaction, file permissions, web endpoints and listener binds remain unchanged.
 PHP's [error-control documentation](https://www.php.net/manual/en/language.operators.errorcontrol.php)
 confirms suppressed I/O diagnostics can still invoke custom error handlers.
+
+## Marker reader cleanup follow-up (2026-11-16)
+
+The active-state reader and status-transition writer now close acquired marker
+streams in `finally`, matching the stop transaction above. Lock acquisition,
+metadata, reads, writes and explicit unlock faults cannot skip closure. Ordinary
+refusals, return values, marker bytes and explicit unlock order remain unchanged;
+lone throwables propagate unchanged and close faults retain `finally` precedence.
+`QbittorrentWebUiStateCleanupSafetyTest` intercepts every filesystem and lock
+operation with memory streams, including simultaneous operation/close faults.
+Execution stays on testing machines; devbox verification is changed-file PHP
+syntax only, with no live daemon, configuration or signal operations.
+
+The security review above still applies: the marker contains timestamps and
+status only, never primary or service credentials. Its owner/mode guards,
+credential separation, logging/redaction, endpoints and listener binds retain
+their existing behavior. The original [CVE-2023-30801 advisory](https://www.vulncheck.com/advisories/qbittorrent-default-creds)
+documents WebUI default credentials leading to code execution; this cleanup
+does not expand access to that interface or to account files.
