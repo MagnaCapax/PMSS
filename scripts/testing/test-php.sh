@@ -18,6 +18,9 @@ PMSS_CUSTOMER_PANEL_RENDER_ROOT="$ROOT_DIR" php "$ROOT_DIR/scripts/testing/custo
 
 echo "[public-exposure-lint]" >&2
 php "$ROOT_DIR/scripts/testing/public-exposure-lint.php" --root "$ROOT_DIR"
+echo "[ipv4-template-lint]" >&2
+php "$ROOT_DIR/scripts/testing/ipv4-template-lint.php" --root "$ROOT_DIR"
+php "$ROOT_DIR/scripts/testing/ipv4-template-lint.php" --arg=Ipv4TemplateLintTest
 php "$ROOT_DIR/scripts/testing/ipv4RuntimeTest.php" --arg=RtorrentIpv4ConfigTest
 php "$ROOT_DIR/scripts/testing/ipv4RuntimeTest.php" --arg=Ipv4RuntimeTraceTest
 

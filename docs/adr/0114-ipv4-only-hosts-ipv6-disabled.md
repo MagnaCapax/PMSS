@@ -100,22 +100,26 @@ and runtime results remain required before claiming complete fleet coverage.
 
 ### Blockers and sandbox verification
 
-`scripts/testing/public-exposure-lint.php` adds R6 for active lines in shipped
-`etc/**/template.*` files: IPv6 listen/bind literals, dual-stack SSH selection,
-IPv6 enablement/forwarding, and non-family-specific OpenVPN protocols fail the
-existing CI path in `scripts/testing/test-php.sh`. Comments and IPv4 settings
-remain valid. `--arg=Ipv4TemplateLintTest` includes the negative fixture
-`ListenAddress ::` and IPv4/comment controls. It also copies the pinned files
-and templates into a private fixture, requires exit 0, appends that IPv6
-listener, then requires exit 1 with an R6 diagnostic from the actual CLI.
-This is a shape guard, not a parser
-for every application; runtime checks remain necessary for default behavior.
+`scripts/testing/ipv4-template-lint.php` is this ADR's own lint, run by
+`scripts/testing/test-php.sh` (so by CI and by `static-lints.sh`). It reads the
+active lines of every shipped `etc/**/template.*` file and fails on an IPv6
+listen or bind literal (F1), a dual-stack or IPv6 address family (F2), IPv6
+turned on in the kernel (F3), or an OpenVPN server protocol that is not
+IPv4-specific (F4). The OpenVPN client template keeps `proto udp`: it runs on
+the customer's device, and the server name has no AAAA record. It also pins the
+lines that must stay: the rTorrent IPv4 bind and the `network.block.ipv6` catch
+(P1), `AddressFamily inet` for sshd (P2) and `UseIPv6 off` for ProFTPD (P3).
+Comments and IPv4 settings remain valid. `--arg=Ipv4TemplateLintTest` checks
+bad and good lines, then runs the real CLI on a private copy of the templates:
+exit 0 when clean, exit 1 with an F1 diagnostic after `ListenAddress ::` is
+appended. This is a shape guard, not a parser for every application; runtime
+checks remain necessary for default behavior.
 
 On the testing VM only:
 
 ```text
-php scripts/testing/public-exposure-lint.php --root .
-php scripts/testing/public-exposure-lint.php --arg=Ipv4TemplateLintTest
+php scripts/testing/ipv4-template-lint.php --root .
+php scripts/testing/ipv4-template-lint.php --arg=Ipv4TemplateLintTest
 php scripts/testing/ipv4RuntimeTest.php --arg=RtorrentIpv4ConfigTest
 php scripts/testing/ipv4RuntimeTest.php --arg=Ipv4RuntimeTraceTest
 PMSS_IPV4_TEST_SANDBOX=1 php scripts/testing/ipv4RuntimeTest.php --arg=Ipv4RuntimeTest --matrix=PATH
