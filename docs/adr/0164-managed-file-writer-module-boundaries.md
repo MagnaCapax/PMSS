@@ -130,6 +130,29 @@ including the defenses relevant to PHP's historical pathname-NUL issue
 owner/mode and private stage. Primary/service credential separation, redaction,
 file permissions, web endpoints and listeners are unchanged.
 
+## Root-stage close failure follow-up (2026-11-16)
+
+`pmssRootStageFileWrite()` checks the staging stream's close result before
+metadata changes, immutable clearing or publication. A false result takes the
+existing write-stage failure path and attempts unpublished-stage removal through
+the existing cleanup. Successful writes retain their order, bytes and metadata;
+throwables retain the existing cleanup and precedence rules. The
+[PHP close contract](https://www.php.net/manual/en/function.fclose.php) permits
+failure even after the earlier write and flush succeeded.
+
+`RootStageDirectoryCleanupSafetyTest` covers the refused publication and cleanup
+order with intercepted I/O; `RootStageFailureTest` checks old destination bytes
+and stage removal in a temporary fixture. These run on testing machines; devbox
+verification checks changed-file PHP syntax only. No live publication or
+immutable operation is executed on the devbox.
+
+The security review retains path, owner and inode validation, including the
+existing NUL defenses relevant to PHP's historical CVE-2015-2348 above. Exposure
+of staged content remains bounded by the root-private directory and the managed
+payload's existing destination permissions. Primary/service credential
+separation, payload-free diagnostics, secret permissions, web endpoints and
+listeners are unchanged.
+
 ## References
 
 - [ADR 0121](0121-root-operations-and-account-controlled-objects.md)

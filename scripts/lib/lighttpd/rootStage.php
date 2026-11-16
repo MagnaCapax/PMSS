@@ -117,8 +117,10 @@ function pmssRootStageFileWrite(string $path, string $content, string $group, in
             $failure = 'stage=write rc=not-started';
             if (!pmssStreamWriteAll($handle, $content) || !@fflush($handle)) return false;
         } finally {
-            @fclose($handle);
+            $closeOk = @fclose($handle);
         }
+        // A failed close must leave the destination and its immutable state untouched.
+        if (!$closeOk) return false;
         // Keep short-circuit order, but distinguish each metadata failure.
         $failure = 'stage=owner rc=not-started';
         if (!@chown($stageFile, 'root')) return false;

@@ -313,6 +313,9 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   inode instead. Stage cleanup follows restoration even when restoration throws.
   Ordinary results and failure text stay unchanged; lone throwables propagate,
   with PHP's normal `finally` precedence for combined cleanup faults (ADR 0164).
+  A failed staging-stream close returns `false` at the existing write stage,
+  before metadata changes, immutable clearing or publication. The old destination
+  remains intact; unpublished-file and empty stage-directory cleanup is attempted.
 
 - Lock lifecycle helpers close streams when handle validation, lock acquisition,
   or explicit unlocking throws. The original throwable propagates; successful

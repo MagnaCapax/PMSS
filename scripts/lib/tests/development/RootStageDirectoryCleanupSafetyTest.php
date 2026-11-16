@@ -54,7 +54,7 @@ PHP;
         $script .= \pmssTestingFunctionExport('pmssRootStageFileWrite', 'RootStageDirectoryCleanupFixture');
         $script .= <<<'PHP'
 $rows = [];
-$cases = ['success', 'mkdir-false', 'inspect-false', 'open-false', 'write-false', 'flush-false',
+$cases = ['success', 'mkdir-false', 'inspect-false', 'open-false', 'write-false', 'flush-false', 'close-false',
     'group-false', 'publish-false', 'unlink-false', 'rmdir-false', 'write', 'close', 'publish',
     'unlink', 'rmdir', 'write+unlink', 'close+unlink', 'publish+unlink',
     'unlink+rmdir', 'write+unlink+rmdir'];
@@ -79,7 +79,7 @@ foreach ($cases as $case) {
 echo json_encode($rows);
 PHP;
         $rows = $this->pmssRunInlinePhpJson($script);
-        $this->assertSame(40, count($rows));
+        $this->assertSame(42, count($rows));
         $stage = '/fixture/.pmss-root-stage-'.str_repeat('61', 12);
         $normal = ['mkdir', 'inspect', 'open', 'write', 'flush', 'close', 'owner', 'group', 'mode', 'publish'];
         foreach ($rows as $row) {
@@ -100,7 +100,7 @@ PHP;
                 : ($expectedStage === null ? '' : 'stage='.$expectedStage.' rc=not-started');
             $this->assertSame([
                 $ordinary ? !in_array($case, ['mkdir-false', 'inspect-false', 'open-false',
-                    'write-false', 'flush-false', 'group-false', 'publish-false'], true) : null,
+                    'write-false', 'flush-false', 'close-false', 'group-false', 'publish-false'], true) : null,
                 true, false, $expectedFailure, $trace,
                 $case === 'mkdir-false' ? [] : [$stage.'/file'], $case === 'mkdir-false' ? [] : [$stage],
                 [$stage, 0700], $opened ? [$stage.'/file', 'x+b'] : null,

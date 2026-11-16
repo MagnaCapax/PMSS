@@ -10,16 +10,18 @@ class RootStageFailureTest extends TestCase
 
     public function testEveryPrePublishFailureNamesItsStageAndPreservesOldFile(): void
     {
-        foreach (['context', 'parent', 'mkdir', 'stage-check', 'open', 'write', 'flush',
+        foreach (['context', 'parent', 'mkdir', 'stage-check', 'open', 'write', 'flush', 'close',
             'owner', 'group', 'mode', 'single-regular', 'immutable-clear', 'publish-stderr',
             'unlink', 'publish-launch'] as $fault) {
             $result = $this->runWriter($fault);
-            $stage = ['flush' => 'write', 'unlink' => 'publish-stderr'][$fault] ?? $fault;
+            $stage = ['flush' => 'write', 'close' => 'write', 'unlink' => 'publish-stderr'][$fault] ?? $fault;
             $this->assertFalse($result['ok'], $fault);
             $this->assertSame('stage='.$stage.' rc=not-started', $result['failure'], $fault);
             $this->assertSame('old', $result['content'], $fault);
             $this->assertSame([], $result['stages'], $fault);
             $this->assertFalse($result['captureOpen'], $fault);
+            // A failed close must precede immutable clearing as well as publication.
+            if ($fault === 'close') $this->assertSame([], $result['immutable']);
         }
     }
 
@@ -83,7 +85,7 @@ class RootStageFailureTest extends TestCase
     {
         if (!function_exists('posix_geteuid')) throw new SkipTest('POSIX identity functions required');
         $root = $this->pmssMakeTempDir('pmss-root-stage-case-');
-        $home = $this->pmssEnsureDir($root.'/alice');
+        $home = $this->pmssEnsureDir($root.'/fixtur01');
         $parent = $this->pmssEnsureDir($home.'/inside');
         $path = $this->pmssWriteFile($parent.'/target', 'old');
         $script = <<<'PHP'
@@ -106,6 +108,7 @@ function mkdir($path, $mode) { return $GLOBALS['fault'] === 'mkdir' ? false : \m
 function fopen($path, $mode) { return $GLOBALS['fault'] === 'open' ? false : \fopen($path, $mode); }
 function pmssStreamWriteAll($handle, $content) { return $GLOBALS['fault'] === 'write' ? false : \pmssStreamWriteAll($handle, $content); }
 function fflush($handle) { return $GLOBALS['fault'] === 'flush' ? false : \fflush($handle); }
+function fclose($handle) { $closed = \fclose($handle); return $GLOBALS['fault'] === 'close' ? false : $closed; }
 function chown($path, $owner) { return $GLOBALS['fault'] !== 'owner'; }
 function chgrp($path, $group) { return !in_array($GLOBALS['fault'], ['group', 'metadata', 'serialized'], true); }
 function chmod($path, $mode) { return $GLOBALS['fault'] === 'mode' ? false : \chmod($path, $mode); }
@@ -146,7 +149,7 @@ PHP;
         $script .= 'ini_set("error_log", '.var_export($root.'/errors.log', true).');';
         $script .= <<<'PHP'
 $failure = 'stale'; $callbacks = [];
-$immutable = in_array($GLOBALS['fault'], ['immutable-clear', 'immutable-set', 'immutable-success', 'publish'], true);
+$immutable = in_array($GLOBALS['fault'], ['immutable-clear', 'immutable-set', 'immutable-success', 'publish', 'close'], true);
 if ($GLOBALS['fault'] === 'metadata') {
     pmssUserFileApplyMetadata($GLOBALS['path'], 'root', 0640); $ok = false;
 } elseif ($GLOBALS['fault'] === 'serialized') {
