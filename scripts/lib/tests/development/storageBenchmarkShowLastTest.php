@@ -206,6 +206,32 @@ class StorageBenchmarkShowLastTest extends TestCase
         $this->assertSame($this->pmssRunRepoPhpScript('scripts/util/storageBenchmark.php', ['--show-last', '--json', $log]), $moduleOut);
     }
 
+    public function testShowLastCharacterizesFileRowsWithMountDeviceMetadata(): void
+    {
+        $runId = 'fixture-file-device';
+        $runTs = '2025-01-09T09:09:09Z';
+        // file.php persists mount-device metadata; the report currently uses it as a mode discriminator.
+        // Characterize the mismatch before changing that output contract (docs/TODO.md).
+        foreach ([null, '', '0', '/dev/fixture-volume', '/dev/mapper/fixture-volume'] as $device) {
+            $log = $this->pmssWriteStorageBenchmarkLog([
+                $this->pmssStorageBenchmarkFileEntry($runId, $runTs, 'randread-small', [], [
+                    'target_dir' => '/fixture', 'device' => $device, 'filesystem' => 'ext4', 'ok' => true,
+                ]),
+            ]);
+            $expected = "\n== Storage benchmark (last run) ==\nRun ID: {$runId}  Time: {$runTs}\n\n"
+                ."File-backed tests\n"
+                ."test\tread_MB/s\twrite_MB/s\tread_IOPS\twrite_IOPS\tread_p95\twrite_p95\n";
+            if ($device === null || $device === '' || $device === '0') {
+                $expected .= sprintf("%s\t%.2f\t%.2f\t%.1f\t%.1f\t%.2f\t%.2f\n", 'randread-small', 1, 0, 1, 0, 1, 0);
+            }
+            $expected .= "\nPer-device tests\n";
+            if ($device === '/dev/fixture-volume' || $device === '/dev/mapper/fixture-volume') {
+                $expected .= $device."\n";
+            }
+            $this->assertSame($expected, $this->pmssRunStorageBenchmarkShowLast($log));
+        }
+    }
+
     public function testShowLastPrintsPreflightOnlyIfNoTests(): void
     {
         $runTs  = '2025-01-04T03:03:03Z';

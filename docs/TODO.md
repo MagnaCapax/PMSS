@@ -16,6 +16,17 @@ Active work items are tracked in GitHub issues to avoid duplication between this
 
 ## Code Quality Audits
 
+- [ ] Resolve storage-benchmark result classification before unifying live and
+  saved report flows. `storageBenchmarkRunFileTests()` in
+  `scripts/lib/storageBenchmark/file.php` persists the mount device in `device`,
+  but `storageBenchmarkShowLast()` in `storageBenchmark/report.php` excludes
+  every row with a printable nonzero `device` from its file table. Its device
+  table prints only dd, device-ioping and dev-randread tests, so those file
+  metrics disappear there too. Existing file-report fixtures omit the device;
+  `StorageBenchmarkShowLastTest::testShowLastCharacterizesFileRowsWithMountDeviceMetadata()`
+  now locks both shapes, including empty and literal-zero compatibility.
+  Correcting the discriminator changes stdout and requires a separate behavior
+  change under ADRs 0178/0189; this is a prerequisite, not a refactor to conceal.
 - [ ] Establish the compatibility scope of `PmssUserStatsProcessor::spawnWorkers()`
   before removing detached processing. `ResourceStatsProcessor` and
   `TrafficStatsProcessor` select inline processing, while their shared base still
