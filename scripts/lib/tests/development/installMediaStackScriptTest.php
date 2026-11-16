@@ -1411,6 +1411,14 @@ LIGHTTPD;
         $bin = $this->pmssMakeTempDir('pmss-media-stack-uninstall-bin-');
         $this->pmssWriteFiles($home, ['.install-media-stack.log' => "old installer output\n",
             '.media-stack-status.json' => "{\"state\":\"failed\"}\n", '.media-stack-credentials.txt' => "preserve\n"]);
+        $customDir = $home.'/.lighttpd/custom.d';
+        $custom = '$HTTP["url"] =~ "^/custom/" { }'."\n";
+        $this->pmssWriteFiles($customDir, [
+            'media-stack.conf' => '$HTTP["url"] =~ "^/sonarr/" { }'."\n",
+            'custom-migrated.conf' => '$HTTP["url"] =~ "^/radarr/" { }'."\n".$custom,
+            'customer.conf' => '$HTTP["url"] =~ "^/public-fixtur01/jellyfin/" { }'."\n".$custom,
+            'untouched.conf' => $custom,
+        ]);
         $this->pmssWriteExecutableFile($bin.'/tmux', "#!/usr/bin/env bash\nexit 0\n");
         $this->pmssWriteExecutableFile($bin.'/pgrep', "#!/usr/bin/env bash\nexit 1\n");
         $this->pmssWriteExecutableFile($bin.'/ps', "#!/usr/bin/env bash\nexit 1\n");
@@ -1430,6 +1438,10 @@ LIGHTTPD;
         $this->assertFalse(file_exists($home.'/.install-media-stack.log'));
         $this->assertFalse(file_exists($home.'/.media-stack-status.json'));
         $this->assertSame("preserve\n", (string) file_get_contents($home.'/.media-stack-credentials.txt'));
+        $this->assertFalse(file_exists($customDir.'/media-stack.conf'));
+        foreach (['custom-migrated.conf', 'customer.conf', 'untouched.conf'] as $fragment) {
+            $this->assertSame($custom, file_get_contents($customDir.'/'.$fragment));
+        }
     }
 
     public function testJellyfinConfigResetUsesExactPathGuard(): void

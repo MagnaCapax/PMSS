@@ -238,7 +238,15 @@ Run from SSH:
 - `bash install-media-stack.sh --uninstall`
 - Add `--dry-run` to preview the cleanup without removing files.
 
-The uninstall mode stops the media-stack `tmux` sessions, removes only the PMSS-managed app directories under `~/.bin`, removes the matching config directories under `~/.config`, removes `~/.lighttpd/custom.d/media-stack.conf`, clears the installer log and watchdog status snapshot, and backs up `~/.bashrc.custom` before stripping the installer-managed alias/PATH blocks. It does not remove credentials, unrelated files from `~/.bin` or `~/.config`, or user-owned lighttpd custom fragments.
+The uninstall mode stops the media-stack `tmux` sessions, removes only the PMSS-managed app directories under `~/.bin`, removes the matching config directories under `~/.config`, removes `~/.lighttpd/custom.d/media-stack.conf`, clears the installer log and watchdog status snapshot, and backs up `~/.bashrc.custom` before stripping the installer-managed alias/PATH blocks. Credentials and unrelated files under `~/.bin` or `~/.config` remain untouched.
+
+It also strips the uninstalled web apps' URL blocks from regular `custom.d/*.conf`
+fragments, including `custom-migrated.conf`, recognizing the panel's bare, public,
+and user app paths. Fragment files, permissions, and unrelated rules remain;
+symlinks are skipped.
+Ambiguous or unbalanced blocks leave the entire fragment unchanged, report a
+warning, and stop uninstall before it reports completion. Dry runs preview this
+cleanup without rewriting fragments.
 
 ## Troubleshooting
 - Before uninstalling, check `~/.install-media-stack.log` for a full run transcript.

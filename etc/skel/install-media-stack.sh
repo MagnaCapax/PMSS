@@ -989,48 +989,98 @@ lighttpd_custom_has_legacy_media_stack_rules() {
 }
 
 lighttpd_custom_strip_managed_media_stack_routes() {
-	local custom_fragment="$1"
-	local temp_fragment=""
-	[[ -f "$custom_fragment" ]] || return 0
+	local custom_fragment="$1" uninstall_routes="${2:-0}"
+	local temp_fragment="" strip_status=0
+	[[ -f "$custom_fragment" && ! -L "$custom_fragment" ]] || return 0
+	if [[ ${DRY_RUN:-0} -eq 1 ]]; then
+		log_info "[dry-run] would strip media stack routes from $custom_fragment"
+		return 0
+	fi
 
-	temp_fragment="${custom_fragment}.pmss.$$"
+	temp_fragment=$(mktemp "${custom_fragment}.pmss.XXXXXX") || return 1
 
-	if ! awk '
+	# Only uninstall broadens matching to index.php app paths; migration stays narrow.
+	if awk -v uninstall_routes="$uninstall_routes" '
+    BEGIN {
+      quotes = "[\"" sprintf("%c", 39) "]"
+      prefix = "(user-[^\"" sprintf("%c", 39) "/]+/(apps/)?|public-[^\"" sprintf("%c", 39) "/]+/)?"
+      apps = "(sabnzbd|radarr|prowlarr|sonarr|jellyfin|autobrr)"
+      condition = "^[[:space:]]*\\$http\\[[[:space:]]*" quotes "url" quotes "[[:space:]]*\\][[:space:]]*(=~|==)[[:space:]]*" quotes
+    }
     function line_is_managed_route_start(line) {
-      return line ~ /^[[:space:]]*\$HTTP\["url"\] =~ "\^\/(sabnzbd|radarr|prowlarr|sonarr|jellyfin)[(]\\[$][|]\/[)]"/
+      if (!uninstall_routes) {
+        return line ~ /^[[:space:]]*\$HTTP\["url"\] =~ "\^\/(sabnzbd|radarr|prowlarr|sonarr|jellyfin)[(]\\[$][|]\/[)]"/
+      }
+      return tolower(line) ~ condition "(\\^/" prefix apps "([(]|/|[$])|/" prefix apps "(/|" quotes "))"
     }
 
-    function brace_delta(line, open_count, close_count) {
-      open_count = gsub(/\{/, "{", line)
-      close_count = gsub(/\}/, "}", line)
-      return open_count - close_count
+    # Braces inside strings and comments must not end a customer config block.
+    function config_code(line, i, c, code) {
+      for (i = 1; i <= length(line); i++) {
+        c = substr(line, i, 1)
+        if (quoted != "") {
+          if (escaped) escaped = 0
+          else if (c == "\\") escaped = 1
+          else if (c == quoted) quoted = ""
+        } else if (c == "#") break
+        else if (c == "\"" || c == sprintf("%c", 39)) quoted = c
+        else code = code c
+      }
+      return code
     }
 
     {
-      if (skip_block == 1) {
-        block_depth += brace_delta($0)
-        if (block_depth <= 0) {
-          skip_block = 0
-          block_depth = 0
-        }
-        next
+      was_quoted = quoted
+      code = config_code($0)
+      if (just_removed && code ~ /^[[:space:]]*else/) {
+        unsafe = 1
+        exit 1
       }
-
-      if (line_is_managed_route_start($0)) {
+      if (code ~ /[^[:space:]]/) just_removed = 0
+      if (!skip_block && !was_quoted && line_is_managed_route_start($0)) {
+        if (code !~ /\{/) { unsafe = 1; exit 1 }
+        # Other alternatives might expose unrelated paths in the same conditional.
+        route_header = $0
+        gsub(/\(\\?[$][|]\/\)|\(\/[|]\\?[$]\)/, "", route_header)
+        if (route_header ~ /[|]/) { unsafe = 1; exit 1 }
         skip_block = 1
-        block_depth = brace_delta($0)
-        if (block_depth <= 0) {
+        start_depth = depth
+        removed = 1
+      }
+      for (i = 1; i <= length(code); i++) {
+        c = substr(code, i, 1)
+        if (c == "{") depth++
+        if (c == "}") {
+          depth--
+          # Refuse attached else branches or adjacent directives, never erase them.
+          if (depth < 0 || (skip_block && depth == start_depth && substr(code, i + 1) ~ /[^[:space:]]/)) {
+            unsafe = 1
+            exit 1
+          }
+        }
+      }
+      if (skip_block) {
+        if (depth == start_depth) {
           skip_block = 0
-          block_depth = 0
+          just_removed = 1
         }
         next
       }
-
       print
     }
+    END {
+      if (unsafe || skip_block || depth != 0 || quoted != "") exit 1
+      if (!removed) exit 3
+    }
   ' "$custom_fragment" >"$temp_fragment"; then
+		strip_status=0
+	else
+		strip_status=$?
+	fi
+	if [[ $strip_status -ne 0 ]]; then
 		rm -f "$temp_fragment"
-		log_warn "Failed to sanitize overlapping PMSS lighttpd routes in ~/.lighttpd/custom.d/custom-migrated.conf"
+		[[ $strip_status -eq 3 ]] && return 0
+		log_warn "Failed to sanitize overlapping PMSS lighttpd routes in $custom_fragment; original preserved"
 		return 1
 	fi
 
@@ -1039,14 +1089,22 @@ lighttpd_custom_strip_managed_media_stack_routes() {
 		return 0
 	fi
 
+	# Uninstall edits customer fragments, whose existing permissions must survive.
+	if [[ $uninstall_routes -eq 1 ]] && ! chmod --reference="$custom_fragment" "$temp_fragment"; then
+		rm -f "$temp_fragment"
+		log_warn "Failed to preserve lighttpd fragment permissions in $custom_fragment; original preserved"
+		return 1
+	fi
 	if mv "$temp_fragment" "$custom_fragment"; then
-		chmod 640 "$custom_fragment" 2>/dev/null || true
-		log_info "Removed PMSS-managed media stack proxy routes from ~/.lighttpd/custom.d/custom-migrated.conf"
+		if [[ $uninstall_routes -eq 0 ]]; then
+			chmod 640 "$custom_fragment" 2>/dev/null || true
+		fi
+		log_info "Removed PMSS-managed media stack proxy routes from $custom_fragment"
 		return 0
 	fi
 
 	rm -f "$temp_fragment"
-	log_warn "Failed to update sanitized PMSS lighttpd routes in ~/.lighttpd/custom.d/custom-migrated.conf"
+	log_warn "Failed to update sanitized PMSS lighttpd routes in $custom_fragment"
 	return 1
 }
 
@@ -1425,7 +1483,7 @@ media_stack_app_processes_kill() {
 }
 
 media_stack_uninstall() {
-	local app username managed_path
+	local app username managed_path custom_fragment
 
 	username=$(whoami)
 	log_step "Uninstalling PMSS media stack"
@@ -1447,6 +1505,10 @@ media_stack_uninstall() {
 	while IFS= read -r managed_path; do
 		media_stack_managed_path_remove "$managed_path"
 	done < <(media_stack_managed_paths)
+	# Migration and customer fragments can retain routes after media-stack.conf is gone.
+	for custom_fragment in "$HOME/.lighttpd/custom.d/"*.conf; do
+		lighttpd_custom_strip_managed_media_stack_routes "$custom_fragment" 1 || return 1
+	done
 	bashrc_custom_media_stack_blocks_strip
 	log_ok "PMSS media stack uninstall complete."
 }

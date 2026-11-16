@@ -56,6 +56,9 @@ class MediaStackLighttpdMigrationTest extends TestCase
             '$HTTP["url"] =~ "^/custom(\$|/)" {',
             '  setenv.add-response-header = ( "X-Test" => "yes" )',
             '}',
+            '$HTTP["url"] =~ "^/public-fixtur01/sonarr/" {',
+            '  setenv.add-response-header = ( "X-Customer" => "preserved" )',
+            '}',
             '',
         ]);
 
@@ -63,6 +66,7 @@ class MediaStackLighttpdMigrationTest extends TestCase
         $migrated = (string) file_get_contents($home.'/.lighttpd/custom.d/custom-migrated.conf');
 
         $this->assertStringContainsAllStrings(['# user-owned rules stay intact', '^/custom(\$|/)'], $migrated);
+        $this->assertSame($custom, $migrated);
     }
 
     public function testPrepareLighttpdBlanksLegacyManagedFileInsteadOfMigrating(): void
@@ -99,6 +103,109 @@ class MediaStackLighttpdMigrationTest extends TestCase
 
         $this->assertTrue(is_file($home.'/.lighttpd/custom'));
         $this->assertSame('', (string) file_get_contents($home.'/.lighttpd/custom'));
+    }
+
+    public function testStripRecognizesPanelAppPathsAndIsIdempotent(): void
+    {
+        $fragment = $this->pmssMakeTempDir('pmss-media-routes-').'/routes.conf';
+        $unrelated = "# preserved\n".'$HTTP["url"] =~ "^/sonarrival/" { }'."\n";
+        $contents = $unrelated;
+        foreach (['sabnzbd', 'radarr', 'prowlarr', 'sonarr', 'jellyfin', 'autobrr'] as $app) {
+            foreach (['^/'.$app.'(\$|/)', '^/public-fixtur01/'.$app.'($|/)',
+                '^/user-fixtur01/'.$app.'(/|$)', '/user-fixtur01/apps/'.$app.'/', '/'.$app] as $path) {
+                $contents .= '$HTTP["url"] =~ "'.$path.'" { proxy.server = () }'."\n";
+            }
+        }
+        $contents .= '$HTTP ["url"] == "/sonarr/" { }'."\n"; // Unrecognized syntax stays intact.
+        $unrelated .= '$HTTP ["url"] == "/sonarr/" { }'."\n";
+        $contents .= '$HTTP[ "url" ] == "/JELLYFIN/" { }'."\n";
+        $this->pmssWriteFile($fragment, $contents);
+        chmod($fragment, 0600);
+
+        $this->pmssRunRouteStrip($fragment);
+        $this->assertSame($unrelated, file_get_contents($fragment));
+        clearstatcache(true, $fragment);
+        $this->assertSame(0600, fileperms($fragment) & 0777);
+        $this->pmssRunRouteStrip($fragment);
+        $this->assertSame($unrelated, file_get_contents($fragment));
+    }
+
+    public function testStripPreservesNestedUnrelatedRulesAndIgnoresQuotedBraces(): void
+    {
+        $fragment = $this->pmssMakeTempDir('pmss-media-routes-').'/routes.conf';
+        $before = '$HTTP["host"] == "fixture.invalid" {'."\n";
+        $after = '  $HTTP["url"] =~ "^/custom/" { }'."\n}\n";
+        $route = <<<'LIGHTTPD'
+  $HTTP["url"] =~ "^/sonarr/" { # } does not close the route
+    setenv.add-response-header = ( "X-Fixture" => "escaped \" } { #" )
+    $HTTP["request-method"] == "GET" {
+      proxy.server = ( "" => (( "host" => "127.0.0.1", "port" => 12345 )) )
+    }
+  }
+LIGHTTPD;
+        $this->pmssWriteFile($fragment, $before.$route."\n".$after);
+
+        $this->pmssRunRouteStrip($fragment);
+        $this->assertSame($before.$after, file_get_contents($fragment));
+    }
+
+    public function testStripRefusesIncompleteBlocksAndAmbiguousElseBranches(): void
+    {
+        $fragment = $this->pmssMakeTempDir('pmss-media-routes-').'/routes.conf';
+        foreach ([
+            '$HTTP["url"] =~ "^/sonarr/" {',
+            '$HTTP["url"] =~ "^/sonarr/" { } else { }',
+            '$HTTP["url"] =~ "^/sonarr/" { }'."\n# comment\nelse { }\n",
+            '$HTTP["url"] =~ "^/sonarr/" { } $HTTP["url"] =~ "^/custom/" { }',
+            '$HTTP["url"] =~ "^/sonarr/"'."\n{ }\n",
+            '$HTTP["url"] =~ "^/sonarr/|^/custom/" { }',
+        ] as $contents) {
+            $this->pmssWriteFile($fragment, $contents);
+            $output = $this->pmssRunRouteStrip($fragment, 0, true);
+            $this->assertStringContainsString('original preserved', $output);
+            $this->assertSame($contents, file_get_contents($fragment));
+            $this->assertSame([], glob($fragment.'.pmss.*'));
+        }
+    }
+
+    public function testStripDryRunPreservesFragmentWithoutStagingFiles(): void
+    {
+        $fragment = $this->pmssMakeTempDir('pmss-media-routes-').'/routes.conf';
+        $contents = '$HTTP["url"] =~ "^/radarr/" { }'."\n";
+        $this->pmssWriteFile($fragment, $contents);
+
+        $this->assertStringContainsString('[dry-run]', $this->pmssRunRouteStrip($fragment, 1));
+        $this->assertSame($contents, file_get_contents($fragment));
+        $this->assertSame([], glob($fragment.'.pmss.*'));
+    }
+
+    public function testStripSkipsSymlinksMissingFilesAndNonMatchingContent(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-media-routes-');
+        $contents = '$HTTP["url"] =~ "^/sonarr/" { }';
+        $this->pmssWriteFile($dir.'/target', $contents);
+        symlink($dir.'/target', $dir.'/linked.conf');
+        $this->pmssWriteFile($dir.'/custom.conf', '# no final newline');
+        chmod($dir.'/custom.conf', 0600);
+        foreach (['linked.conf', 'missing.conf', 'custom.conf'] as $name) {
+            $this->pmssRunRouteStrip($dir.'/'.$name);
+        }
+        $this->assertTrue(is_link($dir.'/linked.conf'));
+        $this->assertSame($contents, file_get_contents($dir.'/target'));
+        $this->assertFalse(file_exists($dir.'/missing.conf'));
+        $this->assertSame('# no final newline', file_get_contents($dir.'/custom.conf'));
+        $this->assertSame(0600, fileperms($dir.'/custom.conf') & 0777);
+    }
+
+    private function pmssRunRouteStrip(string $fragment, int $dryRun = 0, bool $expectFailure = false): string
+    {
+        $call = 'lighttpd_custom_strip_managed_media_stack_routes '.escapeshellarg($fragment).' 1';
+        return $this->pmssRunShellHarness(implode("\n", [
+            '#!/usr/bin/env bash', 'set -euo pipefail', 'DRY_RUN='.$dryRun,
+            'log_info() { echo "INFO:$*"; }', 'log_warn() { echo "WARN:$*"; }',
+            $this->pmssExtractShellFunctions($this->script, ['lighttpd_custom_strip_managed_media_stack_routes']),
+            $expectFailure ? 'if '.$call.'; then exit 1; fi' : $call, '',
+        ]));
     }
 
     private function pmssRunPrepareLighttpd(?string $customContents, ?string $migratedContents = null): string
