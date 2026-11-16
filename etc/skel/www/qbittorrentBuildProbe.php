@@ -9,11 +9,12 @@ function pmssQbittorrentFrontendBuildProbe(string $binary, array $ops = []): ?st
     // --version still loads and saves the profile's qBittorrent.conf, so the probe gets an empty private profile.
     $profile = rtrim(sys_get_temp_dir(), '/').'/pmss-qbt-probe-'.bin2hex(random_bytes(8));
     if (!@mkdir($profile, 0700)) return null;
-    $env = ['PATH' => getenv('PATH') ?: '/usr/bin:/bin', 'HOME' => $profile, 'XDG_CONFIG_HOME' => $profile.'/.config',
-        'XDG_DATA_HOME' => $profile.'/.local/share', 'XDG_CACHE_HOME' => $profile.'/.cache'];
     $process = null; $pipes = []; $pid = null;
     $complete = false;
     try {
+        // Environment setup already owns the profile, even before a child is launched.
+        $env = ['PATH' => getenv('PATH') ?: '/usr/bin:/bin', 'HOME' => $profile, 'XDG_CONFIG_HOME' => $profile.'/.config',
+            'XDG_DATA_HOME' => $profile.'/.local/share', 'XDG_CACHE_HOME' => $profile.'/.cache'];
         $process = @proc_open('exec setsid '.escapeshellarg($binary).' --version',
             [0 => ['file', '/dev/null', 'r'], 1 => ['pipe', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes, $profile, $env);
         if (!is_resource($process)) return null;

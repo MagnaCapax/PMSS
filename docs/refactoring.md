@@ -1,5 +1,15 @@
 # Refactoring Guidelines
 
+Operator and customer qBittorrent version probes protect environment setup with
+the existing profile cleanup lifetime immediately after directory creation.
+Environment setup exceptions and errors attempt profile removal before propagating;
+failed directory creation authorizes no cleanup. PATH fallback, launch arguments,
+profile locations and normal results remain unchanged. Combined setup/cleanup
+faults retain PHP's `finally` precedence.
+`QbittorrentBuildEnvironmentCleanupSafetyTest` intercepts profile and process I/O
+for both copies; execution stays on testing machines, with changed-file PHP
+syntax checks on the devbox.
+
 Customer backup creation and pre-restore snapshots attempt unpublished `.part`
 removal after output closure and pipe reaping, even when those operations or
 publication throw (ADR 0200). Successful rename ends part-file ownership;
