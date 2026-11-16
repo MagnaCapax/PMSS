@@ -288,6 +288,13 @@ artifact and its reason, after the ordinary step summary. This covers binary,
 Debian-package and source-archive callers even when an installer returns early
 (Refs #988). Successful downloads and normal dry runs add no failure summary.
 
+`UpdateAppInstallerContractsTest` keeps a central expected version/archive-to-SHA256
+map for every app entrypoint using `pmssRunPinnedRemoteArchiveStep()`. Its hermetic
+source checks reject missing installer coverage, changed versions and changed or
+additional literal hashes. Update the map with reviewed installer pin changes.
+This detects repository pin mismatches; silent upstream changes to an unchanged
+release require a separate network probe and are outside this suite (Refs #867).
+
 `pmssRefreshRepositories()` ensures external repo prerequisites (currently the
 Docker deb822+keyring and Sonarr scoped keyring) exist before it runs `apt update`.
 ProFTPD remains a notorious dpkg failure mode when hostnames or TLS assets are

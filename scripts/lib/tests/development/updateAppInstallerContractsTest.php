@@ -5,6 +5,28 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class UpdateAppInstallerContractsTest extends TestCase
 {
+    // Reviewed repository pins, not a live upstream manifest. Keep version/hash bumps together.
+    private const EXPECTED_ARCHIVE_PINS = [
+        'syncthing.php' => [
+            'v2.0.13' => '55ffe8a5deefc373c95a760ab71c3cbe77da493bb9bf426525d33c2fe22ead88',
+        ],
+        'iprange.php' => [
+            '1.0.4' => 'e138d18974fb65674e5ea53da1ffbdde19704208e5114cc6b32d01db3ce1d567',
+        ],
+        'firehol.php' => [
+            '3.1.8' => 'b882e999003dae86a447965986025a5af38ead250263c9232d02d06be07e0812',
+        ],
+        'deluge.php' => [
+            'deluge-2.0.5.tar.xz' => 'c4bd04abfd211b65218be03f3c46d26f44024884de10e01859fb856fdd6f25d8',
+        ],
+        'rtorrent.php' => [
+            'rtorrent-0.9.8-udns.tar.gz' => '58a5d96c97c858736cf6dab2eec606c080bd23c0ab22864aecaac6d59233eefb',
+            'libtorrent-0.13.8-udns.tar.gz' => 'eac93f60a9dd5cd0b010b3f4c6f3b08878c050feb4d57fb847c584c94cea4708',
+            'rtorrent-0.9.6.tar.gz' => '1e69c24f1f26f8f07d58d673480dc392bfc4317818c1115265b08a7813ff5b0e',
+            'libtorrent-0.13.6.tar.gz' => '2838a08c96edfd936aff8fbf99ecbb930c2bfca3337dd1482eb5fccdb80d5a04',
+        ],
+    ];
+
     public function testInstallersKeepSourceContracts(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/apps/aiToolsInstall.php', [
@@ -264,12 +286,38 @@ class UpdateAppInstallerContractsTest extends TestCase
         $this->assertSame(1, preg_match('/\$syncthingVersion\s*=\s*\'([^\']+)\';/', $source, $versionMatch), 'Unable to read Syncthing version pin');
         $this->assertSame(1, preg_match('/\$syncthingSha256\s*=\s*\'([a-f0-9]{64})\';/', $source, $shaMatch), 'Unable to read Syncthing SHA256 pin');
 
-        $manifestPins = [
-            'v2.0.13' => '55ffe8a5deefc373c95a760ab71c3cbe77da493bb9bf426525d33c2fe22ead88',
-        ];
+        $manifestPins = self::EXPECTED_ARCHIVE_PINS['syncthing.php'];
 
         $this->assertTrue(isset($manifestPins[$versionMatch[1]]), 'Update the Syncthing release manifest pin map when bumping Syncthing');
         $this->assertSame($manifestPins[$versionMatch[1]], $shaMatch[1], 'Syncthing SHA256 pin does not match the checked release manifest');
+    }
+
+    public function testPinnedArchiveInstallersMatchExpectedPins(): void
+    {
+        $installers = [];
+        // Discover entrypoints without loading them: installer includes can mutate the host.
+        foreach (glob($this->pmssRepoPath('scripts/lib/update/apps/*.php')) as $path) {
+            $installer = basename($path);
+            $source = $this->pmssReadRepoExecutableSource('scripts/lib/update/apps/'.$installer);
+            if (!preg_match('/\bpmssRunPinnedRemoteArchiveStep\s*\(/', $source)) continue;
+            $installers[] = $installer;
+            $this->assertTrue(isset(self::EXPECTED_ARCHIVE_PINS[$installer]),
+                $installer.' needs an expected archive pin map');
+            $pins = self::EXPECTED_ARCHIVE_PINS[$installer];
+            foreach (array_keys($pins) as $version) {
+                $this->assertStringContainsString("'".$version."'", $source,
+                    $installer.' version/archive changed; update the expected pin map');
+            }
+            // Compare every literal hash, including additional archives in an existing installer.
+            $this->assertSame(count($pins), preg_match_all('/\x27([a-f0-9]{64})\x27/', $source, $hashes),
+                $installer.' archive pin count changed; update the expected pin map');
+            $this->assertSame(array_values($pins), $hashes[1], $installer.' SHA256 pins differ from expected pins');
+        }
+        // A retired installer must also leave the map, so stale entries cannot mask lost discovery.
+        $expected = array_keys(self::EXPECTED_ARCHIVE_PINS);
+        sort($expected);
+        sort($installers);
+        $this->assertSame($expected, $installers, 'Archive installer coverage differs from the expected pin map');
     }
 
 }
