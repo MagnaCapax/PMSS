@@ -16,8 +16,7 @@ class LighttpdConfigRefreshResultTest extends TestCase
                 $this->assertStringContainsAllStrings(['Password protected area (fixtur01)', '/user-fixtur01/'], $result['config']);
                 $this->assertSame([['root', 0644]], $result['writes']);
                 $this->assertSame([], $result['auxiliary'], 'no runtime writes after refused preparation');
-                $this->assertFalse($result['linkChanged']);
-                $this->assertSame(['.', '..'], $result['elsewhere']);
+                $this->pmssAssertArraySubsetSame(['linkChanged' => false, 'elsewhere' => ['.', '..']], $result);
                 $this->pmssAssertStringNotContainsString('lighttpd configured', $result['output']);
             }
         }

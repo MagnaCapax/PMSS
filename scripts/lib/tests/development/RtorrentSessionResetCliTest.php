@@ -56,8 +56,7 @@ PHP;
         foreach ([[], ['script'], ['script', '../root'], ['script', 'FIXTUR01'],
             ['script', "fixtur01\n"], ['script', null], ['script', 'fixtur01', 'extra']] as $argv) {
             $result = $this->observe(['argv' => $argv]);
-            $this->assertSame(1, $result[0]);
-            $this->assertSame([], $result[1]);
+            $this->pmssAssertArraySubsetSame([0 => 1, 1 => []], $result);
         }
     }
 
@@ -65,8 +64,7 @@ PHP;
     {
         foreach ([['uid' => 1234], ['missingFunction' => 'posix_setuid']] as $case) {
             $result = $this->observe($case);
-            $this->assertSame(1, $result[0]);
-            $this->assertSame([], $result[1]);
+            $this->pmssAssertArraySubsetSame([0 => 1, 1 => []], $result);
         }
     }
 
@@ -76,8 +74,7 @@ PHP;
             ['uid' => 1234, 'dir' => '/home/fixtur01'],
             ['uid' => 1234, 'gid' => 1234, 'dir' => '/elsewhere']] as $account) {
             $result = $this->observe(['account' => $account]);
-            $this->assertSame(1, $result[0]);
-            $this->assertSame(['lookup'], $result[1]);
+            $this->pmssAssertArraySubsetSame([0 => 1, 1 => ['lookup']], $result);
         }
     }
 
@@ -94,11 +91,11 @@ PHP;
     {
         foreach ([true, false] as $success) {
             $result = $this->observe(['resetSuccess' => $success]);
-            $this->assertSame($success ? 0 : 1, $result[0]);
-            $this->assertSame(['lookup', ['groups', 'fixtur01', 1234], ['gid', 1234], ['uid', 1234],
-                ['reset', '/home/fixtur01', 'fixtur01', 1234]], $result[1]);
-            $this->assertSame("session.broken-fixture\n", $result[2][0]);
-            $this->assertSame($success ? "Session reset complete\n" : "Session reset failed\n", $result[2][1]);
+            $this->pmssAssertArraySubsetSame([0 => $success ? 0 : 1,
+                1 => ['lookup', ['groups', 'fixtur01', 1234], ['gid', 1234], ['uid', 1234],
+                    ['reset', '/home/fixtur01', 'fixtur01', 1234]]], $result);
+            $this->pmssAssertArraySubsetSame([0 => "session.broken-fixture\n",
+                1 => $success ? "Session reset complete\n" : "Session reset failed\n"], $result[2]);
         }
     }
 }

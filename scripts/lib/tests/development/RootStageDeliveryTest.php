@@ -36,11 +36,9 @@ foreach ($cases as [$user, $bytes, $free, $rootFree]) {
 echo json_encode([$reasons, $quotaCalls, $paths]);
 PHP
         );
-        $this->assertSame([null, 'over quota', 'over quota', null, 'over quota', null, null,
+        $this->pmssAssertArraySubsetSame([0 => [null, 'over quota', 'over quota', null, 'over quota', null, null,
             'home full', null, 'root reserve low', 'home full', 'root reserve low', null,
-            'root reserve low', 'root reserve low'], $result[0]);
-        $this->assertSame(1, $result[1]);
-        $this->assertSame(['/fixture', '/quota mount'], $result[2]);
+            'root reserve low', 'root reserve low'], 1 => 1, 2 => ['/fixture', '/quota mount']], $result);
     }
 
     public function testFailedQuotaObservationIsCachedAndOnlySpaceApplies(): void
@@ -74,9 +72,9 @@ foreach (['1001', 'missing', 'badgroup', '1001'] as $index => $user) {
 echo json_encode([$results, $GLOBALS['stageCalls']]);
 PHP
         );
-        $this->assertSame([[true, ''], [false, 'account primary group unavailable'],
-            [false, 'account primary group unavailable'], [false, 'stage=publish rc=23']], $result[0]);
-        $this->assertSame(array_fill(0, 2, ['/fixture/1001/file', 'panel', 'account-primary', 0755, false]), $result[1]);
+        $this->pmssAssertArraySubsetSame([0 => [[true, ''], [false, 'account primary group unavailable'],
+            [false, 'account primary group unavailable'], [false, 'stage=publish rc=23']],
+            1 => array_fill(0, 2, ['/fixture/1001/file', 'panel', 'account-primary', 0755, false])], $result);
     }
 
     public function testCountsAccumulatePerUserAndDrainAfterReporting(): void

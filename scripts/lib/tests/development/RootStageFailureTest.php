@@ -15,11 +15,10 @@ class RootStageFailureTest extends TestCase
             'unlink', 'publish-launch'] as $fault) {
             $result = $this->runWriter($fault);
             $stage = ['flush' => 'write', 'close' => 'write', 'unlink' => 'publish-stderr'][$fault] ?? $fault;
-            $this->assertFalse($result['ok'], $fault);
-            $this->assertSame('stage='.$stage.' rc=not-started', $result['failure'], $fault);
-            $this->assertSame('old', $result['content'], $fault);
-            $this->assertSame([], $result['stages'], $fault);
-            $this->assertFalse($result['captureOpen'], $fault);
+            $this->pmssAssertArraySubsetSame([
+                'ok' => false, 'failure' => 'stage='.$stage.' rc=not-started', 'content' => 'old',
+                'stages' => [], 'captureOpen' => false,
+            ], $result, $fault.':');
             // A failed close must precede immutable clearing as well as publication.
             if ($fault === 'close') $this->assertSame([], $result['immutable']);
         }
@@ -28,9 +27,8 @@ class RootStageFailureTest extends TestCase
     public function testPublishRefusalNamesPinnedParentAndPreservesBothDirectories(): void
     {
         $result = $this->runWriter('parent-swap');
-        $this->assertFalse($result['ok']);
         $this->pmssAssertArraySubsetSame([
-            'failure' => 'stage=publish rc=1 stderr=publish parent changed', 'movedContent' => 'old',
+            'ok' => false, 'failure' => 'stage=publish rc=1 stderr=publish parent changed', 'movedContent' => 'old',
             'content' => 'replacement-parent', 'stages' => [],
         ], $result);
     }
@@ -38,33 +36,29 @@ class RootStageFailureTest extends TestCase
     public function testPublishCapturesBoundedSanitizedStderrAndRestoresImmutableState(): void
     {
         $result = $this->runWriter('publish');
-        $this->assertFalse($result['ok']);
         $this->pmssAssertArraySubsetSame([
+            'ok' => false,
             'failure' => 'stage=publish rc=23 stderr=quota full [31m '.str_repeat('E', 283), 'content' => 'old',
-            'immutable' => ['clear', 'set'], 'descriptor' => [0, 0600],
+            'immutable' => ['clear', 'set'], 'descriptor' => [0, 0600], 'captureOpen' => false, 'stages' => [],
         ], $result);
-        $this->assertFalse($result['captureOpen']);
-        $this->assertSame([], $result['stages']);
     }
 
     public function testSuccessClearsStaleFailureAndRetainsLegacyInvocation(): void
     {
         foreach (['success', 'legacy', 'immutable-success'] as $scenario) {
             $result = $this->runWriter($scenario);
-            $this->assertTrue($result['ok']);
             $this->pmssAssertArraySubsetSame([
-                'failure' => $scenario === 'legacy' ? 'stale' : '', 'content' => 'private-payload', 'stages' => [],
+                'ok' => true, 'failure' => $scenario === 'legacy' ? 'stale' : '',
+                'content' => 'private-payload', 'stages' => [], 'captureOpen' => false,
             ], $result);
-            $this->assertFalse($result['captureOpen']);
         }
     }
 
     public function testImmutableSetFailureIsReportedAfterPublication(): void
     {
         $result = $this->runWriter('immutable-set');
-        $this->assertFalse($result['ok']);
         $this->pmssAssertArraySubsetSame([
-            'failure' => 'stage=immutable-set rc=not-started', 'content' => 'private-payload',
+            'ok' => false, 'failure' => 'stage=immutable-set rc=not-started', 'content' => 'private-payload',
             'immutable' => ['clear', 'set'], 'stages' => [],
         ], $result);
     }
@@ -75,9 +69,8 @@ class RootStageFailureTest extends TestCase
         $this->assertStringContainsString('(stage=group rc=not-started)', $metadata['log']);
         $this->assertFalse(strpos($metadata['log'], 'private-payload') !== false);
         $serialized = $this->runWriter('serialized');
-        $this->assertFalse($serialized['ok']);
-        $this->assertSame([[$serialized['path'], 'stage=group rc=not-started']], $serialized['callbacks']);
-        $this->assertSame('old', $serialized['content']);
+        $this->pmssAssertArraySubsetSame(['ok' => false,
+            'callbacks' => [[$serialized['path'], 'stage=group rc=not-started']], 'content' => 'old'], $serialized);
     }
 
     /** Run real staging and shell publication only inside a disposable fixture tree. */

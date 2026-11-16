@@ -141,10 +141,8 @@ PHP;
         foreach (['missing-valid', 'missing-timeout', 'missing-running', 'missing-backoff',
             'missing-repair-failure', 'missing-repair-timeout', 'missing-repair-noop', 'missing-link'] as $scenario) {
             $result = $this->scenario($scenario);
-            $this->assertSame([false, false, false], $result['results'], $scenario);
-            $this->assertSame([], $result['moveCommands'], $scenario);
-            $this->assertSame('untouched', $result['outside'], $scenario);
-            $this->assertSame('managed config', $result['config'], $scenario);
+            $this->pmssAssertArraySubsetSame(['results' => [false, false, false], 'moveCommands' => [],
+                'outside' => 'untouched', 'config' => 'managed config'], $result, $scenario.':');
             if (in_array($scenario, ['missing-valid', 'missing-timeout', 'missing-running', 'missing-backoff'], true)) {
                 $this->assertSame([], $result['repairCommands'], $scenario);
             } else {
