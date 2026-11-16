@@ -262,10 +262,10 @@ PHP;
             .'$GLOBALS["failure"] = new $failureClass("application fault"); $sameFailure = null; $ok = null; try {';
         if (($options['entry'] ?? '') === 'step2') {
             // Execute the actual orchestrator recovery block without running step2's system setup.
-            $source = $this->pmssReadRepoFile('scripts/util/update-step2.php');
+            $source = $this->pmssReadRepoFile('scripts/lib/update/packagePhase.php');
             $start = strpos($source, 'if (!$dpkgBaselineOk) {');
             $end = strpos($source, '// Re-apply libssl3', $start);
-            $script .= '$dpkgBaselineOk = false; $effectiveRepoVersion = 12;';
+            $script .= '$dpkgBaselineOk = false; $distribution = ["baselineVersion" => 12];';
             $script .= 'eval('.var_export('namespace DpkgRecoveryFixture;'.substr($source, $start, $end - $start), true).'); $ok = $dpkgBaselineOk;';
         } else {
             $script .= '$ok = $GLOBALS["options"]["entry"] === "wait" ? pmssWaitForDpkgLocks($GLOBALS["options"]["budget"], 5) : pmssApplyDpkgSelections(12, true);';

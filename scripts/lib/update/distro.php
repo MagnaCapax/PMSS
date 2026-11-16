@@ -56,3 +56,22 @@ function pmssVersionFromCodename(string $codename): int
     $major = array_search(strtolower($codename), array_map(static function (array $spec): string { return $spec['repo']; }, pmssDebianReleaseSpecs()), true);
     return $major === false ? 0 : (int) $major;
 }
+
+/** Keep phase-2 repository selection and its deferred diagnostic in the distro record. */
+function pmssUpdateStep2DistroContextBuild(array $distribution): array
+{
+    $reported = (int) $distribution['version'];
+    $mapped = pmssVersionFromCodename($distribution['codename']);
+    $codename = $distribution['codename'] !== '' ? $distribution['codename'] : 'unknown';
+    $distribution['repoMessage'] = '';
+    if ($mapped === 0 && $reported >= 0) {
+        $distribution['repoMessage'] = $reported > 0
+            ? sprintf('Repository codename %s unresolved; falling back to VERSION_ID %d', $codename, $reported)
+            : sprintf('Repository detection failed for distro=%s codename=%s; skipping repository updates', $distribution['name'], $codename);
+    } elseif ($mapped !== 0 && $reported !== 0 && $mapped !== $reported) {
+        $distribution['repoMessage'] = sprintf('Repository version mapped via codename %s -> %d (reported=%s)', $codename, $mapped, $distribution['version']);
+    }
+    $distribution['repoVersion'] = $mapped > 0 ? $mapped : $reported;
+    $distribution['baselineVersion'] = $distribution['repoVersion'] > 0 ? $distribution['repoVersion'] : null;
+    return $distribution;
+}

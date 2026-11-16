@@ -8,7 +8,7 @@ class UpdateStep2ProfilingCoverageTest extends TestCase
     /** Lock the externally visible phase order while orchestration stays table-driven. */
     public function testUpdateStep2ProfiledPhaseOrderSnapshot(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/util/update-step2.php');
+        $source = $this->phaseSource();
         preg_match_all("/^\\s+\\['([^']+)', '(pmss[^']+)'(?:,|\\])/m", $source, $matches, PREG_SET_ORDER);
         $steps = [];
         foreach ($matches as $match) {
@@ -25,8 +25,7 @@ class UpdateStep2ProfilingCoverageTest extends TestCase
         $source = $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/update-step2.php', [
             'Preparing noninteractive apt defaults',
             "foreach (array('DEBIAN_FRONTEND=noninteractive', 'APT_LISTCHANGES_FRONTEND=none', 'UCF_FORCE_CONFOLD=1', 'UCF_FORCE_CONFNEW=0', 'UCF_FORCE_CONFDEF=1', 'NEEDRESTART_MODE=a') as \$envDefault) { putenv(\$envDefault); }",
-            'Refreshing package repositories',
-            'Applying distro dpkg baseline selections',
+            'pmssUpdateStep2PackagePhase($distribution, $pmssDockerPackageVersionsBefore);',
             'pmssRunProfiledCallableBatch([',
             'Configuring web stack',
             'Updating all user environments',
@@ -35,6 +34,7 @@ class UpdateStep2ProfilingCoverageTest extends TestCase
             '#TODO profiling (GH #120)' => 'Profiling TODO marker should be removed once coverage is wired',
             'function pmssUpdateStep2Run'.'ClassifiedCallable(' => 'Classified callable handling should be folded into pmssRunProfiledCallable',
         ]);
+        $source = $this->phaseSource();
         $this->assertOrderedStrings([
             "runStep('Refreshing root cron configuration'",
             "pmssRunProfiledCallable('Refreshing MOTD'",
@@ -47,5 +47,13 @@ class UpdateStep2ProfilingCoverageTest extends TestCase
             "\$dpkgBaselineOk = pmssRunProfiledCallable('Applying distro dpkg baseline selections'",
             "putenv('PMSS_PACKAGE_PHASE=complete')",
         ], $source, 'Missing package phase step: ', 'Package phase order changed at: ');
+    }
+
+    /** Expand the single package-phase call where it executes, preserving the original snapshot. */
+    private function phaseSource(): string
+    {
+        return str_replace('pmssUpdateStep2PackagePhase($distribution, $pmssDockerPackageVersionsBefore);',
+            $this->pmssReadRepoFile('scripts/lib/update/packagePhase.php'),
+            $this->pmssReadRepoFile('scripts/util/update-step2.php'));
     }
 }

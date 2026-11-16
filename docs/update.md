@@ -208,6 +208,14 @@ is skipped rather than assuming `/tmp` is unmounted.
 
 ### Package Phase Ordering
 
+Phase 2 keeps repository selection and its deferred diagnostic in the distro
+record built by `pmssUpdateStep2DistroContextBuild()`. After the existing
+MediaArea prelude, `scripts/lib/update/packagePhase.php` owns package convergence
+through the completion signal, including baseline recovery, service policy,
+compatibility holds and Docker version comparison (ADR 0292). Status and version
+queries share one read-only dpkg field-query implementation in `packageState.php`.
+The entrypoint retains early recovery, shutdown guards and subsequent phases.
+
 Package recovery and package installation are hard invariants: after lock
 acquisition and fatal preflight checks, update-step2 must repair interrupted
 dpkg configuration before any warning-only probes or other orchestrator steps

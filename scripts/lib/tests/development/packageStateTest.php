@@ -59,7 +59,10 @@ class PackageStateTest extends TestCase
     {
         $this->pmssAssertRepoFileContainsOrderedStrings('scripts/util/update-step2.php', [
             '$pmssDockerPackageVersionsBefore = pmssDockerPackageVersions();',
-            '$pmssDockerPackageVersionsAfter = pmssDockerPackageVersions();',
+            'pmssUpdateStep2PackagePhase($distribution, $pmssDockerPackageVersionsBefore);',
+        ], 'Missing Docker package change signal step: ', 'Docker package signal order changed at: ');
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/lib/update/packagePhase.php', [
+            "'before' => \$dockerVersionsBefore, 'after' => pmssDockerPackageVersions()",
             'pmssDockerPackageVersionsChanged(',
             'PMSS_DOCKER_PACKAGES_CHANGED=',
         ], 'Missing Docker package change signal step: ', 'Docker package signal order changed at: ');
@@ -73,11 +76,13 @@ class PackageStateTest extends TestCase
 
     public function testUpdateStep2DoesNotCarryPackageQueueSkipPath(): void
     {
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/update-step2.php',
-            ['dpkg selections are the authoritative source of package'], [
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/packagePhase.php', 'dpkg selections are the authoritative source of package');
+        foreach (['scripts/util/update-step2.php', 'scripts/lib/update/packagePhase.php'] as $path) {
+            $this->pmssAssertRepoFileContainsAndOmitsStrings($path, [], [
                 "'packages.php'",
                 'PMSS_PACKAGE_INSTALL'.'_WARNINGS',
                 'PMSS_PACKAGE_INSTALL'.'_ERRORS',
             ]);
+        }
     }
 }

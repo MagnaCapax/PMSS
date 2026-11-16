@@ -41,7 +41,7 @@ require_once __DIR__.'/../lib/user/watchdog.php';
 pmssRequireRelativeFiles(__DIR__.'/../lib', [
     'update/runtime/profile.php', 'update/runtime/commands.php', 'update/runtime/stepPolicy.php',
     'update/runtime/processes.php', 'update/environment.php', 'update/filesystem.php',
-    'update/opensslSsh2Compat.php', 'update/distro.php', 'update/kernelHardening.php',
+    'update/opensslSsh2Compat.php', 'update/packagePhase.php', 'update/distro.php', 'update/kernelHardening.php',
     'update/arrRootExecutionBlock.php', 'update/repositories.php', 'update/storageBenchmark.php',
     'update/systemPrep.php', 'update/services/systemd.php', 'update/services/logging.php',
     'update/services/logrotate.php', 'update/services/mountHardening.php', 'update/userMaintenance.php',
@@ -225,34 +225,17 @@ register_shutdown_function(function () use (&$pmssRootCronRestored): void {
 // Safe before the package phase; avoids "Cannot fork" cascades inside user-0.slice.
 runStep('Ensuring root user slice TasksMax is unlimited (preflight)', "systemctl set-property --runtime 'user-0.slice' MemoryHigh=infinity MemoryMax=infinity TasksMax=infinity");
 
-$distribution  = pmssRunProfiledCallable('Detecting distribution metadata', 'pmssDetectDistro');
-$distroName    = $distribution['name'];
-$distroVersion = $distribution['version'];
-$lsbCodename   = $distribution['codename'];
-$reportedVersion = (int) $distroVersion;
-$repoVersion     = pmssVersionFromCodename($lsbCodename);
-$repoLogMessage  = '';
-if ($repoVersion === 0 && $reportedVersion > 0) {
-    $repoVersion    = $reportedVersion;
-    $repoLogMessage = sprintf('Repository codename %s unresolved; falling back to VERSION_ID %d', $lsbCodename !== '' ? $lsbCodename : 'unknown', $repoVersion);
-} elseif ($repoVersion === 0 && $reportedVersion === 0) {
-    $repoLogMessage = sprintf('Repository detection failed for distro=%s codename=%s; skipping repository updates', $distroName, $lsbCodename !== '' ? $lsbCodename : 'unknown');
-}
-if ($repoVersion !== 0 && $reportedVersion !== 0 && $repoVersion !== $reportedVersion) {
-    $repoLogMessage = sprintf('Repository version mapped via codename %s -> %d (reported=%s)', $lsbCodename !== '' ? $lsbCodename : 'unknown', $repoVersion, $distroVersion);
-}
+$distribution = pmssUpdateStep2DistroContextBuild(pmssRunProfiledCallable('Detecting distribution metadata', 'pmssDetectDistro'));
 
-if ($reportedVersion > 0 && $reportedVersion < 10) {
-    logmsg(sprintf('Detected unsupported Debian release %s; aborting', $distroVersion));
-    pmssLogJson(['event' => 'update-step2', 'status' => 'error', 'reason' => 'unsupported_debian', 'version' => $distroVersion]);
+if ((int) $distribution['version'] > 0 && (int) $distribution['version'] < 10) {
+    logmsg(sprintf('Detected unsupported Debian release %s; aborting', $distribution['version']));
+    pmssLogJson(['event' => 'update-step2', 'status' => 'error', 'reason' => 'unsupported_debian', 'version' => $distribution['version']]);
     exit(1);
 }
 
-putenv('PMSS_DISTRO_NAME='.$distroName);
-putenv('PMSS_DISTRO_VERSION='.(string) $reportedVersion);
-putenv('PMSS_DISTRO_CODENAME='.$lsbCodename);
-
-$effectiveRepoVersion = $repoVersion > 0 ? $repoVersion : $reportedVersion;
+putenv('PMSS_DISTRO_NAME='.$distribution['name']);
+putenv('PMSS_DISTRO_VERSION='.(string) (int) $distribution['version']);
+putenv('PMSS_DISTRO_CODENAME='.$distribution['codename']);
 
 logmsg('Update-step2 log: '.(defined('PMSS_LOG_FILE') ? PMSS_LOG_FILE : '/var/log/pmss/update.log'));
 $jsonPath = pmssJsonLogPath();
@@ -296,72 +279,7 @@ runStep('Removing legacy bespoke libssl3/openssh APT pin (superseded by dpkg sel
 // baseline -> recovery/autoremove; package state stays owned by dpkg selections.
 // -------------------------------------------------------------------------------------------
 
-runStep('Attempting apt fix-broken install (pre-package phase)', aptCmd('--fix-broken install -y'));
-pmssRunProfiledCallable('Refreshing package repositories', 'pmssRefreshRepositories', [$distroName, $effectiveRepoVersion, 'logmsg']);
-$dpkgBaselineOk = pmssRunProfiledCallable('Applying distro dpkg baseline selections', 'pmssApplyDpkgSelections', [$effectiveRepoVersion > 0 ? $effectiveRepoVersion : null, true]);
-
-// System-wide services must not run on seedbox hosts. Stop/disable early so
-// package installs cannot leave attack surface exposed for the rest of the run.
-pmssRunProfiledCallableBatch([
-    ['Applying system service disable/mask policy (pre-app)', 'pmssStopDisableMaskSeedboxSystemServices'],
-    // Purge failed unbound and keep disabled services from returning at boot.
-    ['Purging failed unbound daemon if present', 'pmssPurgeFailedUnbound'],
-    ['Ensuring systemd service guard boot unit', 'pmssEnsureSystemdServicesGuardBootUnit'],
-]);
-// Remove legacy Apache packages; keep apache2-utils. It provides htpasswd (used by
-// lighttpd basic auth) and ab; removing it breaks auth setup and other scripts.
-runStep('Removing residual Apache packages', aptCmd('purge -y apache2 apache2-bin apache2-data libapache2-mod-php7.4 || true'));
-pmssRunProfiledCallable('Hardening legacy Apache systemd unit (post-purge)', 'pmssStopDisableMaskSystemdUnit', ['apache2', 'Apache httpd (legacy)', true]);
-if ($repoLogMessage !== '') { logmsg($repoLogMessage); }
-if (!$dpkgBaselineOk) {
-    logmsg('[WARN] Dpkg baseline application reported issues; attempting recovery');
-    if (pmssRecoverDpkgBaseline('Attempting apt fix-broken install (dpkg baseline recovery)')) {
-        $dpkgBaselineOk = pmssRunProfiledCallable('Reapplying distro dpkg baseline selections', 'pmssApplyDpkgSelections', [$effectiveRepoVersion > 0 ? $effectiveRepoVersion : null, true]);
-    }
-    if (!$dpkgBaselineOk) {
-        logmsg('[ERROR] Dpkg baseline still failing after recovery attempt; continuing with caution');
-        pmssLogJson(['event' => 'package_phase', 'status' => 'warn', 'reason' => 'dpkg_baseline']);
-    }
-}
-
-// Re-apply libssl3 + openssl hold after dpkg baseline phase.
-// Belt-2: selections-debian12 hold entries are belt-1. This call handles
-// hosts already at broken versions and ensures convergence to exactly 3.0.17.
-// Uses simulate-guarded downgrade logic with a dpkg-direct fallback path when
-// apt predicts openssh removals. Refs #436.
-$opensslCompatArgs = [$effectiveRepoVersion > 0 ? $effectiveRepoVersion : null];
-pmssRunProfiledCallableBatch([
-    ['Holding libssl3/openssl for PECL ssh2 compat (dpkg-direct guard)', 'pmssHoldLibssl3ForPeclSsh2Compat', $opensslCompatArgs],
-    ['Healing openssh-server post-cascade if missing/deleted', 'pmssHealOpensshServerIfMissing', $opensslCompatArgs],
-    ['Ensuring openssh-server is libssl3-3.0.17-compatible (canonical baseline downgrade)', 'pmssEnsureOpensshCompatibleWithHeldLibssl3', $opensslCompatArgs],
-]);
-
-// Package convergence: dpkg selections are the authoritative source of package
-// state.
-logmsg('[OK] Package phase relies on dpkg baseline selections only');
-
-pmssRecoverDpkgBaseline('Attempting apt fix-broken install (post-package phase)');
-runStep('Removing packages no longer required', aptCmd('autoremove -y'));
-
-$pmssDockerPackageVersionsAfter = pmssDockerPackageVersions();
-$pmssDockerPackagesChanged = pmssDockerPackageVersionsChanged(
-    $pmssDockerPackageVersionsBefore,
-    $pmssDockerPackageVersionsAfter
-);
-putenv('PMSS_DOCKER_PACKAGES_CHANGED='.($pmssDockerPackagesChanged ? '1' : '0'));
-pmssLogJson([
-    'event' => 'docker_package_versions',
-    'changed' => $pmssDockerPackagesChanged,
-    'before' => $pmssDockerPackageVersionsBefore,
-    'after' => $pmssDockerPackageVersionsAfter,
-]);
-if ($pmssDockerPackagesChanged) {
-    logmsg('[INFO] Docker runtime package versions changed; rootless daemons will restart during user maintenance');
-}
-
-$GLOBALS['PMSS_PACKAGES_READY'] = true;
-putenv('PMSS_PACKAGE_PHASE=complete');
-pmssLogJson(['event' => 'package_phase', 'status' => 'ok']);
+pmssUpdateStep2PackagePhase($distribution, $pmssDockerPackageVersionsBefore);
 
 // Decide before the quota-mount step: its remount turns journaled quota back on
 // without recounting usage (ADR 0140).
@@ -521,7 +439,7 @@ pmssRunProfiledStep('Running post-update web refresh', static function (): void 
 });
 
 pmssRunProfiledCallableBatch([
-    ['Configuring /tmp disk-backed baseline', 'pmssConfigureTempDiskBackedMount', ['logmsg', $distroVersion]],
+    ['Configuring /tmp disk-backed baseline', 'pmssConfigureTempDiskBackedMount', ['logmsg', $distribution['version']]],
     ['Configuring /tmp tmpfs mount policy', 'pmssConfigureTempTmpfsMount', ['logmsg']],
     ['Configuring /tmp noexec hardening', 'pmssConfigureTempMountNoexec', ['logmsg']],
 ]);

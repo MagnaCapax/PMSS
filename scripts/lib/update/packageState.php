@@ -13,18 +13,15 @@
 /**
  * Return the dpkg status string for a package or an empty string when missing.
  */
-function pmssPackageStatus(string $package): string
-{
-    $cmd = 'dpkg-query -W -f=\'${Status}\' '.escapeshellarg($package).' 2>/dev/null';
-    exec($cmd, $output, $rc);
-    return $rc === 0 ? trim($output[0] ?? '') : '';
-}
+function pmssPackageStatus(string $package): string { return pmssPackageQueryField($package, 'Status'); }
 
 /** Return the installed version for a package, or an empty string when absent. */
-function pmssPackageVersion(string $package): string
+function pmssPackageVersion(string $package): string { return pmssPackageQueryField($package, 'Version'); }
+
+/** Keep dpkg field-query command bytes and first-line failure handling in one place. */
+function pmssPackageQueryField(string $package, string $field): string
 {
-    $cmd = 'dpkg-query -W -f=\'${Version}\' '.escapeshellarg($package).' 2>/dev/null';
-    exec($cmd, $output, $rc);
+    exec('dpkg-query -W -f='.escapeshellarg('${'.$field.'}').' '.escapeshellarg($package).' 2>/dev/null', $output, $rc);
     return $rc === 0 ? trim($output[0] ?? '') : '';
 }
 
@@ -83,13 +80,11 @@ function pmssPackageAvailable(string $package): bool
         }
     }
 
-    $nameOnly = strtolower((string) preg_replace('/:.+$/', '', $package));
     if (!empty($availableSet)) {
-        return $cache[$package] = isset($availableSet[$nameOnly]);
+        return $cache[$package] = isset($availableSet[strtolower((string) preg_replace('/:.+$/', '', $package))]);
     }
 
-    $cmd = 'apt-cache policy '.escapeshellarg($package).' 2>/dev/null';
-    exec($cmd, $output, $rc);
+    exec('apt-cache policy '.escapeshellarg($package).' 2>/dev/null', $output, $rc);
     if ($rc !== 0 || empty($output)) {
         return $cache[$package] = false;
     }
