@@ -7,12 +7,9 @@ class NginxDefaultTlsTemplateTest extends TestCase
 {
     public function testDefaultSiteInheritsProtocolsAndKeepsOnlyExistingAeadCiphers(): void
     {
-        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-site-default-ssl');
-        foreach (['SSLv3', 'TLSv1.1', 'DES-CBC3', 'ssl_protocols'] as $removed) {
-            $this->assertFalse(strpos($template, $removed) !== false);
-        }
-        $global = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-conf');
-        $this->assertTrue(strpos($global, 'ssl_protocols TLSv1.2 TLSv1.3;') !== false);
+        $template = $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/seedbox/config/template.nginx-site-default-ssl',
+            [], ['SSLv3', 'TLSv1.1', 'DES-CBC3', 'ssl_protocols']);
+        $this->pmssAssertRepoFileContainsString('etc/seedbox/config/template.nginx-conf', 'ssl_protocols TLSv1.2 TLSv1.3;');
         $this->assertSame(1, preg_match('/ssl_ciphers\s+"([^"]+)";/', $template, $matches));
         $ciphers = explode(':', $matches[1]);
         $this->assertSame([

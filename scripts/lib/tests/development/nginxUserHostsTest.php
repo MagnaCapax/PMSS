@@ -84,8 +84,8 @@ class NginxUserHostsTest extends TestCase
             $this->pmssWriteFile($home.'/.billingServiceId', $vector['id']);
             $result = $this->pmssExecShellCommand(escapeshellarg(PHP_BINARY).' '.escapeshellarg($script), ['HOME' => $home]);
             $this->assertSame(0, $result['rc']);
-            $this->assertTrue(strpos($result['output'], 'https://'.\pmssMcxLabel('service', $vector['id']).'.mcx.fi/') !== false);
-            $this->assertTrue(strpos($result['output'], 'https://'.$vector['label'].'.mcx.fi/') !== false);
+            $this->assertStringContainsAllStrings(['https://'.\pmssMcxLabel('service', $vector['id']).'.mcx.fi/',
+                'https://'.$vector['label'].'.mcx.fi/'], $result['output']);
         }
     }
 
@@ -114,7 +114,7 @@ class NginxUserHostsTest extends TestCase
         $this->pmssWriteFile($legacyHome.'/.billingId', "123\n");
         $result = $this->pmssExecShellCommand($php.' '.$script, ['HOME' => $legacyHome]);
         $this->assertSame(0, $result['rc']);
-        $this->assertTrue(strpos($result['output'], 'https://'.\pmssNginxUserMcxHostname('123').'/') !== false);
+        $this->assertStringContainsString('https://'.\pmssNginxUserMcxHostname('123').'/', $result['output']);
         $this->assertSame("default\n", file_get_contents($legacyHome.'/.request-web-certs'));
 
         $emptyHome = $this->pmssMakeTempDir('mcx-certs-empty-');
@@ -127,7 +127,7 @@ class NginxUserHostsTest extends TestCase
         $result = $this->pmssExecShellCommand("printf 'yes\\n' | HOME=".escapeshellarg($yesHome).' '.$php.' '.$script.' --with-username-hostname');
         $this->assertSame(0, $result['rc']);
         $this->assertSame("username\n", file_get_contents($yesHome.'/.request-web-certs'));
-        $this->assertTrue(strpos($result['output'], 'Certificate Transparency') !== false);
+        $this->assertStringContainsString('Certificate Transparency', $result['output']);
 
         $noHome = $this->pmssMakeTempDir('mcx-certs-no-');
         $result = $this->pmssExecShellCommand("printf 'no\\n' | HOME=".escapeshellarg($noHome).' '.$php.' '.$script.' --with-username-hostname');

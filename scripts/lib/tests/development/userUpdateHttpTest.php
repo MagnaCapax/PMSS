@@ -70,10 +70,8 @@ PHP;
 
         $updated = file_get_contents($home.'/.config/qBittorrent/qBittorrent.conf');
         $updatedConfig = ($updated === false) ? '' : $updated;
-        $this->assertStringContainsAllStrings(['WebUI\\CSRFProtection=true', 'WebUI\\ClickjackingProtection=true', 'WebUI\\HostHeaderValidation=false'], $updatedConfig);
-        $this->assertTrue(strpos($updatedConfig, 'WebUI\\CSRFProtection=false') === false);
-        $this->assertTrue(strpos($updatedConfig, 'WebUI\\ClickjackingProtection=false') === false);
-        $this->assertTrue(strpos($updatedConfig, 'WebUI\\HostHeaderValidation=true') === false);
+        $this->assertStringContainsAndOmitsStrings(['WebUI\\CSRFProtection=true', 'WebUI\\ClickjackingProtection=true', 'WebUI\\HostHeaderValidation=false'],
+            ['WebUI\\CSRFProtection=false', 'WebUI\\ClickjackingProtection=false', 'WebUI\\HostHeaderValidation=true'], $updatedConfig);
     }
 
     public function testConfigureHttpCreatesTempDirectory(): void
@@ -107,7 +105,7 @@ PHP;
         });
 
         $this->assertEquals("display_errors = On\n", (string) file_get_contents($target));
-        $this->assertTrue(strpos($output, 'Updated php.ini for user dummy') === false);
+        $this->assertStringNotContainsString('Updated php.ini for user dummy', $output);
     }
 
     public function testConfigureHttpRestoresQbittorrentManagedKeysWhenMissing(): void

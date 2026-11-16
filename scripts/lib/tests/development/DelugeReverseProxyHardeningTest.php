@@ -71,7 +71,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
                 continue;
             }
             $delugeReturns++;
-            $this->assertTrue(strpos($target, '$is_args$args') !== false, 'Deluge redirect must preserve query string');
+            $this->assertStringContainsString('$is_args$args', $target, 'Deluge redirect must preserve query string');
         }
         $this->assertTrue($delugeReturns >= 1, 'Expected Deluge slash-normalizing redirect target');
     }
@@ -102,9 +102,11 @@ class DelugeReverseProxyHardeningTest extends TestCase
             if (strpos($target, '/deluge-##username/') === false) {
                 continue;
             }
-            $this->assertTrue(strpos($target, 'http') === false, 'Deluge redirect must not include scheme/host');
-            $this->assertTrue(strpos($target, '$host') === false, 'Deluge redirect must not reference $host');
-            $this->assertTrue(strpos($target, '$scheme') === false, 'Deluge redirect must not reference $scheme');
+            $this->assertStringContainsAndOmitsStrings([], [
+                'http' => 'Deluge redirect must not include scheme/host',
+                '$host' => 'Deluge redirect must not reference $host',
+                '$scheme' => 'Deluge redirect must not reference $scheme',
+            ], $target);
             $this->assertTrue(strpos($target, '//') !== 0, 'Deluge redirect must not be protocol-relative');
         }
     }

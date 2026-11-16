@@ -91,11 +91,8 @@ PHP;
         [$restart, $reload, $site, $enabled] = $result['tests'][0];
         $this->assertSame([false, true], [$restart, $reload]);
         $this->assertSame($site, $enabled);
-        foreach ($this->certificatePaths() as $path) {
-            $this->assertTrue(strpos($site, $path) !== false, $path);
-        }
-        $this->assertFalse(strpos($site, '/etc/nginx/ssl/nginx.crt') !== false);
-        $this->assertFalse(strpos($site, '||SERVER_HOSTNAME||') !== false);
+        $this->assertStringContainsAndOmitsStrings(array_combine($this->certificatePaths(), $this->certificatePaths()),
+            ['/etc/nginx/ssl/nginx.crt', '||SERVER_HOSTNAME||'], $site);
     }
 
     public function testEachMissingRequiredFileKeepsSelfSignedFallback(): void
@@ -104,8 +101,8 @@ PHP;
             $result = $this->runSetup([$path => 'missing']);
             $this->assertSame([0], $result['results']);
             $site = $result['tests'][0][2];
-            $this->assertTrue(strpos($site, '/etc/nginx/ssl/nginx.crt') !== false, $path);
-            $this->assertFalse(strpos($site, '/etc/letsencrypt/') !== false, $path);
+            $this->assertStringContainsAndOmitsStrings(['/etc/nginx/ssl/nginx.crt' => $path],
+                ['/etc/letsencrypt/' => $path], $site);
         }
     }
 
@@ -115,8 +112,8 @@ PHP;
             $result = $this->runSetup([$path => 'unreadable']);
             $this->assertSame([0], $result['results']);
             $site = $result['tests'][0][2];
-            $this->assertTrue(strpos($site, '/etc/nginx/ssl/nginx.crt') !== false, $path);
-            $this->assertFalse(strpos($site, '/etc/letsencrypt/') !== false, $path);
+            $this->assertStringContainsAndOmitsStrings(['/etc/nginx/ssl/nginx.crt' => $path],
+                ['/etc/letsencrypt/' => $path], $site);
         }
     }
 
