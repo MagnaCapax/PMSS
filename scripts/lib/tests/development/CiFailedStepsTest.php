@@ -67,6 +67,17 @@ class CiFailedStepsTest extends TestCase
         $this->assertStringContainsString('bytes cut', (string) $out);
     }
 
+    public function testManyFailedStepsStillFitTheCap(): void
+    {
+        $log = '';
+        for ($i = 0; $i < 300; $i++) {
+            $log .= "T ##[group]Run step-$i\n".str_repeat("T output of step $i\n", 300)."T ##[error]step $i failed\n";
+        }
+        [, $out] = $this->runSteps(['job-build.log' => $log]);
+        $this->assertTrue(strlen((string) $out) <= 524288 + 300 * 80, 'many sections stay within the cap');
+        $this->assertStringContainsString('step 299 failed', (string) $out);
+    }
+
     /** Every launcher names its workspace <name>-codex. */
     public function testEveryLauncherWorkspacePrefixEndsInCodex(): void
     {

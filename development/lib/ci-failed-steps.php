@@ -37,6 +37,9 @@ function ciFailedStepsBound(string $text, int $cap): string
     if (strlen($text) <= $cap) {
         return $text;
     }
+    if ($cap <= 2 * CI_FAILED_STEPS_HEAD) {
+        return '[... ' . (strlen($text) - $cap) . " bytes cut ...]\n" . substr($text, -$cap);
+    }
     $tail = $cap - CI_FAILED_STEPS_HEAD;
     $cut = strlen($text) - CI_FAILED_STEPS_HEAD - $tail;
     return substr($text, 0, CI_FAILED_STEPS_HEAD) . "[... $cut bytes cut ...]\n" . substr($text, -$tail);
