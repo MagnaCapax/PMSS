@@ -242,9 +242,7 @@ class TorrentPortFrontendTest extends TestCase
         $outsidePath = $this->pmssMakeTempDir('pmss-user-patch-outside-').'/frontend.php';
         $this->pmssWriteFile($outsidePath, "legacy\n");
 
-        \pmssUserPatchWritableFile($outsidePath, static function (string $content): string {
-            return "patched\n";
-        });
+        \pmssUserPatchWritableFile($outsidePath, self::pmssMakeCallbacks(['patch' => "patched\n"])['patch']);
 
         $this->assertSame("legacy\n", (string) file_get_contents($outsidePath));
     }

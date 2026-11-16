@@ -39,8 +39,8 @@ final class QbittorrentProvisionOwnershipTest extends TestCase
             $this->assertTrue(in_array($status, [0, 2], true), implode("\n", $output));
             return $status === 2;
         }
-        $result = \pmssQbittorrentThrottleAccount($home, $cap, true, ['build' => $build,
-            'accountPids' => static function (): array { return []; }, 'restore' => static function (): bool { return true; }]);
+        $result = \pmssQbittorrentThrottleAccount($home, $cap, true,
+            ['build' => $build] + self::pmssMakeCallbacks(['accountPids' => [], 'restore' => true]));
         $this->assertTrue(is_bool($result));
         return $result;
     }
@@ -82,8 +82,8 @@ final class QbittorrentProvisionOwnershipTest extends TestCase
 
     public function testUnlimitedTemplateDoesNotCreateAnAppliedRecord(): void
     {
-        $home = $this->pmssMakeTrackedHomeRoot('pmss-qbt-provision-no-cap-').'/alice';
-        foreach ([0, -1] as $cap) $this->assertTrue(\pmssQbittorrentThrottleSeedRecord('alice', $home, $cap));
+        $home = $this->pmssMakeTrackedHomeRoot('pmss-qbt-provision-no-cap-').'/fixtur01';
+        foreach ([0, -1] as $cap) $this->assertTrue(\pmssQbittorrentThrottleSeedRecord('fixtur01', $home, $cap));
         $this->assertFalse(file_exists($home));
     }
 }

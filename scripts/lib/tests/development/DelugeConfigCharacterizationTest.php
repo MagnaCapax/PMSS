@@ -51,9 +51,8 @@ final class DelugeConfigCharacterizationTest extends TestCase
         $path = $this->pmssMakeTempDir('pmss-deluge-characterization-').'/core.conf';
         $raw = ' {"file":1} {"user":"kept"} ';
         $this->pmssWriteFile($path, $raw);
-        foreach ([static function (array $config) { return $config; },
-            static function () { return null; }, static function () { return false; },
-            static function () { return ['invalid' => INF]; }] as $mutator) {
+        foreach ([static function (array $config) { return $config; }]
+            + self::pmssMakeCallbacks(['null' => null, 'false' => false, 'invalid' => ['invalid' => INF]]) as $mutator) {
             $this->assertFalse(\pmssDelugeConfigMutate('fixtur01', $mutator, $path));
             $this->assertSame($raw, file_get_contents($path));
         }

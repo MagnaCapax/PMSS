@@ -125,9 +125,7 @@ class QbittorrentManagedConfigTest extends TestCase
         $this->assertTrue(pmssQbittorrentThrottleAccount($this->homeRoot.'/fixtur01', 512, true, [
             'build' => '4.3.9',
             'recordWrite' => static function ($path, $value): bool { return file_put_contents($path, $value) === strlen($value); },
-            'accountPids' => static function (): array { return []; },
-            'restore' => static function (): bool { return true; },
-        ]));
+        ] + self::pmssMakeCallbacks(['accountPids' => [], 'restore' => true])));
 
         $updated = (string) file_get_contents($configPath);
         $this->assertStringContainsString("Connection\\GlobalUPLimit=512\n", $updated);

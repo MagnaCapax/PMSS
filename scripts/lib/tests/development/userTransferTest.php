@@ -415,7 +415,7 @@ class UserTransferTest extends TestCase
         $this->assertStringNotContainsString('verification skipped', $failedOutput);
 
         [, $successOutput] = $this->pmssCaptureStdout(static function () use ($home): void {
-            \pmssUserTransferRunRtorrentRestart($home, 'fixtur01', static function (): int { return 0; });
+            \pmssUserTransferRunRtorrentRestart($home, 'fixtur01', self::pmssMakeCallbacks(['run' => 0])['run']);
         });
         $this->assertStringContainsString('verification skipped: no session torrent files found', $successOutput);
 
@@ -1034,9 +1034,8 @@ SNAP;
             if ($case === 'symlink' || $case === 'dangling') symlink($home.'/enabled', $marker);
             if ($case === 'dry-run') $this->pmssWriteFile($marker, '');
             $ops = [
-                'account' => static function (): array { return ['uid' => 1000]; },
                 'pids' => static function (): array { throw new \RuntimeException('Unexpected process probe'); },
-            ];
+            ] + self::pmssMakeCallbacks(['account' => ['uid' => 1000]]);
             [, $output] = $this->pmssCaptureStdout(static function () use ($home, $ops): void {
                 \pmssUserTransferRequestQbittorrentRestart($home, 'newuser', $ops);
             }, ['PMSS_DRY_RUN' => $case === 'dry-run' ? '1' : '0', 'PMSS_LOG_DIR' => $home]);
@@ -1084,7 +1083,7 @@ SNAP;
 
         // A stopped client is left for the watchdog without claiming a restart.
         $signals = [];
-        $ops['pids'] = static function (): array { return []; };
+        $ops['pids'] = self::pmssMakeCallbacks(['pids' => []])['pids'];
         [, $output] = $this->pmssCaptureStdout(static function () use ($home, $ops): void {
             \pmssUserTransferRequestQbittorrentRestart($home, 'newuser', $ops);
         }, ['PMSS_DRY_RUN' => '0', 'PMSS_LOG_DIR' => $home]);
@@ -1228,9 +1227,7 @@ SNAP;
 
         $this->assertSame(2, $count);
         $this->assertSame(1, $calls);
-        $this->assertSame(null, \pmssUserTransferRtorrentDownloadListCount($home, static function () {
-            return false;
-        }));
+        $this->assertSame(null, \pmssUserTransferRtorrentDownloadListCount($home, self::pmssMakeCallbacks(['rpc' => false])['rpc']));
     }
 
     public function testIsPathWithinHomeAcceptsRealChildPaths(): void

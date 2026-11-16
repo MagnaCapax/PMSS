@@ -868,6 +868,9 @@ for fixed operation results, with optional call-order recording. Literal results
 including false, null and empty arrays, stay in each test's operation map;
 argument-dependent, stateful and throwing callbacks remain explicit. This shares
 one callback factory without changing assertions or runtime service behavior.
+Torrent configuration, port and transfer fixtures also use it for fixed mutation,
+account, PID, restart and RPC results. Child-process stubs stay self-contained;
+identity mutators and callbacks that validate arguments or record effects stay explicit.
 
 AI launcher tests share their temporary-directory setup, valid account state,
 passthrough cases, explicit-environment matrix and result assertions through
