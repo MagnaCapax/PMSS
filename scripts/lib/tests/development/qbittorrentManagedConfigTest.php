@@ -219,4 +219,42 @@ class QbittorrentManagedConfigTest extends TestCase
         $this->assertSame("[Preferences]\n", file_get_contents($target));
     }
 
+    /** ADR 0114: an account that never chose a listen address gets IPv4-only listening on the next pass. */
+    public function testIpv4ListenAddressFilledWhenUnsetOrEmpty(): void
+    {
+        foreach (["[BitTorrent]\nSession\\Port=1234\n", "[BitTorrent]\nSession\\InterfaceAddress=\nSession\\Port=1234\n"] as $before) {
+            $configPath = $this->pmssWriteRelativeFile($this->homeRoot, 'fixtur01/.config/qBittorrent/qBittorrent.conf', $before);
+            $this->assertTrue(pmssQbittorrentApplyManagedConfig('fixtur01'));
+            $updated = (string) file_get_contents($configPath);
+            $this->assertSame(1, preg_match_all('/^Session\\\\InterfaceAddress=0\.0\.0\.0$/m', $updated));
+            $this->assertStringContainsAllStrings(["Session\\Port=1234\n"], $updated);
+        }
+    }
+
+    /** A customer's own address or interface (a VPN binding) is never changed; 4.1.x would fall back to 127.0.0.1. */
+    public function testIpv4ListenFillLeavesCustomerBindingAlone(): void
+    {
+        $kept = [
+            "[BitTorrent]\nSession\\InterfaceAddress=192.0.2.10\n",
+            "[BitTorrent]\nSession\\Interface=tun0\nSession\\InterfaceName=tun0\n",
+            "[BitTorrent]\nSession\\InterfaceName=wg0\n",
+            "[Preferences]\nConnection\\Interface=tun0\n",
+        ];
+        foreach ($kept as $config) {
+            $this->assertSame($config, pmssQbittorrentIpv4ListenFill($config));
+        }
+    }
+
+    public function testIpv4ListenFillIsIdempotentAndReadsOnlyItsSection(): void
+    {
+        $once = (string) pmssQbittorrentIpv4ListenFill("[Other]\nSession\\Interface=tun0\n\n[BitTorrent]\nSession\\Port=1\n");
+        $this->assertSame(1, preg_match_all('/^Session\\\\InterfaceAddress=0\.0\.0\.0$/m', $once));
+        $this->assertSame($once, pmssQbittorrentIpv4ListenFill($once));
+    }
+
+    public function testNewAccountTemplateListensOnIpv4Only(): void
+    {
+        $template = (string) file_get_contents(dirname(__DIR__, 4).'/etc/seedbox/config/template.qbittorrent.conf');
+        $this->assertSame(1, preg_match('/^\[BitTorrent\]$[^\[]*^Session\\\\InterfaceAddress=0\.0\.0\.0$/ms', $template));
+    }
 }

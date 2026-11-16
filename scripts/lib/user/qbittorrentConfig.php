@@ -110,3 +110,32 @@ function pmssQbittorrentConfigUpsert(string $config, string $section, string $ke
     }
     return $updated;
 }
+
+/** Value of one key inside one section, or null when the key is absent there. */
+function pmssQbittorrentConfigValue(string $config, string $section, string $key): ?string
+{
+    $inside = false;
+    foreach (pmssQbittorrentConfigSplitLines($config)[0] as $line) {
+        if (preg_match('/^\[[^\]]+\]$/', $line) === 1) {
+            $inside = $line === '['.$section.']';
+            continue;
+        }
+        if ($inside && strpos($line, $key.'=') === 0) return (string) substr($line, strlen($key) + 1);
+    }
+    return null;
+}
+
+/**
+ * IPv4-only peer listening (ADR 0114): fill Session\InterfaceAddress=0.0.0.0 only when the account left the
+ * listen address and interface unset. A chosen interface is never touched: qBittorrent 4.1.x looks for an
+ * address equal to InterfaceAddress on that interface, so 0.0.0.0 there falls back to listening on 127.0.0.1.
+ */
+function pmssQbittorrentIpv4ListenFill(string $config): ?string
+{
+    foreach (['Session\\InterfaceAddress', 'Session\\Interface', 'Session\\InterfaceName'] as $key) {
+        if (trim((string) pmssQbittorrentConfigValue($config, 'BitTorrent', $key)) !== '') return $config;
+    }
+    // A pre-4.x config not yet migrated by the client keeps these under [Preferences]; leave it to the client.
+    if (preg_match('/^Connection\\\\Interface[A-Za-z]*=\s*\S/m', $config) !== 0) return $config; // match or regex error: leave it
+    return pmssQbittorrentConfigSet($config, 'BitTorrent', 'Session\\InterfaceAddress', '0.0.0.0');
+}

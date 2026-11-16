@@ -117,7 +117,7 @@ function pmssQbittorrentApplyManagedConfig(string $username, ?string $configFile
                 }
             }
 
-            return $updatedConfig;
+            return pmssQbittorrentIpv4ListenFill($updatedConfig);
         },
         $configFile
     );

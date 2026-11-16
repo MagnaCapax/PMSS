@@ -22,6 +22,7 @@
  *       `catch = {"network.block.ipv6.set=yes"}`
  *   P2  template.sshd_config: `AddressFamily inet`
  *   P3  template.proftpd: `UseIPv6 off`
+ *   P4  template.qbittorrent.conf: `Session\InterfaceAddress=0.0.0.0`
  *
  * This is a shape guard, not a parser for every application. Defaults that open IPv6
  * without any line in a template are found by the runtime check in ipv4RuntimeTest.php.
@@ -38,6 +39,7 @@ const PMSS_IPV4_LINT_PINS = [
     'template.rtorrent.rc' => ['network.bind_address.set = 0.0.0.0', 'catch = {"network.block.ipv6.set=yes"}'],
     'template.sshd_config' => ['AddressFamily inet'],
     'template.proftpd'     => ['UseIPv6 off'],
+    'template.qbittorrent.conf' => ['Session\InterfaceAddress=0.0.0.0'],
 ];
 
 /** Rule hits for one active line of one template; [] when the line is clean. */
