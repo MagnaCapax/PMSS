@@ -19,7 +19,8 @@ if (empty($GLOBALS['PMSS_PACKAGES_READY'])) {
     return;
 }
 
-if (file_exists('/usr/local/bin/iprange')) {
+// Keep the distro binary authoritative instead of shadowing it with a source build.
+if (file_exists('/usr/local/bin/iprange') || file_exists('/usr/bin/iprange')) {
     return;
 }
 
