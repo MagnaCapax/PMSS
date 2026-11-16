@@ -90,7 +90,8 @@ PHP;
         $rows = $this->pmssRunInlinePhpJson($script);
         $this->assertSame(52, count($rows));
         $normal = ['path-initial', 'create', 'write', 'opened-path', 'prepare', 'verify', 'path-final', 'rename'];
-        foreach ($rows as [$case, $result, $sameFault, $open, $published, $events, $unlinks, $content, $verified, $rename, $prepared]) {
+        foreach ($rows as $row) {
+            [$case] = $row;
             $first = explode('+', $case)[0];
             $phase = str_replace(['-false', '-null'], '', $first);
             $position = array_search($phase, $normal, true);
@@ -103,16 +104,14 @@ PHP;
             }
             $ordinary = strpos($case, '+') === false && ($case === 'success' || substr($case, -6) === '-false' || substr($case, -5) === '-null');
             $ordinary = $ordinary || in_array($case, ['write-false+unlink-false', 'write-false+close-false'], true);
-            $this->assertSame($ordinary ? $didPublish : null, $result, $case);
-            $this->assertTrue($sameFault, $case);
-            $this->assertSame(strpos($case, 'close-before') !== false, $open, $case);
-            $this->assertSame($didPublish, $published, $case);
-            $this->assertSame($trace, $events, $case);
-            $this->assertSame($didPublish || $case === 'create-null' ? [] : ['/fixture/target.stage'], $unlinks, $case);
-            $this->assertSame($case === 'create-null' ? null : "fixture\0bytes", $content, $case);
-            $this->assertSame(in_array('verify', $trace, true) ? '/fixture/target.stage' : null, $verified, $case);
-            $this->assertSame(in_array('rename', $trace, true) ? ['/fixture/target.stage', '/fixture/target'] : null, $rename, $case);
-            $this->assertSame(in_array('prepare', $trace, true) ? '/proc/self/fd/73' : null, $prepared, $case);
+            $this->assertSame([
+                $ordinary ? $didPublish : null, true, strpos($case, 'close-before') !== false, $didPublish, $trace,
+                $didPublish || $case === 'create-null' ? [] : ['/fixture/target.stage'],
+                $case === 'create-null' ? null : "fixture\0bytes",
+                in_array('verify', $trace, true) ? '/fixture/target.stage' : null,
+                in_array('rename', $trace, true) ? ['/fixture/target.stage', '/fixture/target'] : null,
+                in_array('prepare', $trace, true) ? '/proc/self/fd/73' : null,
+            ], array_slice($row, 1), $case);
         }
     }
 }

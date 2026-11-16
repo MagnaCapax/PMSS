@@ -108,20 +108,17 @@ echo json_encode($rows);
 PHP;
         $rows = $this->pmssRunInlinePhpJson($script);
         $this->assertSame(count($cases) * 2, count($rows));
-        foreach ($rows as [$case, $result, $sameFault, $events, $toggles, $failure, $open]) {
+        foreach ($rows as $row) {
+            [$case] = $row;
             [$expectedResult, $expectedEvents, $expectedFailure] = $cases[$case];
-            $this->assertSame($expectedResult, $result, $case);
-            $this->assertTrue($sameFault, $case);
-            $this->assertSame($expectedEvents, $events, $case);
-            $this->assertSame($expectedFailure, $failure, $case);
-            $this->assertFalse($open, $case);
             $expectedToggles = [];
             foreach ($expectedEvents as $phase) {
                 if (!in_array($phase, ['clear', 'restore', 'set-new'], true)) continue;
                 $expectedToggles[] = [$phase, '/fixture/fixtur01/target',
                     ['dev' => 7, 'ino' => $phase === 'set-new' ? 19 : 11, 'mode' => 0100640, 'nlink' => 1], $phase !== 'clear'];
             }
-            $this->assertSame($expectedToggles, $toggles, $case);
+            $this->assertSame([$expectedResult, true, $expectedEvents, $expectedToggles, $expectedFailure, false],
+                array_slice($row, 1), $case);
         }
     }
 }

@@ -82,12 +82,9 @@ PHP;
         $this->assertSame(40, count($rows));
         $stage = '/fixture/.pmss-root-stage-'.str_repeat('61', 12);
         $normal = ['mkdir', 'inspect', 'open', 'write', 'flush', 'close', 'owner', 'group', 'mode', 'publish'];
-        foreach ($rows as [$case, $result, $sameFault, $open, $failure, $events, $removed, $directories, $directory, $acquisition, $content]) {
+        foreach ($rows as $row) {
+            [$case] = $row;
             $ordinary = $case === 'success' || strpos($case, '-false') !== false;
-            $this->assertTrue($sameFault, $case);
-            $this->assertFalse($open, $case);
-            $this->assertSame($ordinary ? !in_array($case, ['mkdir-false', 'inspect-false', 'open-false',
-                'write-false', 'flush-false', 'group-false', 'publish-false'], true) : null, $result, $case);
             $phase = explode('+', str_replace('-false', '', $case))[0];
             $trace = $normal;
             if (in_array($phase, $normal, true)) {
@@ -95,19 +92,20 @@ PHP;
                 if (in_array($phase, ['write', 'flush'], true)) $trace[] = 'close';
             }
             if ($case !== 'mkdir-false') array_push($trace, 'unlink', 'rmdir');
-            $this->assertSame($trace, $events, $case);
-            $this->assertSame($case === 'mkdir-false' ? [] : [$stage.'/file'], $removed, $case);
-            $this->assertSame($case === 'mkdir-false' ? [] : [$stage], $directories, $case);
-            $this->assertSame([$stage, 0700], $directory, $case);
             $opened = !in_array($case, ['mkdir-false', 'inspect-false'], true);
-            $this->assertSame($opened ? [$stage.'/file', 'x+b'] : null, $acquisition, $case);
-            $this->assertSame($opened && $case !== 'open-false' ? 'fixture bytes' : null, $content, $case);
             $expectedStage = ['mkdir' => 'mkdir', 'inspect' => 'stage-check', 'open' => 'open',
                 'write' => 'write', 'flush' => 'write', 'close' => 'write', 'group' => 'group',
                 'publish' => 'immutable-clear'][$phase] ?? null;
             $expectedFailure = $case === 'publish-false' ? 'stage=publish rc=23'
                 : ($expectedStage === null ? '' : 'stage='.$expectedStage.' rc=not-started');
-            $this->assertSame($expectedFailure, $failure, $case);
+            $this->assertSame([
+                $ordinary ? !in_array($case, ['mkdir-false', 'inspect-false', 'open-false',
+                    'write-false', 'flush-false', 'group-false', 'publish-false'], true) : null,
+                true, false, $expectedFailure, $trace,
+                $case === 'mkdir-false' ? [] : [$stage.'/file'], $case === 'mkdir-false' ? [] : [$stage],
+                [$stage, 0700], $opened ? [$stage.'/file', 'x+b'] : null,
+                $opened && $case !== 'open-false' ? 'fixture bytes' : null,
+            ], array_slice($row, 1), $case);
         }
     }
 }

@@ -95,7 +95,8 @@ PHP;
         $normal = ['directory-open', 'iterator-open', 'walk', 'path:link', 'link:link', 'unlink:link',
             'path:file', 'link:file', 'type:file', 'unlink:file', 'path:directory', 'link:directory',
             'type:directory', 'rmdir:directory', 'walk-end', 'rmdir:profile'];
-        foreach ($rows as [$cleaner, $mode, $stage, $sameFault, $result, $events, $removed, $directory, $order]) {
+        foreach ($rows as $row) {
+            [$cleaner, $mode, $stage] = $row;
             $expected = $normal;
             if ($mode === 'empty') $expected = ['directory-open', 'iterator-open', 'walk', 'walk-end', 'rmdir:profile'];
             if (in_array($mode, ['throw', 'combined'], true)) {
@@ -109,10 +110,9 @@ PHP;
                     $expectedRemoved[] = '/fixture/profile'.($name === 'profile' ? '' : '/'.$name);
                 }
             }
-            $label = $cleaner.':'.$mode.':'.$stage;
-            $this->assertSame([true, null, $expected, $expectedRemoved], [$sameFault, $result, $events, $removed], $label);
-            $this->assertSame(['/fixture/profile', \FilesystemIterator::SKIP_DOTS], $directory, $label);
-            $this->assertSame($stage === 'directory-open' ? null : \RecursiveIteratorIterator::CHILD_FIRST, $order, $label);
+            $this->assertSame([true, null, $expected, $expectedRemoved, ['/fixture/profile', \FilesystemIterator::SKIP_DOTS],
+                $stage === 'directory-open' ? null : \RecursiveIteratorIterator::CHILD_FIRST],
+                array_slice($row, 3), $cleaner.':'.$mode.':'.$stage);
         }
     }
 }

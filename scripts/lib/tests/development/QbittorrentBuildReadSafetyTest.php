@@ -78,7 +78,8 @@ echo json_encode($rows);
 PHP;
         $rows = $this->pmssRunInlinePhpJson($script);
         $this->assertSame(16, count($rows));
-        foreach ($rows as [$probe, $name, $chunks, $expected, $result, $events, $limits, $pipeLive, $processLive]) {
+        foreach ($rows as $row) {
+            [$probe, $name, $chunks, $expected] = $row;
             $expectedEvents = ['launch', 'status', 'blocking'];
             $expectedLimits = []; $bytes = 0;
             foreach ($chunks as $index => $chunk) {
@@ -93,7 +94,7 @@ PHP;
             if ($expected === null) $expectedEvents = array_merge($expectedEvents, ['group-signal', 'terminate']);
             $expectedEvents = array_merge($expectedEvents, ['pipe-close', 'reap', 'profile-clean']);
             $this->assertSame([$expected, $expectedEvents, $expectedLimits, false, false],
-                [$result, $events, $limits, $pipeLive, $processLive], $probe.':'.$name);
+                array_slice($row, 4), $probe.':'.$name);
         }
     }
 }
