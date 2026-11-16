@@ -177,7 +177,10 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
         // 0.16 rejects encoding.add even with -D; it must only run inside the 0.9.8 branch.
         $this->assertSame(1, preg_match_all('/encoding\.add/', preg_replace('/^#.*$/m', '', $rc)));
         $this->assertStringContainsString('branch = ((equal, ((system.client_version)), ((cat, "0.9.8")))), '
-            .'((encoding.add, utf8)), ((network.bind_address.set, "0.0.0.0"))', $rc);
+            .'((encoding.add, utf8)), ((cat))', $rc);
+        // ADR 0114: every build binds IPv4; the IPv6 block is catch-wrapped because 0.9.8 has no such command.
+        $this->assertSame(1, preg_match('/^network\.bind_address\.set = 0\.0\.0\.0$/m', $rc));
+        $this->assertSame(1, preg_match('/^catch = \{"network\.block\.ipv6\.set=yes"\}$/m', $rc));
         $this->assertSame(0, preg_match('/^encoding\.add/m', $rc));
         $this->assertMatches('/^rtorrent([ -]main)?$/', 'rtorrent-main');
         $this->assertMatches('/^rtorrent([ -]main)?$/', 'rtorrent main');
