@@ -25,19 +25,29 @@ try {
     $record['outcome'] = 'failed';
     $record['failed'][] = 'internal';
 } finally {
-    $record['duration_ms'] = (int) round((microtime(true) - $startedAt) * 1000);
-    if ($message !== '' && $record['outcome'] !== 'success') $record['reason'] = $message;
-    if (!pmssRestartUserLogWrite($record)) {
-        if ($exitCode === 0) $message = 'restart audit log unavailable';
-        $exitCode = 1;
-    }
-    if ($user !== null && function_exists('pmssUserLog')) {
-        pmssUserLog($user, 'restartUser: '.$record['outcome'].($record['failed'] ? ' ('.implode(', ', $record['failed']).')' : ''));
-    }
-    if ($locks !== null) {
-        fclose($locks['restart']);
-        fclose($locks['recreate']);
-        putenv(PMSS_UPDATE_LOCK_FDS_ENV);
+    try {
+        $record['duration_ms'] = (int) round((microtime(true) - $startedAt) * 1000);
+        if ($message !== '' && $record['outcome'] !== 'success') $record['reason'] = $message;
+        if (!pmssRestartUserLogWrite($record)) {
+            if ($exitCode === 0) $message = 'restart audit log unavailable';
+            $exitCode = 1;
+        }
+        if ($user !== null && function_exists('pmssUserLog')) {
+            pmssUserLog($user, 'restartUser: '.$record['outcome'].($record['failed'] ? ' ('.implode(', ', $record['failed']).')' : ''));
+        }
+    } finally {
+        // Audit faults must not retain locks or their child-descriptor export.
+        if ($locks !== null) {
+            try {
+                fclose($locks['restart']);
+            } finally {
+                try {
+                    fclose($locks['recreate']);
+                } finally {
+                    putenv(PMSS_UPDATE_LOCK_FDS_ENV);
+                }
+            }
+        }
     }
 }
 

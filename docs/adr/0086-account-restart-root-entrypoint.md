@@ -55,3 +55,19 @@ A start failure is recorded but does not prevent later starts. A restart is
 verified on a live host by checking that the account's rTorrent, media stack,
 and lighttpd processes are running again and by reading
 `/var/log/pmss/restartUser.log`.
+
+## Final cleanup safety follow-up (2026-11-16)
+
+The CLI attempts both lock closes and child-descriptor export removal even when
+audit logging or an earlier close throws. Audit reporting still runs with both
+locks held; restart closes before recreate, then the export is removed. Ordinary
+messages, audit records, refusal results and exit codes retain their contracts.
+Lone exceptions and errors propagate unchanged; combined cleanup faults retain
+PHP's normal `finally` precedence. No authentication, credential, permission,
+service-launch or exposure policy changes.
+
+`RestartUserFinalCleanupSafetyTest` isolates the CLI body with memory streams and
+recording boundaries, covering audit failures, both close failures, export faults,
+combined faults and runs without acquired locks. Execution stays on the testing
+machine; devbox verification checks changed-file PHP syntax only. No service or
+provisioning dry run executes on the devbox.
