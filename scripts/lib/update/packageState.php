@@ -21,6 +21,10 @@ function pmssPackageVersion(string $package): string { return pmssPackageQueryFi
 /** Keep dpkg field-query command bytes and first-line failure handling in one place. */
 function pmssPackageQueryField(string $package, string $field): string
 {
+    // Malformed bytes must not reach shell quoting or select a truncated argument.
+    if (strpos($package, "\0") !== false || strpos($field, "\0") !== false) {
+        return '';
+    }
     exec('dpkg-query -W -f='.escapeshellarg('${'.$field.'}').' '.escapeshellarg($package).' 2>/dev/null', $output, $rc);
     return $rc === 0 ? trim($output[0] ?? '') : '';
 }
@@ -59,6 +63,10 @@ function pmssDockerPackageVersionsChanged(array $before, array $after): bool
  */
 function pmssPackageAvailable(string $package): bool
 {
+    // Refuse corrupt input before loading or consulting the process-local cache.
+    if (strpos($package, "\0") !== false) {
+        return false;
+    }
     static $cache = [];
     static $availableSet = null;
 
@@ -101,6 +109,10 @@ function pmssPackageAvailable(string $package): bool
 /** Detect an Intel display controller from read-only PCI sysfs metadata. */
 function pmssHostHasIntelDisplayPciDevice(string $devicesPath = '/sys/bus/pci/devices'): bool
 {
+    // glob() must never observe the valid prefix of a NUL-containing path.
+    if (strpos($devicesPath, "\0") !== false) {
+        return false;
+    }
     foreach (@glob(rtrim($devicesPath, '/').'/*/class') ?: [] as $classPath) {
         $class = @file_get_contents($classPath);
         $vendor = @file_get_contents(dirname($classPath).'/vendor');

@@ -278,6 +278,14 @@ and serialized field order retain their contracts.
 
 ## Minimal Contract Rules (Joukahainen)
 
+Read-only package-state probes reject NUL-containing package names, dpkg field
+names and PCI roots before shell quoting, cache access or filesystem probes.
+Malformed inputs use the existing empty-string/false unavailable results.
+Valid command bytes, first-line selection, availability caching and hardware
+matching remain unchanged (ADR 0261). `PackageStateInputSafetyTest` intercepts
+package commands and PCI reads; execution stays on testing machines, with
+changed-file PHP syntax checks on the devbox.
+
 rTorrent SCGI transport and queue probes reject NUL-containing socket paths before
 filesystem, connection or command probes, retaining their false/null fallbacks.
 Queue observations reject NUL-containing raw rows before whitespace normalization;
