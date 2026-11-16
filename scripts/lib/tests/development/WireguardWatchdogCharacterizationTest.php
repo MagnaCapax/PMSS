@@ -178,9 +178,49 @@ PHP
         foreach (['false', 'short', 'mode', 'sync', 'throw'] as $mode) {
             $calls = array_merge($temp, [['write', '/fixture/stage', 'stripped'], ['chmod', '/fixture/stage', 0600]]);
             if ($mode === 'sync' || $mode === 'throw') $calls[] = ['command', "wg 'syncconf' 'wg0' '/fixture/stage'", 30];
-            if ($mode !== 'throw') $calls[] = ['unlink', '/fixture/stage'];
+            $calls[] = ['unlink', '/fixture/stage'];
             $expected[] = [$mode === 'throw' ? 'fixture failure' : ['stage' => $mode === 'sync' ? 'syncconf' : 'tempfile', 'rc' => $mode === 'sync' ? 4 : 1], $calls];
         }
+        $this->assertSame($expected, $results);
+    }
+
+    public function testSyncconfCleansAcquiredTempfileThroughExceptionsAndErrors(): void
+    {
+        $results = $this->observe(<<<'PHP'
+$rows = [];
+foreach (['write', 'chmod', 'sync', 'unlink'] as $stage) {
+    foreach ([\RuntimeException::class, \Error::class] as $type) {
+        foreach ([false, true] as $cleanupThrows) {
+            $fault = new $type('fixture failure');
+            $cleanup = $cleanupThrows ? new \LogicException('cleanup failure') : true;
+            resetFixture(['write' => $stage === 'write' ? $fault : 8,
+                'chmod' => $stage === 'chmod' ? $fault : true,
+                'unlink' => $stage === 'unlink' ? $fault : $cleanup,
+                'responses' => [['rc' => 0, 'stdout' => 'stripped'], $stage === 'sync' ? $fault : ['rc' => 0]]]);
+            try { pmssWireguardSyncconfFromConfig(); $sameFault = false; }
+            catch (\Throwable $error) { $sameFault = $error === ($stage !== 'unlink' && $cleanupThrows ? $cleanup : $fault); }
+            $rows[] = [$sameFault, $GLOBALS['fixture']['calls']];
+        }
+    }
+}
+// An unsuccessful removal retains the existing successful sync result.
+resetFixture(['unlink' => false, 'responses' => [['rc' => 0, 'stdout' => 'stripped'], ['rc' => 0]]]);
+$rows[] = [pmssWireguardSyncconfFromConfig(), $GLOBALS['fixture']['calls']];
+echo json_encode($rows);
+PHP
+        );
+        $base = [['command', "wg-quick 'strip' 'wg0'", 30], ['temp', '/fixture/tmp', 'pmss-wg-sync-'],
+            ['write', '/fixture/stage', 'stripped']];
+        $expected = [];
+        foreach (['write', 'chmod', 'sync', 'unlink'] as $stage) {
+            $calls = $base;
+            if ($stage !== 'write') $calls[] = ['chmod', '/fixture/stage', 0600];
+            if ($stage === 'sync' || $stage === 'unlink') $calls[] = ['command', "wg 'syncconf' 'wg0' '/fixture/stage'", 30];
+            $calls[] = ['unlink', '/fixture/stage'];
+            // Both throwable families, with successful cleanup and with a later cleanup fault.
+            for ($i = 0; $i < 4; ++$i) $expected[] = [true, $calls];
+        }
+        $expected[] = [['stage' => 'syncconf', 'rc' => 0], $calls];
         $this->assertSame($expected, $results);
     }
 
@@ -256,9 +296,22 @@ function pmssCommandCapture($command, $timeout) {
 }
 function sys_get_temp_dir() { return '/fixture/tmp'; }
 function tempnam($dir, $prefix) { $GLOBALS['fixture']['calls'][] = ['temp', $dir, $prefix]; return $GLOBALS['fixture']['temp']; }
-function file_put_contents($path, $bytes) { $GLOBALS['fixture']['calls'][] = ['write', $path, $bytes]; return $GLOBALS['fixture']['write']; }
-function chmod($path, $mode) { $GLOBALS['fixture']['calls'][] = ['chmod', $path, $mode]; return $GLOBALS['fixture']['chmod']; }
-function unlink($path) { $GLOBALS['fixture']['calls'][] = ['unlink', $path]; return true; }
+function file_put_contents($path, $bytes) {
+    $GLOBALS['fixture']['calls'][] = ['write', $path, $bytes];
+    if ($GLOBALS['fixture']['write'] instanceof \Throwable) throw $GLOBALS['fixture']['write'];
+    return $GLOBALS['fixture']['write'];
+}
+function chmod($path, $mode) {
+    $GLOBALS['fixture']['calls'][] = ['chmod', $path, $mode];
+    if ($GLOBALS['fixture']['chmod'] instanceof \Throwable) throw $GLOBALS['fixture']['chmod'];
+    return $GLOBALS['fixture']['chmod'];
+}
+function unlink($path) {
+    $GLOBALS['fixture']['calls'][] = ['unlink', $path];
+    $result = $GLOBALS['fixture']['unlink'] ?? true;
+    if ($result instanceof \Throwable) throw $result;
+    return $result;
+}
 PHP;
         $script .= 'require_once '.var_export($this->pmssRepoPath('scripts/lib/wireguard.php'), true).';';
         $script .= 'require_once '.var_export($this->pmssRepoPath('scripts/lib/cli/optionParser.php'), true).';';

@@ -74,6 +74,28 @@ No primary or service credentials are generated, reused or stored differently.
 No new listener, bind, public name, DNS record, certificate or web endpoint is
 introduced; the same local service commands operate on the existing interface.
 
+## Safety expansion: temporary configuration cleanup
+
+The syncconf helper now owns an acquired temporary file through `finally`.
+Payload assembly, write, chmod and command exceptions or errors all attempt
+removal before propagation. Failed acquisition still authorizes no removal.
+Normal command order, stage/rc results, complete-write and 0600 gates remain
+unchanged. A false unlink result remains best-effort; a thrown cleanup fault
+retains PHP's normal `finally` precedence over an earlier fault.
+
+`WireguardWatchdogCharacterizationTest` extends the original sync exception
+expectation to require removal, and injects exceptions and errors at write,
+chmod, sync and unlink boundaries. It checks throwable identity, exact command
+and filesystem call order, combined faults and unsuccessful removal without
+creating files or running service commands. Changed-file `php -l` checks run
+on the devbox; fixture execution and service dry runs stay on testing machines.
+
+The security review above and its upstream sources were rechecked for this
+expansion. Temporary payloads still hold only VPN service configuration, never
+primary account passwords. Cleanup adds no payload logging or exposure path;
+existing key separation, file modes, bind policy and endpoints are preserved.
+Persistent unlink failures can still leave a private temporary file behind.
+
 ## References
 
 - [Peer-state boundaries](0268-wireguard-peer-state-responsibility-boundaries.md)

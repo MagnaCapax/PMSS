@@ -45,18 +45,21 @@ function pmssWireguardSyncconfFromConfig(): array
         return ['stage' => 'tempfile', 'rc' => 1];
     }
 
-    $config = (string) $strip['stdout'];
-    $written = @file_put_contents($tmp, $config);
-    $secured = @chmod($tmp, 0600);
-    if ($written === false || $written !== strlen($config) || !$secured) {
+    try {
+        $config = (string) $strip['stdout'];
+        $written = @file_put_contents($tmp, $config);
+        $secured = @chmod($tmp, 0600);
+        if ($written === false || $written !== strlen($config) || !$secured) {
+            return ['stage' => 'tempfile', 'rc' => 1];
+        }
+
+        $sync = pmssWireguardCommandCapture('wg', ['syncconf', 'wg0', $tmp]);
+
+        return ['stage' => 'syncconf', 'rc' => (int) $sync['rc']];
+    } finally {
+        // Stripped configuration may contain private keys; thrown faults still require cleanup.
         @unlink($tmp);
-        return ['stage' => 'tempfile', 'rc' => 1];
     }
-
-    $sync = pmssWireguardCommandCapture('wg', ['syncconf', 'wg0', $tmp]);
-    @unlink($tmp);
-
-    return ['stage' => 'syncconf', 'rc' => (int) $sync['rc']];
 }
 
 /** Emit the standard command rc status to stdout and per-user logs. */
