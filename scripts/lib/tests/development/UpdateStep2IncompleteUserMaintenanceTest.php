@@ -120,9 +120,8 @@ class UpdateStep2IncompleteUserMaintenanceTest extends TestCase
     public function testFullCompletionClearsStaleMarker(): void
     {
         // The policy helper clears the marker on a clean run.
-        $data = $this->pmssReadRepoFile('scripts/lib/update/runtime/userMaintenanceState.php');
-        $this->assertTrue(
-            strpos($data, 'pmssUpdateClearIncompleteUserMaintenance()') !== false,
+        $this->pmssAssertRepoFileContainsString(
+            'scripts/lib/update/runtime/userMaintenanceState.php', 'pmssUpdateClearIncompleteUserMaintenance()',
             'a clean run (all users processed) must clear a stale incomplete-tail marker'
         );
     }

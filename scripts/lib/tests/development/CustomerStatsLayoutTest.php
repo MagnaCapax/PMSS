@@ -134,12 +134,8 @@ final class CustomerStatsLayoutTest extends TestCase
             'function pmssStatsNetworkInterfaceStatus(',
             'function pmssStatsDockerInactiveNote(',
         ));
-        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/statsCharts.php', array(
-            'function pmssStatsRenderLineChart(',
-        ));
-        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/statsResourceRender.php', array(
-            'function pmssStatsRenderResourceBlocks(',
-        ));
+        $this->pmssAssertRepoFileContainsString('etc/skel/www/statsCharts.php', 'function pmssStatsRenderLineChart(');
+        $this->pmssAssertRepoFileContainsString('etc/skel/www/statsResourceRender.php', 'function pmssStatsRenderResourceBlocks(');
     }
 
     public function testStatsPageFailsSoftWhenBundledHelperIsMissing(): void

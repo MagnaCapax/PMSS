@@ -118,8 +118,7 @@ final class WelcomeHomeTest extends TestCase
             .'pmssWelcomeHomeNewsPartHtmlBuild("Articles", array()),'
             .'pmssWelcomeHomeNewsPartHtmlBuild("Articles", '.var_export($this->newsItems('B', 1, 200), true).', "", false)));');
 
-        $this->assertStringContainsString('<h3 class="h-news-sub">Announcements <a href="https://example.test/all"', $html[0]);
-        $this->assertStringContainsString('<li data-ts="100">', $html[0]);
+        $this->assertStringContainsAllStrings(['<h3 class="h-news-sub">Announcements <a href="https://example.test/all"', '<li data-ts="100">'], $html[0]);
         $this->assertSame('', $html[1]);
         $this->assertStringContainsString('<time', $html[0]);
         $this->assertStringNotContainsString('<time', $html[2]);

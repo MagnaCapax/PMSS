@@ -117,9 +117,9 @@ final class AddUserPostProvisionTest extends TestCase
         $this->assertTrue($noInstaller === null, 'no installer in ~/bin');
         $this->assertTrue($belowFloor === null, 'below the RAM floor');
         foreach (['nohup sh -c ', 'systemd-run', '--slice=user-', 'PIKKUMIES_SKIP_HERMES=1', 'install-pikkumies.sh', "' >/dev/null 2>&1 &"] as $part) {
-            $this->assertTrue(strpos($command, $part) !== false, "preinstall command lacks $part: $command");
+            $this->assertStringContainsString($part, $command, "preinstall command lacks $part: $command");
         }
-        $this->assertTrue(strpos($command, '--slice=user-4321.slice') !== false, 'not the new user\'s slice: '.$command);
-        $this->assertTrue(strpos($command, '--accept-terms') === false, 'the terms are the person\'s to accept at the first session');
+        $this->assertStringContainsAndOmitsStrings(['--slice=user-4321.slice' => 'not the new user\'s slice: '.$command],
+            ['--accept-terms' => 'the terms are the person\'s to accept at the first session'], $command);
     }
 }

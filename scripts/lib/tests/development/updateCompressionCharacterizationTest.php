@@ -16,147 +16,118 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testInlineHelperCompressionContractsStayLocal(): void
     {
-        $this->pmssAssertRepoFileContractCases([
-            'scripts/util/update-step2.php' => [
-                'required' => [
-                    "pmssRunProfiledStep('Adjusting lighttpd security settings'",
-                    "runStep('Restricting /etc/lighttpd directory permissions', 'chmod 750 /etc/lighttpd');",
-                    "logmsg('[SKIP] lighttpd .htpasswd missing; per-user instances manage authentication');",
-                    "pmssRunProfiledStep('Cleaning mediaarea bootstrap package state'",
-                    'pmssDpkgStatusIndicatesPresent(pmssRepoMediaareaDpkgStatus())',
-                    "runStep('Marking repo-mediaarea for deinstallation', \$setSelection);",
-                ],
-                'forbidden' => [
-                    'pmssAdjust'.'LighttpdSecurity' => 'update-step2.php should own the lighttpd hardening block directly',
-                    'pmssCleanup'.'MediaareaBootstrapPackage' => 'update-step2.php should own the mediaarea bootstrap cleanup directly',
-                    'pmssUpdateStep2Register'.'WebRefreshShutdownGuard' => 'phase-2 should keep one shutdown rescue lifecycle',
-                    'pmssUpdateStep2Register'.'PermissionShutdownGuard' => 'phase-2 should keep one shutdown rescue lifecycle',
-                    'pmssUpdateStep2Mark'.'WebRefreshRequired' => 'the pending refresh state should not need setter wrappers',
-                    'pmssUpdateStep2Mark'.'WebRefreshCompleted' => 'the pending refresh state should not need setter wrappers',
-                ],
-            ],
-            'scripts/lib/update/apt.php' => [
-                'required' => [
-                    "require_once __DIR__.'/distro.php';",
-                    'pmssDebianReleaseSpecs()[$version] ?? null',
-                ],
-                'forbidden' => [
-                    'static $targets = [' => 'apt.php should not keep a second Debian release target table',
-                ],
-            ],
-            'scripts/lib/update/runtime/processes.php' => [
-                'required' => [
-                    "foreach (['TERM' => max(0, \$timeoutSeconds), 'KILL' => 5] as \$signal => \$waitSeconds)",
-                    "runStep(\$description.' (SIG'.\$signal.')'",
-                    'graceful stop',
-                    'processes linger after SIGKILL',
-                    "\$selector = '-x '.escapeshellarg(\$name).",
-                    "\$probeCommand = 'pgrep '.\$selector.' >/dev/null 2>&1';",
-                    'exec($probeCommand, $_, $probeStatus);',
-                    '[SKIP] {$description} (no {$name} processes)',
-                    '$deadline = microtime(true) + $waitSeconds;',
-                    'usleep(250000);',
-                ],
-                'forbidden' => [
-                    'function pmssWaitFor'.'ProcessExit(' => 'process wait logic should be localized inside killProcess()',
-                    'function pmssProcess'.'Running(' => 'process presence checks should stay localized inside killProcess()',
-                    '$process'.'Running = static function' => 'killProcess() should keep the process probe inline without a local closure',
-                    '$waitFor'.'ProcessExit = static function' => 'killProcess() should keep the wait loops inline without a local closure',
-                ],
-            ],
-            'scripts/lib/update/services/systemd.php' => [
-                'required' => ["pmssRefreshManagedPathFile(\n        \$dropinFile"],
-                'forbidden' => ['file_put_contents($dropinFile' => 'cron drop-ins should not bypass the managed-file refresher', 'chmod($dropinFile' => 'cron drop-in mode belongs to the managed write path'],
-            ],
-            'scripts/lib/update/systemPrep/systemdSlicesEnsure.php' => [
-                'required' => [
-                    "pmssRefreshManagedPathFile(\$target, \$raw, 'systemd drop-in'",
-                ],
-                'forbidden' => [
-                    'function pmssSystemdDropin'.'Install(' => 'systemd drop-in writes should use the shared managed-file writer directly',
-                    'pmssWriteManagedPathFile(' => 'systemd drop-ins should have one convergence path through the managed-file refresher',
-                    '$write'.'FailurePrefix' => 'systemd drop-in writes should not keep a dead temp-write prefix concept',
-                    'Failed to write'.' temp' => 'systemd drop-in callers should log the single managed-write failure path',
-                ],
-            ],
-            'scripts/lib/update/systemPrep/systemdSliceDropins.php' => [
-                'required' => ["pmssRefreshManagedPathFile(\$target, \$body, 'systemd drop-in'"],
-                'forbidden' => [
-                    'function pmssSystemdDropin'.'Install(' => 'systemd drop-in writes should use the shared managed-file writer directly',
-                    'pmssWriteManagedPathFile(' => 'systemd drop-ins should have one convergence path through the managed-file refresher',
-                    '$write'.'FailurePrefix' => 'systemd drop-in writes should not keep a dead temp-write prefix concept',
-                    'Failed to write'.' temp' => 'systemd drop-in callers should log the single managed-write failure path',
-                ],
-            ],
-            'scripts/lib/update/services/sshd.php' => [
-                'required' => ["pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config').'/template.ssh.service.pmss-starvation.conf'"],
-                'forbidden' => ['function pmssSshdStarvation'.'DropinTemplatePath(' => 'the sole drop-in caller should resolve its template directly'],
-            ],
-            'scripts/lib/lighttpd/proxyFragments.php' => [
-                'required' => ["require_once __DIR__.'/proxyRoutes.php';", "require_once __DIR__.'/proxyPorts.php';"],
-            ],
-            'scripts/lib/lighttpd/proxyRoutes.php' => [
-                'required' => ["\$fragment .= '\$HTTP[\"url\"] == \"'.\$base"],
-                'forbidden' => ['function pmssLighttpdProxyExact'.'RedirectFragment(' => 'the sole redirect renderer should stay with route framing'],
-            ],
-            'scripts/lib/lighttpd/watchdogSocketListeners.php' => [
-                'required' => ['function pmssLighttpdWatchdogListeningSocketSnapshot(', 'function pmssLighttpdWatchdogSocketPathsFromLines('],
-                'forbidden' => ['function pmssLighttpdWatchdogListeningSocketPath'.'s(' => 'callers should consume paths from the status-preserving snapshot', 'pmssLighttpdWatchdogListeningSocketPath'.'sFromLines(' => 'the parser name should not retain the removed pass-through prefix'],
-            ],
-            'scripts/lib/user/userConfigPolicy.php' => [
-                'required' => ['function pmssUserConfigNormaliseToggleValue('],
-                'forbidden' => ['function pmssUserScheduledConfigBackup'.'Enabled(' => 'scheduled backup policy is consumed from its normalized payload'],
-            ],
-            'scripts/lib/update/logging.php' => [
-                'required' => [
-                    "gmdate('Ymd-His')",
-                    "bin2hex(random_bytes(3))",
-                    "substr(hash('sha256', \$timestamp.\$host.microtime(true)), 0, 6)",
-                ],
-                'forbidden' => [
-                    'function pmssBuild'.'CorrelationId(' => 'logging.php should keep correlation ID generation inside pmssCorrelationId()',
-                ],
-            ],
-            'scripts/update.php' => [
-                'required' => [
-                    "bin2hex(random_bytes(3))",
-                    "PMSS_CORRELATION_ENV.'='.\$generated",
-                    'is_readable(VERSION_FILE)',
-                ],
-                'forbidden' => [
-                    'function pmssBuild'.'CorrelationId(' => 'update.php should keep correlation ID generation inside pmssCorrelationId()',
-                    'function pmssInstalledVersion'.'Line(' => 'the snapshot guard should read its sole version marker directly',
-                ],
-            ],
-            'scripts/lib/quota/snapshotText.php' => [
-                'required' => [
-                    "preg_replace('/^([0-9]+)(\\*)?$/', '\$1K\$2', array_slice(\$tokens, 1, 3), -1, \$changed)",
-                    'array_splice($tokens, 1, 3, $sizes);',
-                ],
-                'forbidden' => [
-                    'function pmssQuotaSnapshotNormalize'.'SizeToken(' => 'quotaSnapshot.php should keep bare-size token normalization inside the line normalizer',
-                ],
-            ],
-            'scripts/lib/user/torrentPort.php' => [
-                'required' => [
-                    "pmssRequireRelativeFiles(__DIR__, ['../lighttpd/userConfigApply.php', '../torrentClients/identity.php', 'qbittorrent.php', 'identity.php']);",
-                    'pmssQbittorrentConfigMutate(',
-                ],
-                'forbidden' => [
-                    'function pmssTorrentPort'.'FileWrite(' => 'torrentPort.php should not grow a second qBittorrent file-writer helper',
-                    '@tempnam($dir, basename($configPath).\'.pmss-tmp-\')' => 'qBittorrent port repair should use the shared config writer instead of an inline temp-file path',
-                ],
-            ],
-            'scripts/suspend.php' => [
-                'required' => [
-                    "/etc/seedbox/config/template.suspended.notice.html",
-                    "pmssSuspendedFallbackHtml(\$username)",
-                    "pmssReplaceAccountFile(\$username, \$homeDir, \$suspendRoot.'/index.html', \$html, 0644, true)",
-                ],
-                'forbidden' => [
-                    'function pmssRender'.'SuspendedHtml(' => 'suspend.php should keep suspended landing template selection inside pmssCreateSuspendedLanding()',
-                ],
-            ],
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/update-step2.php', [
+            "pmssRunProfiledStep('Adjusting lighttpd security settings'",
+            "runStep('Restricting /etc/lighttpd directory permissions', 'chmod 750 /etc/lighttpd');",
+            "logmsg('[SKIP] lighttpd .htpasswd missing; per-user instances manage authentication');",
+            "pmssRunProfiledStep('Cleaning mediaarea bootstrap package state'",
+            'pmssDpkgStatusIndicatesPresent(pmssRepoMediaareaDpkgStatus())',
+            "runStep('Marking repo-mediaarea for deinstallation', \$setSelection);",
+        ], [
+            'pmssAdjust'.'LighttpdSecurity' => 'update-step2.php should own the lighttpd hardening block directly',
+            'pmssCleanup'.'MediaareaBootstrapPackage' => 'update-step2.php should own the mediaarea bootstrap cleanup directly',
+            'pmssUpdateStep2Register'.'WebRefreshShutdownGuard' => 'phase-2 should keep one shutdown rescue lifecycle',
+            'pmssUpdateStep2Register'.'PermissionShutdownGuard' => 'phase-2 should keep one shutdown rescue lifecycle',
+            'pmssUpdateStep2Mark'.'WebRefreshRequired' => 'the pending refresh state should not need setter wrappers',
+            'pmssUpdateStep2Mark'.'WebRefreshCompleted' => 'the pending refresh state should not need setter wrappers',
+        ]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/apt.php', [
+            "require_once __DIR__.'/distro.php';",
+            'pmssDebianReleaseSpecs()[$version] ?? null',
+        ], [
+            'static $targets = [' => 'apt.php should not keep a second Debian release target table',
+        ]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/runtime/processes.php', [
+            "foreach (['TERM' => max(0, \$timeoutSeconds), 'KILL' => 5] as \$signal => \$waitSeconds)",
+            "runStep(\$description.' (SIG'.\$signal.')'",
+            'graceful stop',
+            'processes linger after SIGKILL',
+            "\$selector = '-x '.escapeshellarg(\$name).",
+            "\$probeCommand = 'pgrep '.\$selector.' >/dev/null 2>&1';",
+            'exec($probeCommand, $_, $probeStatus);',
+            '[SKIP] {$description} (no {$name} processes)',
+            '$deadline = microtime(true) + $waitSeconds;',
+            'usleep(250000);',
+        ], [
+            'function pmssWaitFor'.'ProcessExit(' => 'process wait logic should be localized inside killProcess()',
+            'function pmssProcess'.'Running(' => 'process presence checks should stay localized inside killProcess()',
+            '$process'.'Running = static function' => 'killProcess() should keep the process probe inline without a local closure',
+            '$waitFor'.'ProcessExit = static function' => 'killProcess() should keep the wait loops inline without a local closure',
+        ]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/services/systemd.php', [
+            "pmssRefreshManagedPathFile(\n        \$dropinFile",
+        ], [
+            'file_put_contents($dropinFile' => 'cron drop-ins should not bypass the managed-file refresher',
+            'chmod($dropinFile' => 'cron drop-in mode belongs to the managed write path',
+        ]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/systemPrep/systemdSlicesEnsure.php', [
+            "pmssRefreshManagedPathFile(\$target, \$raw, 'systemd drop-in'",
+        ], [
+            'function pmssSystemdDropin'.'Install(' => 'systemd drop-in writes should use the shared managed-file writer directly',
+            'pmssWriteManagedPathFile(' => 'systemd drop-ins should have one convergence path through the managed-file refresher',
+            '$write'.'FailurePrefix' => 'systemd drop-in writes should not keep a dead temp-write prefix concept',
+            'Failed to write'.' temp' => 'systemd drop-in callers should log the single managed-write failure path',
+        ]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/systemPrep/systemdSliceDropins.php', [
+            "pmssRefreshManagedPathFile(\$target, \$body, 'systemd drop-in'",
+        ], [
+            'function pmssSystemdDropin'.'Install(' => 'systemd drop-in writes should use the shared managed-file writer directly',
+            'pmssWriteManagedPathFile(' => 'systemd drop-ins should have one convergence path through the managed-file refresher',
+            '$write'.'FailurePrefix' => 'systemd drop-in writes should not keep a dead temp-write prefix concept',
+            'Failed to write'.' temp' => 'systemd drop-in callers should log the single managed-write failure path',
+        ]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/services/sshd.php', [
+            "pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config').'/template.ssh.service.pmss-starvation.conf'",
+        ], ['function pmssSshdStarvation'.'DropinTemplatePath(' => 'the sole drop-in caller should resolve its template directly']);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/lighttpd/proxyFragments.php', [
+            "require_once __DIR__.'/proxyRoutes.php';", "require_once __DIR__.'/proxyPorts.php';",
+        ]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/lighttpd/proxyRoutes.php', [
+            "\$fragment .= '\$HTTP[\"url\"] == \"'.\$base",
+        ], ['function pmssLighttpdProxyExact'.'RedirectFragment(' => 'the sole redirect renderer should stay with route framing']);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/lighttpd/watchdogSocketListeners.php', [
+            'function pmssLighttpdWatchdogListeningSocketSnapshot(', 'function pmssLighttpdWatchdogSocketPathsFromLines(',
+        ], [
+            'function pmssLighttpdWatchdogListeningSocketPath'.'s(' => 'callers should consume paths from the status-preserving snapshot',
+            'pmssLighttpdWatchdogListeningSocketPath'.'sFromLines(' => 'the parser name should not retain the removed pass-through prefix',
+        ]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/user/userConfigPolicy.php', [
+            'function pmssUserConfigNormaliseToggleValue(',
+        ], ['function pmssUserScheduledConfigBackup'.'Enabled(' => 'scheduled backup policy is consumed from its normalized payload']);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/logging.php', [
+            "gmdate('Ymd-His')",
+            "bin2hex(random_bytes(3))",
+            "substr(hash('sha256', \$timestamp.\$host.microtime(true)), 0, 6)",
+        ], [
+            'function pmssBuild'.'CorrelationId(' => 'logging.php should keep correlation ID generation inside pmssCorrelationId()',
+        ]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/update.php', [
+            "bin2hex(random_bytes(3))",
+            "PMSS_CORRELATION_ENV.'='.\$generated",
+            'is_readable(VERSION_FILE)',
+        ], [
+            'function pmssBuild'.'CorrelationId(' => 'update.php should keep correlation ID generation inside pmssCorrelationId()',
+            'function pmssInstalledVersion'.'Line(' => 'the snapshot guard should read its sole version marker directly',
+        ]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/quota/snapshotText.php', [
+            "preg_replace('/^([0-9]+)(\\*)?$/', '\$1K\$2', array_slice(\$tokens, 1, 3), -1, \$changed)",
+            'array_splice($tokens, 1, 3, $sizes);',
+        ], [
+            'function pmssQuotaSnapshotNormalize'.'SizeToken(' => 'quotaSnapshot.php should keep bare-size token normalization inside the line normalizer',
+        ]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/user/torrentPort.php', [
+            "pmssRequireRelativeFiles(__DIR__, ['../lighttpd/userConfigApply.php', '../torrentClients/identity.php', 'qbittorrent.php', 'identity.php']);",
+            'pmssQbittorrentConfigMutate(',
+        ], [
+            'function pmssTorrentPort'.'FileWrite(' => 'torrentPort.php should not grow a second qBittorrent file-writer helper',
+            '@tempnam($dir, basename($configPath).\'.pmss-tmp-\')' => 'qBittorrent port repair should use the shared config writer instead of an inline temp-file path',
+        ]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/suspend.php', [
+            "/etc/seedbox/config/template.suspended.notice.html",
+            "pmssSuspendedFallbackHtml(\$username)",
+            "pmssReplaceAccountFile(\$username, \$homeDir, \$suspendRoot.'/index.html', \$html, 0644, true)",
+        ], [
+            'function pmssRender'.'SuspendedHtml(' => 'suspend.php should keep suspended landing template selection inside pmssCreateSuspendedLanding()',
         ]);
     }
 
