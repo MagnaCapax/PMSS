@@ -19,6 +19,12 @@ PMSS_CUSTOMER_PANEL_RENDER_ROOT="$ROOT_DIR" php "$ROOT_DIR/scripts/testing/custo
 echo "[public-exposure-lint]" >&2
 php "$ROOT_DIR/scripts/testing/public-exposure-lint.php" --root "$ROOT_DIR"
 
+# static-lints.sh (a pre-push check) runs everything above but not the suite.
+if [[ "${PMSS_TESTING_SKIP_DEV_TESTS:-0}" == "1" ]]; then
+	echo "OK: PHP lint + customer-tree isolation + customer-context fatal scan + customer panel render + public-exposure lint (dev tests skipped)" >&2
+	exit 0
+fi
+
 echo "[dev-tests]" >&2
 php "$ROOT_DIR/scripts/lib/tests/development/Runner.php"
 
