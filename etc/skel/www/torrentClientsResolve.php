@@ -91,7 +91,9 @@ function pmssRtorrentExecutorCommand(
     return escapeshellarg($binary).' -O '.escapeshellarg(
         'branch = "network.http.cacert=", "cat=", "network.http.capath=", "cat=", '
         .'"network.http.cacert.set=/etc/ssl/certs/ca-certificates.crt"')
-        .(pmssRtorrentDeprecatedRedirects(basename(dirname($binary)), $projectionPath) ? ' -D' : '');
+        // ADR 0114: block IPv6 on 0.16+; 0.9.8 builds do not have this command.
+        .(pmssRtorrentDeprecatedRedirects(basename(dirname($binary)), $projectionPath)
+            ? ' -D -O '.escapeshellarg('network.block.ipv6.set = yes') : '');
 }
 
 /** Keep a failed store command on the system build until the resolved selection changes. */

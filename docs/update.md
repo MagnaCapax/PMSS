@@ -368,6 +368,14 @@ settings are empty: jesec processes `-O` after rc imports, while upstream and
 stickz process it before them. Customer overrides survive either ordering;
 the system-build launch command remains unchanged (Refs #1188).
 
+Store launches in compatibility family 0.16 or later also pass a separate
+`-O 'network.block.ipv6.set = yes'`, following the IPv4-only policy (ADR 0114,
+Refs #1279). The existing `-D` family gate keeps this unsupported command away
+from 0.9.8 builds. Upstream processes these options before rc imports, so an
+explicit custom rc setting still takes precedence. Normal skeleton delivery
+updates the resolver for existing accounts; it takes effect after the executor
+restarts, without rewriting rc files or restarting running clients.
+
 Normal per-user maintenance also repairs exact legacy `encoding.add = utf8`
 lines in existing `.rtorrent.rc` files to the ADR 0141 template branch, retaining
 0.9.8 encoding support and setting an IPv4 bind for newer builds (Refs #1204).

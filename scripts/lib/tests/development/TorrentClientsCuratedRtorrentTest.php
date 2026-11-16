@@ -156,13 +156,14 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
         $this->pmssEnsureDir($home.'/bin/rtorrent');
         $caDefault = 'branch = "network.http.cacert=", "cat=", "network.http.capath=", "cat=", '
             .'"network.http.cacert.set=/etc/ssl/certs/ca-certificates.crt"';
-        // Old account configs need no regeneration, and every family receives one shell-safe option.
+        // Existing rc files need no regeneration; only 0.16 receives the IPv6 command.
         $this->pmssWriteFiles($home, ['.rtorrent.rc' => "try_import = .rtorrent.rc.custom\n",
             '.rtorrent.rc.custom' => "network.http.cacert.set = /custom/ca.pem\n"]);
         foreach (['0.16.25', '0.16.26', '0.9.8-r16', '0.9.8-stickz7.2'] as $version) {
             symlink($store.'/rtorrent/'.$version, $home.'/bin/rtorrent/default');
             $result = $this->pmssExecShellCommand(\pmssRtorrentExecutorCommand($home, $projection, $store), [], '');
-            $this->pmssAssertArraySubsetSame(['rc' => 0, 'lines' => ['-O|'.$caDefault.'|'.(strpos($version, '0.16.') === 0 ? '-D|' : '')]], $result);
+            $this->pmssAssertArraySubsetSame(['rc' => 0, 'lines' => ['-O|'.$caDefault.'|'
+                .(strpos($version, '0.16.') === 0 ? '-D|-O|network.block.ipv6.set = yes|' : '')]], $result);
             $this->assertSame("try_import = .rtorrent.rc.custom\n", file_get_contents($home.'/.rtorrent.rc'));
             $this->assertSame("network.http.cacert.set = /custom/ca.pem\n", file_get_contents($home.'/.rtorrent.rc.custom'));
             unlink($home.'/bin/rtorrent/default');

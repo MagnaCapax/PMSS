@@ -1264,6 +1264,10 @@ read-only probes used by baseline sanitization and source-build guards.
   default for Debian's CA bundle only when `network.http.cacert` and
   `network.http.capath` are both empty. This covers old account configs while
   preserving customer rc overrides across before/after-import option ordering.
+  Store compatibility families 0.16 and later also receive a separate `-O`
+  setting `network.block.ipv6.set = yes` under the existing `-D` family gate
+  (ADR 0114). Upstream applies it before rc imports; explicit rc settings retain
+  precedence. System and 0.9.8 launch commands remain unchanged (Refs #1279).
   Between child runs, a deleted PHP executable or a changed launcher checksum
   makes it clear its run marker and release its executor lock before exiting.
   The existing watchdog (or panel restart) then starts a fresh launcher. Failed
