@@ -41,8 +41,8 @@ class NginxMovedStateTest extends TestCase
                     ['mvdtst', 'old.example.test', '<script'], $html);
             }
         }
-        $primary = file_get_contents($ctx['nginxUsersDir'].'/mvdtst');
-        foreach (['location /user-mvdtst/', 'location /public-mvdtst/'] as $location) $this->assertTrue(strpos($primary, $location) !== false);
+        $this->assertStringContainsAllStrings(['location /user-mvdtst/', 'location /public-mvdtst/'],
+            file_get_contents($ctx['nginxUsersDir'].'/mvdtst'));
         $this->assertSame([], glob($ctx['homeBase'].'/mvdtst/www/*'));
     }
 

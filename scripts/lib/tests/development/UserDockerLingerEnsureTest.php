@@ -77,14 +77,13 @@ class UserDockerLingerEnsureTest extends TestCase
             'USER_DOCKER_STOP_DEADLINE_SECONDS',
             "userDockerStopSignal(\$user, \$uid, \$remainingPids, 9, 'remaining-kill')",
         ], substr($src, strpos($src, 'function userDockerStop(')), '', 'stop order: ');
-        $this->assertStringContainsAllStrings([
+        $this->assertStringContainsAndOmitsStrings([
             'USER_DOCKER_DAEMON_WAIT_SECONDS = 20',
             'USER_DOCKER_STOP_DEADLINE_SECONDS = 30',
             "'dockerd' => []",
             "'rootlesskit' => []",
             "'wrapper' => []",
             "ps -u '.escapeshellarg((string) \$uid)",
-        ], $src);
-        $this->assertTrue(strpos($src, 'pkill -f') === false);
+        ], ['pkill -f'], $src);
     }
 }

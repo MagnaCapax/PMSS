@@ -170,7 +170,7 @@ final class PikkumiesPreinstallHookTest extends TestCase
         $this->assertSame(3, substr_count($runs[0], 'install-pikkumies.sh'), 'the new install and both stopped installs run: '.$runs[0]);
         $this->assertSame(2, substr_count($runs[0], 'grep -qF'), 'each skipped as the user when its crontab has the update line: '.$runs[0]);
         foreach (['fxstop', 'fxmark'] as $user) {
-            $this->assertTrue(strpos($runs[0], ") && printf finished > '\\''".$root."/state/".$user."'\\''") !== false, "$user is recorded as finished only after it succeeds: ".$runs[0]);
+            $this->assertStringContainsString(") && printf finished > '\\''".$root."/state/".$user."'\\''", $runs[0], "$user is recorded as finished only after it succeeds: ".$runs[0]);
         }
         $this->assertSame(1, substr_count($runs[0], ' && touch -- '), 'only the new clone gets an empty completion file: '.$runs[0]);
         $this->assertFalse(file_exists($root.'/home/fxfresh/.mcxPikkumies'));
@@ -227,10 +227,10 @@ final class PikkumiesPreinstallHookTest extends TestCase
         $this->assertSame(['done', 'has'], $marked, 'only an existing install is marked up front; below the floor, without an installer or not yet installed stay unmarked');
         $this->assertSame(2, count($runs), 'unmarked: retried; marked after success: never again: '.implode(' | ', $runs));
         foreach (['nohup sh -c ', 'systemd-run', 'PIKKUMIES_SKIP_HERMES=1', 'install-pikkumies.sh'] as $part) {
-            $this->assertTrue(strpos($runs[0], $part) !== false, "chain lacks $part: ".$runs[0]);
+            $this->assertStringContainsString($part, $runs[0], "chain lacks $part: ".$runs[0]);
         }
         $this->assertSame(1, substr_count($runs[0], 'install-pikkumies.sh'), 'only one account is eligible: '.$runs[0]);
-        $this->assertTrue(strpos($runs[0], ") && touch -- '\\''".$root."/state/big'\\''") !== false, 'the state file must follow a successful install only: '.$runs[0]);
+        $this->assertStringContainsString(") && touch -- '\\''".$root."/state/big'\\''", $runs[0], 'the state file must follow a successful install only: '.$runs[0]);
     }
     public function testSpaceFloorSkipsWholeRunAndMeasuresHomeOnce(): void
     {
@@ -307,7 +307,7 @@ final class PikkumiesPreinstallHookTest extends TestCase
         $this->pmssWithPathPrefix($root.'/stub', function () use ($root, $home, &$command): void {
             $command = (string) \pmssAddUserPikkumiesPreinstallCommand(['name' => 'fixt01', 'memory' => '2000'], $home, $root.'/state');
         });
-        $this->assertTrue(strpos($command, ") && touch -- '\\''".$root."/state/fixt01'\\''") !== false, 'the marker must follow a successful install: '.$command);
+        $this->assertStringContainsString(") && touch -- '\\''".$root."/state/fixt01'\\''", $command, 'the marker must follow a successful install: '.$command);
         $this->assertFalse(file_exists($root.'/state/fixt01'), 'nothing is marked before the install has run');
     }
 }

@@ -150,11 +150,10 @@ class ConfigSyntaxValidationTest extends TestCase
     public function testLighttpdLogsUseAccountPipes(): void
     {
         $config = $this->renderLighttpdTemplate();
-        $this->assertTrue(strpos($config, '"mod_accesslog"') !== false, 'Access logging must stay enabled');
+        $this->assertStringContainsString('"mod_accesslog"', $config, 'Access logging must stay enabled');
         foreach (['server.errorlog' => 'error.log', 'accesslog.filename' => 'access.log'] as $key => $file) {
             $expected = '"|exec /bin/cat >> /home/testuser/.lighttpd/'.$file.'"';
-            $this->assertTrue(
-                (bool) preg_match('/^'.preg_quote($key, '/').'\\s*=\\s*'.preg_quote($expected, '/').'$/m', $config),
+            $this->assertMatches('/^'.preg_quote($key, '/').'\\s*=\\s*'.preg_quote($expected, '/').'$/m', $config,
                 $key.' must append through the per-user piped logger'
             );
         }
@@ -162,8 +161,7 @@ class ConfigSyntaxValidationTest extends TestCase
 
     public function testLighttpdTemplateDoesNotWritePidFile(): void
     {
-        $this->assertTrue(
-            strpos($this->renderLighttpdTemplate(), 'server.pid-file') === false,
+        $this->assertStringNotContainsString('server.pid-file', $this->renderLighttpdTemplate(),
             'Per-user lighttpd must start when the account cannot create a PID file'
         );
     }

@@ -101,8 +101,7 @@ final class PikkumiesPanelTest extends TestCase
         $this->assertStringContainsString('pikkumies:rows:[1-6]', $index);
         // The frame is exactly the bar page's box: 52px for one row, +22px per extra row, no border of its own.
         $this->assertStringContainsString("bar.style.height = (52 + 22 * (Number(event.data.slice(-1)) - 1)) + 'px';", $index);
-        $this->assertStringContainsString('.pmss-pikkumies-bar iframe{border:0;background:transparent}', $welcome);
-        $this->assertFalse(strpos($welcome, 'height:84px') !== false);
+        $this->assertStringContainsAndOmitsStrings(['.pmss-pikkumies-bar iframe{border:0;background:transparent}'], ['height:84px'], $welcome);
         $this->assertStringContainsString('}, 12000)', $index);
         // The network hint waits for the Pikkumies tab to be open (a frame loaded behind another tab cannot report ready)
         // and is never armed for the panel's own launcher page, which is this origin.
