@@ -214,6 +214,10 @@ Keep the canonical installer/update details under `docs/install.md` and
   reads remain valid; successful output, deadlines and limits retain their contracts.
   `QbittorrentBuildReadSafetyTest` covers first and partial read failures, an exited
   child, empty reads and successful captures using memory streams and fake processes.
+  Both probes also reject empty or NUL-containing executable paths before quoting,
+  profile allocation or process launch, returning `null`. Valid path bytes and
+  command construction stay unchanged. `QbittorrentBuildInputSafetyTest` checks
+  these refusals and launch-failure cleanup with intercepted profile/process I/O.
   Execution stays on testing machines; devbox checks changed-file PHP syntax only.
 - **scripts/lib/user/qbittorrentWebUiAuth.php** – Opt-in qBittorrent WebUI config reconciliation. It checks the same path predicate as the writer, updates every managed key copy, and stops a matching native daemon at most once per account per day until a stopped pass applies the file. The customer panel's password-required helper lives under `etc/skel/www/`.
 - **scripts/lib/user/deluge.php** and **delugeManagedConfig.php** retain provisioning

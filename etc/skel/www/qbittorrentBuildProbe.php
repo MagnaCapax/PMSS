@@ -4,6 +4,8 @@
 /** Start a separate process group and kill the whole probe on deadline or excess output. */
 function pmssQbittorrentFrontendBuildProbe(string $binary, array $ops = []): ?string
 {
+    // Refuse malformed executable paths before quoting, profile creation or launch.
+    if ($binary === '' || strpos($binary, "\0") !== false) return null;
     // --version still loads and saves the profile's qBittorrent.conf, so the probe gets an empty private profile.
     $profile = rtrim(sys_get_temp_dir(), '/').'/pmss-qbt-probe-'.bin2hex(random_bytes(8));
     if (!@mkdir($profile, 0700)) return null;
