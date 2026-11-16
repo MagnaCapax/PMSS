@@ -25,8 +25,7 @@ final class TorrentClientsSwitchLockTest extends TestCase
         $this->pmssWriteFile($parent.'/blocker', 'a file where the directory should be');
         [$lock, $refused] = \pmssConfigureTorrentClientLockOpen($parent.'/blocker/torrentClients', 'qbittorrent', 'qBittorrent');
         $this->assertSame(null, $lock);
-        $this->assertSame(503, $refused['status']);
-        $this->assertSame('The switch lock is unavailable.', $refused['message']);
+        $this->pmssAssertArraySubsetSame(['status' => 503, 'message' => 'The switch lock is unavailable.'], $refused);
     }
 
     public function testAcquisitionFaultsCloseOnlyStreamsNotTransferredToTheCaller(): void
@@ -90,7 +89,8 @@ echo json_encode($rows);
 PHP;
         $rows = $this->pmssRunInlinePhpJson($script);
         $this->assertSame(26, count($rows));
-        foreach ($rows as [$case, $sameFailure, $live, $transferred, $refusal, $events]) {
+        foreach ($rows as $row) {
+            $case = $row[0];
             $success = in_array($case, ['ok', 'created'], true);
             $beforeOpen = in_array($case, ['mkdir-false', 'link'], true);
             $noStream = $beforeOpen || in_array($case, ['open-false', 'quota', 'space', 'open-throw'], true);
@@ -109,8 +109,7 @@ PHP;
                         ? 'Your account is out of disk space, so the switch could not start. Nothing was changed. Free some space and try again.'
                         : ($noStream ? 'The switch lock is unavailable.' : 'A rTorrent switch is already running.')];
             }
-            $this->assertSame([true, $success, $success, $expectedRefusal, $expected],
-                [$sameFailure, $live, $transferred, $refusal, $events], $case);
+            $this->pmssAssertArraySubsetSame([1 => true, $success, $success, $expectedRefusal, $expected], $row, $case.' ');
         }
     }
 }

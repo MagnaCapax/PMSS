@@ -47,8 +47,7 @@ final class TorrentClientsCuratedDelugeTest extends TestCase
             $this->assertSame('bookworm-cp311', $entry['compatWindow']);
             $this->assertFalse($entry['isDefault']);
             $this->assertFalse($entry['disabled']);
-            $this->assertSame([], $entry['url']);
-            $this->assertSame('', $entry['sha256']);
+            $this->pmssAssertArraySubsetSame(['url' => [], 'sha256' => ''], $entry);
         }
     }
 

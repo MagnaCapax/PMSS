@@ -40,8 +40,7 @@ final class TorrentClientsSwitchRecoveryTest extends TestCase
                 $this->assertSame(409, $this->apply($home, $client, '4.2.0', $ops)['status']);
                 $this->assertSame([], $events);
                 $result = $this->apply($home, $client, 'system', $ops);
-                $this->assertSame($starts, $result['ok']);
-                $this->assertSame($starts ? 200 : 503, $result['status']);
+                $this->pmssAssertArraySubsetSame(['ok' => $starts, 'status' => $starts ? 200 : 503], $result);
                 $expected = ['backup', 'stop', 'repoint-system', 'start-system'];
                 if ($starts) $this->assertFalse(is_link($link));
                 else {
@@ -103,8 +102,7 @@ final class TorrentClientsSwitchRecoveryTest extends TestCase
                 ] + self::pmssMakeCallbacks(['resolve' => '/fixture/binary']);
                 $result = $this->apply($home, $client, '4.2.0', $ops);
                 $this->assertSame(507, $result['status'], $client);
-                $this->assertStringContainsString('out of disk space', $result['message']);
-                $this->assertStringContainsString('Nothing was changed.', $result['message']);
+                $this->assertStringContainsAllStrings(['out of disk space', 'Nothing was changed.'], $result['message']);
                 $this->assertSame($target, readlink($home.'/bin/'.$client.'/default'));
             }
         }
