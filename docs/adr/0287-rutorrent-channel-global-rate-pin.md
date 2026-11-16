@@ -1,7 +1,7 @@
 # ADR 0287: Restore ruTorrent's channel global-rate pin
 
 Date: 2026-11-15
-Category: compatibility
+Category: domain
 
 ## Status
 Accepted

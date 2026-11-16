@@ -1,7 +1,7 @@
 # ADR 0286: Rootless Docker watchdog version drift
 
 Date: 2026-11-15
-Category: operations
+Category: architecture
 
 ## Status
 Accepted

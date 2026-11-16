@@ -1,7 +1,7 @@
 # ADR 0282: Account permission walk filesystem boundaries
 
 Date: 2026-11-14
-Category: safety
+Category: security
 
 ## Status
 Accepted; partial implementation of issue #1268.
