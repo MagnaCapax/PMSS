@@ -28,6 +28,12 @@ Keep the canonical installer/update details under `docs/install.md` and
    documented in [`docs/update.md`](./update.md#phase-2--scriptsutilupdate-step2php).
 
 ## Key Modules
+- **scripts/lib/runtime/commandProcess.php** owns terminate-then-reap failure
+  cleanup through `pmssProcessTerminateAndClose()`. Command capture, account
+  commands, root-stage publication, web-root migration and stdout heartbeats
+  retain their live-handle guards, pipe cleanup and termination policy. Reaping
+  still runs after termination faults with normal `finally` precedence; injected
+  process fixtures export the real helper into their interception namespace.
 - **scripts/cron/checkGui.php** retains GUI-watchdog traversal, logging and the
   CLI guard. `gui/watchdogPaths.php` owns account normalization, path/ownership
   checks and sentinel-gated reconciliation; `gui/watchdogRepair.php` owns

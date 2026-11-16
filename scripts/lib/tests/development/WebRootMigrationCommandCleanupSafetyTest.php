@@ -46,6 +46,7 @@ function proc_close($process) {
     return $GLOBALS['case'] === 'child-false' ? 23 : 0;
 }
 PHP;
+        $script .= \pmssTestingFunctionExport('pmssProcessTerminateAndClose', 'WebRootMigrationCommandCleanupFixture');
         $script .= \pmssTestingFunctionExport('pmssUserWebRootMigrationRun', 'WebRootMigrationCommandCleanupFixture');
         $script .= <<<'PHP'
 $results = [];

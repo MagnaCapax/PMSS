@@ -7,6 +7,7 @@
 
 require_once __DIR__.'/../pathSafety.php';
 require_once __DIR__.'/../log.php';
+require_once __DIR__.'/../runtime/commandProcess.php';
 
 /**
  * Root launches account work without inherited env or a controlling TTY. Standard input stays the caller's
@@ -131,13 +132,9 @@ function pmssAccountPathRun(string $username, string $home, array $paths, string
         } finally {
             // Own only this launch's unreaped child; timeout diagnostics can throw after reaping.
             if (is_resource($process)) {
-                try {
-                    if ($timeoutSec > 0) pmssCommandTimeoutTerminate($process);
-                    elseif (function_exists('proc_terminate')) @proc_terminate($process);
-                } finally {
-                    // A pipe-close or termination fault must not skip reaping.
-                    @proc_close($process);
-                }
+                pmssProcessTerminateAndClose($process, $timeoutSec > 0 ? static function ($process): void {
+                    pmssCommandTimeoutTerminate($process);
+                } : null);
             }
         }
         throw $error;

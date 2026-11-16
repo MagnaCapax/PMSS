@@ -2,6 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 2).'/runtime/commandProcess.php';
 
 /** Diagnostic faults must not retain private stderr descriptors or launch real children. */
 class StderrCaptureSafetyTest extends TestCase
@@ -48,6 +49,7 @@ function fclose($handle) {
     return \fclose($handle);
 }
 PHP;
+        $script .= \pmssTestingFunctionExport('pmssProcessTerminateAndClose', 'StderrCaptureFixture');
         foreach (['accountPath.php', 'rootStagePublish.php'] as $module) {
             $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/lighttpd/'.$module, 'StderrCaptureFixture');
         }

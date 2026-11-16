@@ -2,6 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 2).'/runtime/commandProcess.php';
 
 /** Heartbeat ownership faults use memory streams without spawning or signalling a child. */
 final class StdoutHeartbeatCleanupSafetyTest extends TestCase
@@ -34,6 +35,7 @@ function proc_close($process) {
     return 0;
 }
 PHP;
+        $script .= \pmssTestingFunctionExport('pmssProcessTerminateAndClose', 'HeartbeatCleanupFixture');
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/stdoutHeartbeat.php', 'HeartbeatCleanupFixture');
         $script .= <<<'PHP'
 $rows = [];

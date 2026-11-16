@@ -1,6 +1,21 @@
 <?php
 /** Shared command process lifecycle; loaded through runtime/commands.php. */
 
+/** Reap an owned child even if termination throws; callers retain handle guards and pipe cleanup. */
+function pmssProcessTerminateAndClose($process, ?callable $terminate = null): void
+{
+    try {
+        if ($terminate !== null) {
+            $terminate($process);
+        } elseif (function_exists('proc_terminate')) {
+            @proc_terminate($process);
+        }
+    } finally {
+        // Reaping retains normal finally precedence over termination faults.
+        @proc_close($process);
+    }
+}
+
 function pmssProcessCloseExitCode($process, $lastStatus = null): int
 {
     $observedExitCode = is_array($lastStatus) ? ($lastStatus['exitcode'] ?? null) : null;
@@ -90,14 +105,7 @@ function pmssCommandProcessCapture(string $bash, string $timeoutCommand, int $ti
             try {
                 pmssProcessPipesClose($pipes);
             } finally {
-                try {
-                    if (function_exists('proc_terminate')) {
-                        @proc_terminate($process);
-                    }
-                } finally {
-                    // Pipe-close or termination faults must not skip reaping the child.
-                    @proc_close($process);
-                }
+                pmssProcessTerminateAndClose($process);
             }
         }
     }
@@ -138,11 +146,9 @@ function pmssCommandProcessCapture(string $bash, string $timeoutCommand, int $ti
         } finally {
             // Timeout logging can throw after reaping; never signal a closed process.
             if (is_resource($process)) {
-                try {
+                pmssProcessTerminateAndClose($process, static function ($process): void {
                     pmssCommandTimeoutTerminate($process);
-                } finally {
-                    @proc_close($process);
-                }
+                });
             }
         }
         throw $error;

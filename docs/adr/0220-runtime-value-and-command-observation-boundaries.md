@@ -108,6 +108,26 @@ no completed samples, but the censored timeout sample is still returned.
 killed captures with injected command results. Execution stays on the testing
 machine; local verification is limited to changed-file PHP syntax.
 
+## Owned-child cleanup consolidation (2026-11-16)
+
+`runtime/commandProcess.php` now owns `pmssProcessTerminateAndClose()`, replacing
+six terminate/reap lifetimes in command setup and capture, account commands,
+root-stage publication, web-root migration and stdout heartbeat shutdown.
+The default operation retains the existing `proc_terminate` availability gate;
+optional termination callbacks retain process-group termination for timed
+commands and unconditional direct termination for heartbeats. Callers retain
+their live-handle checks, pipe cleanup and diagnostic lifetimes. The helper
+always attempts reaping after termination and preserves PHP's `finally`
+throwable precedence. Reap-only and signal-9 finalizers keep their own contracts.
+
+Direct includes remain definition-only and inside the operator tree. Existing
+fault fixtures export the real helper into the same namespace as their process
+interceptors, preserving memory-only resources and all trace assertions.
+The command-injection and credential review above still applies: launch bytes,
+validation, identity, secrets, permissions, logging and exposure do not change.
+Local verification is changed-file PHP syntax and reference inspection; all
+execution, including dry runs, remains on testing machines.
+
 ## References
 
 - [Architecture overview](../architecture.md)

@@ -2,6 +2,7 @@
 /** Private stderr capture for managed-file publication. @license GPL-3.0-only */
 
 require_once __DIR__.'/../log.php';
+require_once __DIR__.'/../runtime/commandProcess.php';
 
 /** Run the pinned publish command without exposing content or retaining unbounded stderr in memory. */
 function pmssRootStagePublishRun(string $command, ?string &$failure = null): bool
@@ -24,12 +25,7 @@ function pmssRootStagePublishRun(string $command, ?string &$failure = null): boo
     } catch (\Throwable $error) {
         // A failed reap can leave this invocation's child owned and running.
         if (is_resource($process)) {
-            try {
-                if (function_exists('proc_terminate')) @proc_terminate($process);
-            } finally {
-                // Termination faults must not skip the remaining reap attempt.
-                @proc_close($process);
-            }
+            pmssProcessTerminateAndClose($process);
         }
         throw $error;
     } finally {

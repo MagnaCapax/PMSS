@@ -80,12 +80,7 @@ function pmssUserWebRootMigrationRun(string $user, string $home, array $paths, s
     } catch (\Throwable $error) {
         // The legacy fallback owns its child too when the first reap throws.
         if (is_resource($process)) {
-            try {
-                if (function_exists('proc_terminate')) @proc_terminate($process);
-            } finally {
-                // A termination fault must not skip the remaining reap attempt.
-                @proc_close($process);
-            }
+            pmssProcessTerminateAndClose($process);
         }
         throw $error;
     }

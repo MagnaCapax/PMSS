@@ -2,6 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 2).'/runtime/commandProcess.php';
 
 /** Publication faults must release the acquired child before diagnostic capture. */
 class RootStagePublishCleanupSafetyTest extends TestCase
@@ -45,6 +46,7 @@ function fread($handle, $length) { $GLOBALS['readLength'] = $length; return obse
 function pmssLogControlCharactersReplace($value) { return observe('sanitize', $value); }
 function fclose($handle) { observe('capture-close'); return \fclose($handle); }
 PHP;
+        $script .= \pmssTestingFunctionExport('pmssProcessTerminateAndClose', 'RootStagePublishCleanupFixture');
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/lighttpd/rootStagePublish.php', 'RootStagePublishCleanupFixture');
         $script .= <<<'PHP'
 $results = [];

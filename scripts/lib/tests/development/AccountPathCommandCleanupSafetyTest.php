@@ -2,6 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 2).'/runtime/commandProcess.php';
 
 /** Account command faults must release acquired resources without launching children. */
 class AccountPathCommandCleanupSafetyTest extends TestCase
@@ -65,6 +66,7 @@ function rewind($handle) { observe('rewind'); return true; }
 function fread($handle, $length) { return observe('read', ' diagnostic '); }
 function pmssLogControlCharactersReplace($value) { return $value; }
 PHP;
+        $script .= \pmssTestingFunctionExport('pmssProcessTerminateAndClose', 'AccountCommandCleanupFixture');
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/lighttpd/accountPath.php', 'AccountCommandCleanupFixture');
         $script .= <<<'PHP'
 $results = [];

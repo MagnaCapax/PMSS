@@ -39,6 +39,7 @@ function register_shutdown_function($callback) {}
 function proc_terminate($process) { ++$GLOBALS['stopped']; return true; }
 function proc_close($process) { ++$GLOBALS['closed']; return \proc_close($process); }
 PHP;
+        $script .= \pmssTestingFunctionExport('pmssProcessTerminateAndClose', 'HeartbeatStatusFixture');
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/stdoutHeartbeat.php', 'HeartbeatStatusFixture');
         $script .= <<<'PHP'
 [$GLOBALS['parent'], $GLOBALS['status']] = json_decode(getenv('PMSS_TEST_HEARTBEAT_STATUS'), true);

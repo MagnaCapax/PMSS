@@ -1,6 +1,8 @@
 <?php
 /** Keep a non-interactive caller's stdout readable during blocking operations. */
 
+require_once __DIR__.'/commandProcess.php';
+
 /** The caller supplies its TTY probe result so the decision stays testable. */
 function pmssStdoutHeartbeatShouldStart(bool $stdoutIsTty): bool
 {
@@ -58,10 +60,7 @@ function pmssStdoutHeartbeatStop(): void
     if (!is_resource($process) || get_resource_type($process) !== 'process') {
         return;
     }
-    try {
+    pmssProcessTerminateAndClose($process, static function ($process): void {
         @proc_terminate($process);
-    } finally {
-        // A termination failure must not skip reaping the child we started.
-        @proc_close($process);
-    }
+    });
 }
