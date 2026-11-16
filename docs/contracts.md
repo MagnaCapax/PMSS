@@ -891,6 +891,16 @@ Sub-handlers:
 
 ## Web Stack & System Prep
 
+- `pmssReplaceUserFilePreservingMetadata()` in `lighttpd/userFileReplace.php`
+  preserves existing file mode/uid/gid. For a missing file outside managed homes,
+  a root caller uses the parent directory's uid/gid with the requested fallback
+  mode; unreadable parent metadata retains the previous ownership fallback.
+  Managed-home creation continues through the account writer. Ownership changes
+  use the staged open inode and must succeed before publication. Port markers
+  retain their 0640 fallback; no world-readable mode is required for owner access.
+  `UserFileOwnershipFallbackTest` covers this policy with intercepted operations
+  on the testing machine.
+
 - Required-service recovery in `scripts/lib/update/services/systemd/recovery.php`
   attempts update-lock release even when descriptor-environment inspection or
   restoration throws. Restoration still precedes release while the lock is held;

@@ -69,7 +69,7 @@ function pmssReplaceUserFileWithMetadata(string $path, string $content, int $mod
     });
 }
 
-/** Replace a file while keeping existing mode/uid/gid when available. */
+/** Keep existing metadata; fresh files use the fallback mode and parent uid/gid. */
 function pmssReplaceUserFilePreservingMetadata(string $path, string $content, int $fallbackMode = 0644): bool
 {
     if (pmssManagedAccountHomePath($path)) {
@@ -102,6 +102,10 @@ function pmssReplaceUserFilePreservingMetadata(string $path, string $content, in
             $owner = $stat['uid'];
             $group = $stat['gid'];
         }
+    } elseif ($canAdjustOwnership && !pmssPathExistsOrLink($path) && is_array($stat = @stat(dirname($path)))) {
+        // A fresh inode must not inherit the root writer's ownership by accident.
+        $owner = $stat['uid'];
+        $group = $stat['gid'];
     }
 
     return pmssReplaceUserFile($path, $content, static function (string $tmpPath) use ($group, $mode, $owner): bool {
