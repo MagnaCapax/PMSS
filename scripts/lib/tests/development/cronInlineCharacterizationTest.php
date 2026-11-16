@@ -137,7 +137,7 @@ class CronInlineCharacterizationTest extends TestCase
 
     public function testWireguardSyncconfRejectsPartialTempfileWrites(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/checkWireguard.php', [
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/wireguard/watchdogCommands.php', [
             '$config = (string) $strip[\'stdout\'];',
             '$written = @file_put_contents($tmp, $config);',
             '$secured = @chmod($tmp, 0600);',

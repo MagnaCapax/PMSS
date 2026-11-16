@@ -28,6 +28,11 @@ Keep the canonical installer/update details under `docs/install.md` and
    documented in [`docs/update.md`](./update.md#phase-2--scriptsutilupdate-step2php).
 
 ## Key Modules
+- **scripts/cron/checkWireguard.php** retains the cron entrypoint and loads
+  `wireguard/watchdog.php` for configuration preflight and service dispatch.
+  `watchdogPeers.php` owns module/peer observations and reconciliation;
+  `watchdogCommands.php` owns bounded commands, config staging and reporting.
+  Characterization locks output, command order and failure boundaries (ADR 0290).
 - **etc/skel/bin/pmssAccountAgent.php** keeps account command capture local to
   the customer tree. Pipe I/O faults attempt both pipe closes, then terminate
   and reap only the child acquired by that invocation. An already-reaped child
