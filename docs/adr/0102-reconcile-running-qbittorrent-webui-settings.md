@@ -59,3 +59,23 @@ prepared support response before the first host. Enable no more than 2.5% of
 hosts per batch; verify one prompted account recovers on one panel visit and
 that no account is repeatedly stopped before expanding. Removing the marker
 turns off future reconciliation. The network-level design remains separate.
+
+## Stop transaction cleanup follow-up (2026-11-16)
+
+The stop transaction closes its acquired state stream in `finally`, including
+when marker I/O, the config callback, native-process rechecking or signaling
+throws. Closing releases any held lock; ordinary paths retain their explicit
+unlock order, state bytes, rollback writes, stop interval and result strings.
+Lone throwables propagate unchanged; close faults retain PHP's `finally`
+precedence. `QbittorrentWebUiStopCleanupSafetyTest` intercepts filesystem and
+process operations with memory streams. Execution stays on testing machines;
+devbox validation checks changed-file PHP syntax only, without live stops.
+
+Security review retains the guards above and ADR 0111's credential boundary.
+[CVE-2023-30801](https://www.cve.org/CVERecord?id=CVE-2023-30801) concerns default
+WebUI credentials; WebUI control can expose account files and command execution.
+The marker stores only timestamps, pending state and status, with existing 0600
+mode and owner checks. Primary/service credential storage and separation,
+redaction, file permissions, web endpoints and listener binds remain unchanged.
+PHP's [error-control documentation](https://www.php.net/manual/en/language.operators.errorcontrol.php)
+confirms suppressed I/O diagnostics can still invoke custom error handlers.

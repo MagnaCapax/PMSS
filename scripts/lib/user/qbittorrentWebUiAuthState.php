@@ -70,66 +70,70 @@ function pmssQbittorrentWebUiAuthStop(string $user, array $pids, bool $changed, 
     if (!pmssPathTargetIsSafe($path, false, true, false)) return 'state-failed';
     $handle = @fopen($path, 'c+');
     if ($handle === false) return 'state-failed';
-    @chmod($path, 0600);
-    if (!@flock($handle, LOCK_EX)) { fclose($handle); return 'state-failed'; }
-    $stat = fstat($handle);
-    if (!is_array($stat) || $stat['uid'] !== posix_geteuid() || ($stat['mode'] & 0022) !== 0) {
-        flock($handle, LOCK_UN); fclose($handle); return 'state-failed';
-    }
-
-    rewind($handle);
-    $previous = (string) stream_get_contents($handle);
-    $parts = explode("\n", trim($previous));
-    $last = ctype_digit($parts[0] ?? '') ? (int) $parts[0] : 0;
-    $pending = ($parts[1] ?? '') === '1';
-    $logged = $parts[2] ?? '';
-    // Pending survives a deferred pass even after the config file converges.
-    $now = isset($ops['now']) ? (int) $ops['now'] : time();
-    $status = 'idle';
-    if ($pids === [] || (!$changed && !$pending)) {
-        // A stopped daemon or a verified later pass completes the prior apply.
-        $last = 0; $pending = false;
-    } elseif ($changed || $pending) {
-        $pending = true;
-        if ($last > 0 && $now - $last < 86400) {
-            $status = 'deferred';
-        } else {
-            $last = $now;
-            $status = 'stop';
+    try {
+        @chmod($path, 0600);
+        if (!@flock($handle, LOCK_EX)) return 'state-failed';
+        $stat = fstat($handle);
+        if (!is_array($stat) || $stat['uid'] !== posix_geteuid() || ($stat['mode'] & 0022) !== 0) {
+            flock($handle, LOCK_UN); return 'state-failed';
         }
-    }
 
-    $payload = $last."\n".($pending ? '1' : '0')."\n".$logged."\n";
-    if (!pmssQbittorrentWebUiAuthStateWrite($handle, $payload)) {
-        $status = 'state-failed';
-    }
-    // Record the pending state before changing a file held in daemon memory.
-    if ($status !== 'state-failed' && $changed && $write !== null && !$write()) {
-        pmssQbittorrentWebUiAuthStateWrite($handle, $previous);
-        $status = 'write-failed';
-    }
-    if ($status === 'stop') {
-        // Do not ask qBittorrent to save its in-memory config on exit.
-        $signal = $ops['signal'] ?? static function (int $pid): bool { return @posix_kill($pid, 9); };
-        $sent = true;
-        $eligible = 0;
-        foreach ($pids as $pid) {
-            // Recheck after the config write; a numeric process id may be reused.
-            if ($ops === [] ? !in_array((int) $pid, pmssTorrentClientNativeStopPids($user, 'qbittorrent'), true)
-                : !pmssQbittorrentWebUiAuthPidIsNative((int) $pid, $ops)) continue;
-            $eligible++;
-            $sent = $signal($pid) && $sent;
+        rewind($handle);
+        $previous = (string) stream_get_contents($handle);
+        $parts = explode("\n", trim($previous));
+        $last = ctype_digit($parts[0] ?? '') ? (int) $parts[0] : 0;
+        $pending = ($parts[1] ?? '') === '1';
+        $logged = $parts[2] ?? '';
+        // Pending survives a deferred pass even after the config file converges.
+        $now = isset($ops['now']) ? (int) $ops['now'] : time();
+        $status = 'idle';
+        if ($pids === [] || (!$changed && !$pending)) {
+            // A stopped daemon or a verified later pass completes the prior apply.
+            $last = 0; $pending = false;
+        } elseif ($changed || $pending) {
+            $pending = true;
+            if ($last > 0 && $now - $last < 86400) {
+                $status = 'deferred';
+            } else {
+                $last = $now;
+                $status = 'stop';
+            }
         }
-        if ($eligible === 0) $sent = false;
-        if (!$sent) {
+
+        $payload = $last."\n".($pending ? '1' : '0')."\n".$logged."\n";
+        if (!pmssQbittorrentWebUiAuthStateWrite($handle, $payload)) {
+            $status = 'state-failed';
+        }
+        // Record the pending state before changing a file held in daemon memory.
+        if ($status !== 'state-failed' && $changed && $write !== null && !$write()) {
             pmssQbittorrentWebUiAuthStateWrite($handle, $previous);
-            $status = 'stop-failed';
-        } else {
-            // A delivered KILL prevents a clean save of the old in-memory map.
-            pmssQbittorrentWebUiAuthStateWrite($handle, $last."\n0\n".$logged."\n");
+            $status = 'write-failed';
         }
+        if ($status === 'stop') {
+            // Do not ask qBittorrent to save its in-memory config on exit.
+            $signal = $ops['signal'] ?? static function (int $pid): bool { return @posix_kill($pid, 9); };
+            $sent = true;
+            $eligible = 0;
+            foreach ($pids as $pid) {
+                // Recheck after the config write; a numeric process id may be reused.
+                if ($ops === [] ? !in_array((int) $pid, pmssTorrentClientNativeStopPids($user, 'qbittorrent'), true)
+                    : !pmssQbittorrentWebUiAuthPidIsNative((int) $pid, $ops)) continue;
+                $eligible++;
+                $sent = $signal($pid) && $sent;
+            }
+            if ($eligible === 0) $sent = false;
+            if (!$sent) {
+                pmssQbittorrentWebUiAuthStateWrite($handle, $previous);
+                $status = 'stop-failed';
+            } else {
+                // A delivered KILL prevents a clean save of the old in-memory map.
+                pmssQbittorrentWebUiAuthStateWrite($handle, $last."\n0\n".$logged."\n");
+            }
+        }
+        flock($handle, LOCK_UN);
+    } finally {
+        // Close releases the marker lock even when I/O, callbacks or explicit unlock throw.
+        fclose($handle);
     }
-    flock($handle, LOCK_UN);
-    fclose($handle);
     return $status;
 }
