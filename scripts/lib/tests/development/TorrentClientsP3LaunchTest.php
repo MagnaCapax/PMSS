@@ -56,11 +56,11 @@ final class TorrentClientsP3LaunchTest extends TestCase
             'native' => $unexpected, 'probe' => $unexpected, 'run' => $unexpected,
         ]));
         $source = $this->pmssReadRepoFile('scripts/cron/transmissionInstancesCheck.php');
-        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/cron/transmissionInstancesCheck.php', [
+        $this->assertOrderedStrings([
             'pmssCronLockAcquire(', 'pmssUserWatchdogBackoffActive(',
             'pmssLighttpdTransmissionSelected(', 'pmssTransmissionAccountEnabled($home)',
             'pmssTorrentClientLauncherLivenessPids(', 'pmssTransmissionSettingsApply(',
-        ]);
+        ], $source);
         $this->assertStringContainsString('if (!pmssTransmissionAccountEnabled($home)) continue;', $source);
     }
 
@@ -201,8 +201,8 @@ final class TorrentClientsP3LaunchTest extends TestCase
     {
         $this->pmssAssertRepoFileContainsOrderedStrings('scripts/cron/checkLighttpdInstances.php',
             ['pmssLighttpdTransmissionRouteConverge($thisUser, $homeDir);', "if (pmssUserWatchdogBackoffActive(\$thisUser, 'lighttpd')) continue;"]);
-        $cli = (string) file_get_contents($this->pmssRepoPath('etc/skel/www/torrentClientsResolve.php'));
-        $this->assertStringContainsString('pmssTransmissionSettingsPrepare($home) && pmssTransmissionLaunch($home)', $cli);
+        $this->pmssAssertRepoFileContainsString('etc/skel/www/torrentClientsResolve.php',
+            'pmssTransmissionSettingsPrepare($home) && pmssTransmissionLaunch($home)');
     }
     public function testLaunchCliPrepareRunsWithoutTheConfigurePageLoaded(): void
     {

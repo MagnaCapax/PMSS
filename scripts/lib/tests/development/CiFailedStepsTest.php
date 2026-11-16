@@ -33,20 +33,18 @@ class CiFailedStepsTest extends TestCase
     {
         [$rc, $out] = $this->runSteps(['job-build.log' => self::LOG]);
         $this->assertSame(0, $rc);
-        $this->assertStringContainsString("ADR Category invalid ('safety')", (string) $out);
-        $this->assertStringContainsString('Run bash scripts/testing/doctrine-lint.sh', (string) $out);
-        $this->assertStringContainsString('##[error]Process completed with exit code 1.', (string) $out);
-        $this->assertStringNotContainsString('Tests: 12, Failures: 0', (string) $out);
-        $this->assertStringNotContainsString('Post job cleanup.', (string) $out);
+        $this->assertStringContainsAndOmitsStrings([
+            "ADR Category invalid ('safety')", 'Run bash scripts/testing/doctrine-lint.sh',
+            '##[error]Process completed with exit code 1.',
+        ], ['Tests: 12, Failures: 0', 'Post job cleanup.'], (string) $out);
     }
 
     public function testFailedStepsOfEveryJobAreKeptAndNamed(): void
     {
         $smoke = "T ##[group]Run php -l etc/a.php\nT PHP Parse error in etc/a.php\nT ##[error]Process completed with exit code 255.\n";
         [, $out] = $this->runSteps(['job-build.log' => self::LOG, 'job-smoke.log' => $smoke]);
-        $this->assertStringContainsString('failed step in job-build.log', (string) $out);
-        $this->assertStringContainsString('failed step in job-smoke.log', (string) $out);
-        $this->assertStringContainsString('PHP Parse error in etc/a.php', (string) $out);
+        $this->assertStringContainsAllStrings(['failed step in job-build.log', 'failed step in job-smoke.log',
+            'PHP Parse error in etc/a.php'], (string) $out);
     }
 
     public function testAGreenLogWritesNoFile(): void
@@ -62,9 +60,8 @@ class CiFailedStepsTest extends TestCase
             ."T FAIL: SomeTest::testThing\nT ##[error]Process completed with exit code 1.\n";
         [, $out] = $this->runSteps(['job-build.log' => $big]);
         $this->assertTrue(strlen((string) $out) <= 524288 + 200, 'excerpt stays within its cap');
-        $this->assertStringContainsString('Run scripts/testing/test-php.sh', (string) $out);
-        $this->assertStringContainsString('FAIL: SomeTest::testThing', (string) $out);
-        $this->assertStringContainsString('bytes cut', (string) $out);
+        $this->assertStringContainsAllStrings(['Run scripts/testing/test-php.sh',
+            'FAIL: SomeTest::testThing', 'bytes cut'], (string) $out);
     }
 
     public function testManyFailedStepsStillFitTheCap(): void

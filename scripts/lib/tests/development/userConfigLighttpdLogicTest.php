@@ -278,17 +278,12 @@ LIGHTTPD;
             ['maxProcs' => 2, 'children' => 6]
         );
 
-        $this->assertStringContainsString(
+        $this->assertStringContainsAndOmitsStrings([
             '"bin-path"              => "/usr/bin/php-cgi -c /home/fixtureacct/.lighttpd/php.ini",',
-            $rendered
-        );
-        $this->assertStringContainsString(
             '$HTTP["url"] =~ "(?i)^/jellyfin(/(emby|mediabrowser))?/System/(Restart|Shutdown)" {' . "\n" .
             '    url.access-deny = ( "" )' . "\n" .
             '}',
-            $rendered
-        );
-        $this->pmssAssertStringNotContainsString('"bin-args"', $rendered);
+        ], ['"bin-args"'], $rendered);
     }
 
     public function testFastcgiSpawnLoadMatchesWorkerPoolAcrossResourcePlans(): void
@@ -337,9 +332,7 @@ LIGHTTPD;
 
     public function testUserConfigApplyFacadeLoadsFocusedHelpers(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/lib/lighttpd/userConfigApply.php');
-
-        $this->assertStringContainsAllStrings([
+        $src = $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/lighttpd/userConfigApply.php', [
             "require_once __DIR__.'/configRender.php';",
             "require_once __DIR__.'/delugeWebConf.php';",
             "require_once __DIR__.'/panelSessionLogin.php';",
@@ -347,7 +340,7 @@ LIGHTTPD;
             "require_once __DIR__.'/resourcePlan.php';",
             "require_once __DIR__.'/userDirectoriesPrepare.php';",
             'function pmssUserConfigLighttpdConfigureUser(',
-        ], $src);
+        ]);
         foreach ([
             'pmssClampLighttpdBandwidthLimits',
             'pmssStripLighttpdWebdavConfig',
