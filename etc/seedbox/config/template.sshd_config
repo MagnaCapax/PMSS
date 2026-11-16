@@ -17,9 +17,8 @@
 
 # Port and listening addresses
 Port 22
-AddressFamily any
+AddressFamily inet
 ListenAddress 0.0.0.0
-ListenAddress ::
 
 # Faster logins
 UseDNS no

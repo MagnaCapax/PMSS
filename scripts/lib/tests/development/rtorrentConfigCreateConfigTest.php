@@ -311,8 +311,13 @@ class rtorrentConfigCreateConfigTest extends TestCase
         $cfg = $this->rtorrentConfigFixture();
         $guard = 'branch = ((equal, ((system.client_version)), ((cat, "0.9.8")))), '
             .'((encoding.add, utf8)), ((network.bind_address.set, "0.0.0.0"))';
+        // ADR 0114: the template binds IPv4 for every build; the encoding migration still emits the old guard, which the
+        // per-user IPv4 rewrite (pmssRtorrentConfigIpv4Replace) converts in the same update run.
+        $ipv4Block = 'branch = ((equal, ((system.client_version)), ((cat, "0.9.8")))), ((encoding.add, utf8)), ((cat))'
+            ."\nnetwork.bind_address.set = 0.0.0.0\ncatch = {\"network.block.ipv6.set=yes\"}";
         $template = $this->pmssReadRepoFile('etc/seedbox/config/template.rtorrent.rc');
-        $this->assertStringContainsString("\n".$guard."\n", $template);
+        $this->assertStringContainsString("\n".$ipv4Block."\n", $template);
+        $this->assertSame($ipv4Block, pmssRtorrentConfigIpv4Replace($guard));
 
         // Cover first/last lines, duplicate directives, CRLF, and a full legacy template.
         foreach ([
@@ -321,7 +326,7 @@ class rtorrentConfigCreateConfigTest extends TestCase
             "network.scgi.open_port = 127.0.0.1:4100\nencoding.add = utf8\ntry_import = .rtorrent.rc.custom\n",
             "# retain\r\nencoding.add = utf8\r\ntry_import = .rtorrent.rc.custom\r\n",
             "encoding.add = utf8\nencoding.add = utf8\n",
-            str_replace($guard, 'encoding.add = utf8', $template),
+            str_replace($ipv4Block, 'encoding.add = utf8', $template),
         ] as $legacy) {
             $this->pmssWriteFile($path, $legacy);
             chmod($path, 0640);

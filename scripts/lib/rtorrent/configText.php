@@ -32,3 +32,24 @@ function pmssRtorrentConfigEncodingReplace(string $text): string
         'branch = ((equal, ((system.client_version)), ((cat, "0.9.8")))), '
         .'((encoding.add, utf8)), ((network.bind_address.set, "0.0.0.0"))', $text);
 }
+
+/** ADR 0114: replace only the former managed branch; retain customer directives and newline bytes. */
+function pmssRtorrentConfigIpv4Replace(string $text): string
+{
+    $legacy = pmssRtorrentConfigEncodingReplace('encoding.add = utf8');
+    return preg_replace_callback('/^'.preg_quote($legacy, '/').'(\r?)(?=$)/m',
+        static function (array $match): string {
+            $newline = $match[1]."\n";
+            return 'branch = ((equal, ((system.client_version)), ((cat, "0.9.8")))), '
+                .'((encoding.add, utf8)), ((cat))'.$newline
+                .'network.bind_address.set = 0.0.0.0'.$newline
+                .'catch = {"network.block.ipv6.set=yes"}'.$match[1];
+        }, $text);
+}
+
+/** Catch only the known unsupported bare command; all other custom-file bytes survive. */
+function pmssRtorrentConfigIpv6CatchReplace(string $text): string
+{
+    return preg_replace('/^network\.block\.ipv6\.set = yes(?=\r?$)/m',
+        'catch = {"network.block.ipv6.set=yes"}', $text);
+}

@@ -53,6 +53,27 @@ function pmssUserRefreshPermissions(array $ctx): void
 
     $rcCustomPath = "{$home}/.rtorrent.rc.custom";
     $rcCustomContent = pmssReadRegularFileContents($rcCustomPath);
+    // Exact-line IPv4 repairs use the same account writer; never regenerate edited custom files.
+    if (!pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
+        foreach (['.rtorrent.rc' => 'pmssRtorrentConfigIpv4Replace',
+            '.rtorrent.rc.custom' => 'pmssRtorrentConfigIpv6CatchReplace'] as $name => $transform) {
+            $path = $home.'/'.$name;
+            try {
+                $content = pmssReadRegularFileContents($path);
+                if ($content === null) {
+                    if (pmssPathExistsOrLink($path)) pmssUserLog($user, '[WARN] '.$name.' IPv4 repair refused unreadable or unsafe file');
+                    continue;
+                }
+                $updated = $transform($content);
+                if ($updated !== $content) {
+                    $written = pmssReplaceUserFilePreservingMetadata($path, $updated, 0640);
+                    pmssUserLog($user, ($written ? 'Updated ' : '[WARN] Failed updating ').$name.' IPv4 compatibility lines');
+                }
+            } catch (\Throwable $error) {
+                pmssUserLog($user, '[WARN] '.$name.' IPv4 repair failed: '.$error->getMessage());
+            }
+        }
+    }
     // Seed only genuinely absent paths; retain every existing-file migration guard.
     if (!pmssPathExistsOrLink($rcCustomPath) || (is_string($rcCustomContent)
         && in_array(sha1($rcCustomContent), [

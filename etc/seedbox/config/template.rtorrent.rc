@@ -54,7 +54,9 @@ throttle.max_uploads.global.set = ##uploadSlots
 
 protocol.encryption.set = allow_incoming,try_outgoing,enable_retry
 # 0.9.8 needs encoding.add for name.utf-8; 0.16 removed it (it prefers name.utf-8 by default)
-# and listens on IPv6 unless bound, so it binds IPv4 like 0.9.8.
-branch = ((equal, ((system.client_version)), ((cat, "0.9.8")))), ((encoding.add, utf8)), ((network.bind_address.set, "0.0.0.0"))
+# Keep the encoding guard separate: every build needs the IPv4 bind (ADR 0114).
+branch = ((equal, ((system.client_version)), ((cat, "0.9.8")))), ((encoding.add, utf8)), ((cat))
+network.bind_address.set = 0.0.0.0
+catch = {"network.block.ipv6.set=yes"}
 method.insert = system.startup_time, value|const, (system.time)
 try_import = .rtorrent.rc.custom
