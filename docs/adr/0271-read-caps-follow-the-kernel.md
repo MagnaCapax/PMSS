@@ -64,6 +64,20 @@ disk, not a seedbox under real load.
 - `agentDiagnostics` reports the configured string `auto`. The resolved mode is the
   `mode` field of enforce records in `/var/log/pmss/dynamic-iops.jsonl`, or their absence.
 
+## Amendment: a stopped trial removes the kernel, not only boots the old one (2026-11-16)
+
+"Booting the previous kernel" does not hold on its own. GRUB's default entry
+(`GRUB_DEFAULT=0`) boots the highest kernel version, and the PMSS update's reboot step
+picks the newest image with `ls /boot/vmlinuz-* | sort -V | tail -1`. A trial kernel such
+as `7.3.4-zabbly+` sorts above every `6.1.0-N-amd64`, so a host booted back once into 6.1
+returns to the trial kernel at its next routine reboot, and the update's reboot step
+treats that reboot as warranted.
+
+A stop condition therefore ends the trial on a host by purging the trial kernel package,
+running `update-grub`, checking that the default entry in `/boot/grub/grub.cfg` is the
+6.1 kernel, and then rebooting and checking `uname -r`. The same applies when a trial
+passes on some hosts and they "return to the fleet kernel".
+
 ## References
 - [Caps off after journal stall](0243-read-caps-off-by-default-after-the-linux-6-1-journal-stall.md)
 - [Read caps enforced by default](0231-read-caps-enforced-by-default-and-contention-without-cap-stall.md)
