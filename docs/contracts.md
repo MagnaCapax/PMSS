@@ -736,6 +736,12 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
     pipes and delay parent exit or lock release (#905). Start notices, user logs,
     command deadlines and timeout backoff remain active; launch output is discarded.
 - qBittorrent toggle and watchdog diagnostics
+  - Operator and customer version-probe profile cleanup attempts the final
+    non-recursive `rmdir()` even when traversal or entry removal throws.
+    The existing unreadable-directory exception handling and link policy stay
+    intact. Lone exceptions/errors propagate unchanged; combined cleanup faults
+    retain PHP's `finally` precedence. `QbittorrentBuildProfileCleanupSafetyTest`
+    covers both copies with intercepted filesystem operations on testing machines.
   - Operator and customer stopped-config locks attempt stream closure even if
     unlocking throws. Resolver launches own their acquired lock through setup,
     resolution, notices and start callbacks; callers supplying a held lock keep

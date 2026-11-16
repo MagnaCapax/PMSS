@@ -74,6 +74,8 @@ function pmssQbittorrentFrontendBuildProbeClean(string $profile): void
         }
     } catch (UnexpectedValueException $e) {
         // An unreadable leftover stays private (0700) to this account.
+    } finally {
+        // A traversal or entry-removal fault must still attempt empty-profile cleanup.
+        @rmdir($profile);
     }
-    @rmdir($profile);
 }
