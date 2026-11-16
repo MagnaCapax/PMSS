@@ -52,3 +52,23 @@ throwables propagate unchanged; combined faults retain PHP's `finally`
 precedence. `WebRootMigrationCopyCleanupSafetyTest` intercepts filesystem and
 account operations without copying or deleting real paths. Execution stays on
 testing machines; devbox verification checks changed-file PHP syntax only.
+
+Full web-root restoration similarly owns its account-created staging tree until
+publication. Thrown skeleton validation, copying, stage validation, ownership
+inspection, destination inspection or rename failures attempt the existing
+account-authority removal in `finally`. Ordinary refusals still clean before
+logging; cleanup faults are attempted once, and published trees survive logger
+faults. Lone throwables propagate unchanged, with PHP's normal `finally`
+precedence for combined faults. `WebRootReconcileFullCleanupSafetyTest` intercepts
+all I/O and account operations, covering ordinary results and both throwable
+families without creating or removing real trees. Execution stays on testing
+machines; devbox verification checks changed-file PHP syntax only.
+
+The full-restore review retains account identity, path and symlink guards,
+shell quoting, staging mode and cleanup authority. Staged panel bytes stay
+account-local; credential separation, payload-free diagnostics, file permissions,
+listeners and web routes are unchanged. PHP's historical pathname-NUL issue
+([CVE-2015-2348](https://www.php.net/ChangeLog-5.php#5.4.39)) reinforces retaining
+the existing path checks. The [error-control documentation](https://www.php.net/manual/en/language.operators.errorcontrol.php)
+confirms custom error handlers still run for suppressed diagnostics, so cleanup
+must cover throwables as well as false returns.

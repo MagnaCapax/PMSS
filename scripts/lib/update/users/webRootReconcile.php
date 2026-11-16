@@ -66,24 +66,33 @@ function pmssUserWebRootReconcileFull(
         return false;
     }
 
-    $success = pmssUserWebRootReconcileTreeIsSafe($skeleton, $home, false)
-        && pmssUserWebRootReconcileCopyEntry($skeleton, $stage, $home, '', $stats, $user)
-        && pmssUserWebRootReconcileTreeIsSafe($stage, $home)
-        && pmssUserWebRootReconcileApplyOwnership($stage, $user);
-    if ($success) {
-        $entries = pmssDirectoryEntriesRead($www);
-        $currentRootIsSafe = !pmssPathExistsOrLink($www) || (!is_link($www) && $entries === []);
-        $success = $currentRootIsSafe
-            && pmssUserWebRootMigrationRenameAsAccount($user, $home, $stage, $www);
-    }
-    if (!$success) {
-        pmssUserWebRootMigrationRemoveCopy($user, $home, $stage);
-        pmssUserWebRootMigrationLog($user, $logger, 'Full web-root restore refused or failed');
-        return false;
-    }
+    $cleanupNeeded = true;
+    try {
+        $success = pmssUserWebRootReconcileTreeIsSafe($skeleton, $home, false)
+            && pmssUserWebRootReconcileCopyEntry($skeleton, $stage, $home, '', $stats, $user)
+            && pmssUserWebRootReconcileTreeIsSafe($stage, $home)
+            && pmssUserWebRootReconcileApplyOwnership($stage, $user);
+        if ($success) {
+            $entries = pmssDirectoryEntriesRead($www);
+            $currentRootIsSafe = !pmssPathExistsOrLink($www) || (!is_link($www) && $entries === []);
+            $success = $currentRootIsSafe
+                && pmssUserWebRootMigrationRenameAsAccount($user, $home, $stage, $www);
+        }
+        if (!$success) {
+            // Preserve cleanup-before-log order without retrying a throwing cleanup.
+            $cleanupNeeded = false;
+            pmssUserWebRootMigrationRemoveCopy($user, $home, $stage);
+            pmssUserWebRootMigrationLog($user, $logger, 'Full web-root restore refused or failed');
+            return false;
+        }
 
-    pmssUserWebRootMigrationLog($user, $logger, 'Restored complete web root from skeleton');
-    return true;
+        $cleanupNeeded = false;
+        pmssUserWebRootMigrationLog($user, $logger, 'Restored complete web root from skeleton');
+        return true;
+    } finally {
+        // Until publication succeeds, thrown faults still own the account-created stage.
+        if ($cleanupNeeded) pmssUserWebRootMigrationRemoveCopy($user, $home, $stage);
+    }
 }
 
 /** Emit one structured run summary before the reconciler releases its lock. */
