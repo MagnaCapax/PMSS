@@ -94,7 +94,7 @@ class ScriptsIncSplitTest extends TestCase
             $source = $this->pmssReadRepoFile($path);
             $this->assertTrue(strlen($source) > 100, $part.' part is too small.');
             $this->assertTrue(strpos($source, '<?php') === 0, $part.' does not start with PHP.');
-            $this->assertTrue(preg_match('/\A<\?php\n\/\*\* [^\r\n]*Loaded by scriptsInc\.php; never require a part directly\. \*\/\n/', $source) === 1,
+            $this->assertMatches('/\A<\?php\n\/\*\* [^\r\n]*Loaded by scriptsInc\.php; never require a part directly\. \*\/\n/', $source,
                 $part.' needs its one-line loader notice.');
             $this->assertTrue($this->partFunctions($source, $part) !== array(), $part.' has no functions.');
         }
@@ -166,8 +166,8 @@ class ScriptsIncSplitTest extends TestCase
         // A current AppProcess/AppsStatus part cannot run without its catalog (#1076).
         $this->assertSame(1, substr_count($manifest, "'www/toggleAppCatalog.php',"));
         $this->assertSame(1, substr_count($manifest, "pmssUserPanelHelperFiles('www/')"));
-        $this->assertTrue(preg_match('/'.preg_quote("'www/toggleAppCatalog.php',", '/').'\s*'
-            .preg_quote("], pmssUserPanelHelperFiles('www/'), [", '/').'\s*'.preg_quote("'www/scriptsInc.php',", '/').'/', $manifest) === 1,
+        $this->assertMatches('/'.preg_quote("'www/toggleAppCatalog.php',", '/').'\s*'
+            .preg_quote("], pmssUserPanelHelperFiles('www/'), [", '/').'\s*'.preg_quote("'www/scriptsInc.php',", '/').'/', $manifest,
             'Catalog and parts must appear in order immediately before scriptsInc.php.');
         $this->assertSame(array_map(static function ($part): string { return 'www/scriptsInc'.$part.'.php'; }, self::PARTS),
             \pmssUserPanelHelperFiles('www/'));

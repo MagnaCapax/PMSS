@@ -19,10 +19,7 @@ class RtorrentScgiTest extends TestCase
 
         $this->assertStringContainsAllStrings(['CONTENT_LENGTH', 'SCGI', $xmlData], $request);
 
-        $this->assertTrue(
-            preg_match('/^(\d+):/', $request, $m) === 1,
-            'Request should start with netstring length prefix'
-        );
+        $this->assertMatches('/^(\d+):/', $request, 'Request should start with netstring length prefix');
     }
 
     public function testScgiFormatRequestContentLength(): void

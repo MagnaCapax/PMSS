@@ -108,8 +108,7 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
             'Expected fail/warn/ok ordering across mixed disk kinds: '
         );
         $this->assertStringContainsString('NVME', $output);
-        $this->assertTrue(
-            (bool) preg_match('/Fast Flash.*NVME.*61C.*0.*85/', $output),
+        $this->assertMatches('/Fast Flash.*NVME.*61C.*0.*85/', $output,
             'Expected NVMe rows to keep temperature, media-error, and wear columns aligned'
         );
     }

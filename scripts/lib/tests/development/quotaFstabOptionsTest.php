@@ -93,7 +93,7 @@ class QuotaFstabOptionsTest extends TestCase
             'grpjquota=aquota.group',
             'jqfmt=vfsv1',
         ]);
-        $this->assertTrue(strpos($updated, 'defaults,') === false, 'expected defaults token removed');
+        $this->assertStringNotContainsString('defaults,', $updated, 'expected defaults token removed');
     }
 
     public function testMountPointMissingDoesNotTouchFile(): void

@@ -241,9 +241,7 @@ LIGHTTPD;
 
     public function testUserConfigEntryPointKeepsLighttpdApplyHelperWiring(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/util/userConfigLighttpd.php');
-
-        $this->assertStringContainsAndOmitsStrings([
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/userConfigLighttpd.php', [
             "require_once dirname(__DIR__).'/lib/lighttpd/userConfigApply.php';",
         ], [
             "require_once dirname(__DIR__).'/lib/lighttpd/delugeWebConf.php';",
@@ -251,7 +249,7 @@ LIGHTTPD;
             "require_once dirname(__DIR__).'/lib/lighttpd/resourcePlan.php';",
             "require_once dirname(__DIR__).'/lib/lighttpd/userDirectoriesPrepare.php';",
             "require_once dirname(__DIR__).'/lib/lighttpd/configRender.php';",
-        ], $src);
+        ]);
     }
 
     public function testPhpIniContentRendererKeepsExistingDirectivesStable(): void
@@ -334,8 +332,7 @@ LIGHTTPD;
             $path = $this->pmssWriteFile($this->pmssMakeTempFile('pmss-http-phpini-'), $rendered);
             $this->assertSame('', parse_ini_file($path)['session.upload_progress.enabled']);
         }
-        $skel = $this->pmssReadRepoFile('etc/skel/.lighttpd/php.ini');
-        $this->assertSame(1, preg_match('/^session\.upload_progress\.enabled = Off$/m', $skel));
+        $this->pmssAssertRepoFileMatches('etc/skel/.lighttpd/php.ini', '/^session\.upload_progress\.enabled = Off$/m');
     }
 
     public function testUserConfigApplyFacadeLoadsFocusedHelpers(): void

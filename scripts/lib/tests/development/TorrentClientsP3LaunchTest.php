@@ -22,8 +22,8 @@ final class TorrentClientsP3LaunchTest extends TestCase
             $this->assertTrue($result['timed_out']);
             $this->assertTrue(\pmssUserWatchdogBackoffActive('fixtur01', 'transmission'));
         });
-        $source = $this->pmssReadRepoFile('scripts/cron/transmissionInstancesCheck.php');
-        $this->assertTrue(strpos($source, 'pmssUserWatchdogCommandRun(pmssBuildUserServiceShellCommand($user, $command)') !== false);
+        $this->pmssAssertRepoFileContainsString('scripts/cron/transmissionInstancesCheck.php',
+            'pmssUserWatchdogCommandRun(pmssBuildUserServiceShellCommand($user, $command)');
     }
 
     private function fixture(): array
