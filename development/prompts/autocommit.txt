@@ -54,6 +54,7 @@ FILE SIZE AND INTENT (BINDING):
   A new file states its one job in its first comment or heading line. If it cannot, add this trailer line:
     Intent: <repo-relative path> -- <one-line job of the file>
   Never commit a file that crosses 750 lines: split it.
+  An ADR you add or change keeps "Status: Proposed". The lane refuses a commit that adds a "Status: Accepted" line.
 
 PUBLISHING (the lane is the only publisher):
   Do NOT run git push. Do NOT post, edit, label or close anything on GitHub (no gh write commands).
