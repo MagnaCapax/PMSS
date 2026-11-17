@@ -210,9 +210,8 @@ final class TorrentClientsP3LaunchTest extends TestCase
         [$home] = $this->fixture();
         $path = $home.'/.config/transmission-daemon/settings.json';
         $this->pmssWriteFile($path, '{"rpc-whitelist-enabled":false}');
-        $script = 'require '.var_export($this->pmssRepoPath('etc/skel/www/transmissionLaunch.php'), true).';'
-            .'$ok = pmssTransmissionSettingsPrepare('.var_export($home, true).');'
-            .'echo json_encode(["ok" => $ok, "ready" => pmssTransmissionSettingsReady('.var_export($home, true).')]);';
-        $this->assertSame(['ok' => true, 'ready' => true], $this->pmssRunInlinePhpJson($script));
+        $this->assertSame(['ok' => true, 'ready' => true], $this->pmssRunRepoInlinePhpRequireJson('etc/skel/www/transmissionLaunch.php',
+            '$ok = pmssTransmissionSettingsPrepare('.var_export($home, true).');'
+            .'echo json_encode(["ok" => $ok, "ready" => pmssTransmissionSettingsReady('.var_export($home, true).')]);'));
     }
 }

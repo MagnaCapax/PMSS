@@ -206,8 +206,7 @@ final class AppProfilesTest extends TestCase
         $this->pmssWriteExecutableFile($home.'/bin/install-hermes', "#!/bin/sh\n");
         $this->pmssWriteExecutableFile($home.'/stubs/id', "#!/bin/sh\necho 4321\n", 0755, 0700);
         $this->pmssWriteExecutableFile($home.'/stubs/quota', $quota ? "#!/bin/sh\necho '/dev/md4 123 1000 1250 100 100100 125125'\n" : "#!/bin/sh\nexit 1\n");
-        $script = 'require '.var_export($this->pmssRepoPath('scripts/lib/user/appSwitch.php'), true).';'
-            .'$home = '.var_export($home, true).'; $missingApp = '.var_export($missingApp, true).'; $hermesRoute = '.var_export($hermesRoute, true).';'
+        $script = '$home = '.var_export($home, true).'; $missingApp = '.var_export($missingApp, true).'; $hermesRoute = '.var_export($hermesRoute, true).';'
             .'$user = '.var_export(['name' => posix_geteuid() === 0 ? 'root' : 'fixtur01', 'memory' => $memory, 'appProfile' => $profile], true).';';
         $script .= <<<'PHP'
 function logProvisionMessage(string $message): void { $GLOBALS['logs'][] = $message; }
@@ -233,6 +232,7 @@ ksort($markers);
 echo json_encode(['starts' => $starts, 'markers' => $markers, 'config' => pmssUserAppProfileConfig($user),
     'logs' => $GLOBALS['logs'], 'queues' => $GLOBALS['queues'], 'earlyQueues' => $GLOBALS['earlyQueues']]);
 PHP;
-        return $this->pmssRunInlinePhpJson($script, $this->pmssPathPrefixedEnvironment($home.'/stubs', ['PMSS_TEST_MODE' => '1', 'PMSS_DRY_RUN' => '0']));
+        return $this->pmssRunRepoInlinePhpRequireJson('scripts/lib/user/appSwitch.php', $script,
+            $this->pmssPathPrefixedEnvironment($home.'/stubs', ['PMSS_TEST_MODE' => '1', 'PMSS_DRY_RUN' => '0']));
     }
 }

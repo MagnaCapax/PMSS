@@ -26,8 +26,8 @@ final class WelcomeHomeTest extends TestCase
         );
         // Offline: URL streams are off in the child, so a credit-service read fails at once instead of reaching the network.
         $output = $offline
-            ? $this->pmssRunShellCommand(escapeshellarg(PHP_BINARY).' -d allow_url_fopen=0 -r '
-                .escapeshellarg('require '.var_export($fixture, true).'; '.$script), [], '2>&1')
+            ? $this->pmssRunShellCommand($this->pmssBuildArgvCommand([PHP_BINARY, '-d', 'allow_url_fopen=0', '-r',
+                'require '.var_export($fixture, true).'; '.$script]), [], '2>&1')
             : $this->pmssRunInlinePhpRequire($fixture, $script, [], '2>&1');
         $this->pmssAssertStringNotContainsString('Undefined', $output);
         return $this->pmssDecodeJsonArray($output);

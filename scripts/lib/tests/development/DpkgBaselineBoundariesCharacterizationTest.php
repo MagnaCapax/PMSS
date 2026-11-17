@@ -49,13 +49,12 @@ PHP;
     public function testExistingIncludesRetainThePublicPackageHelpers(): void
     {
         foreach (['environment.php', 'dpkgSelections.php'] as $entry) {
-            $script = 'require '.var_export($this->pmssRepoPath('scripts/lib/update/'.$entry), true).';'
-                .'echo json_encode(array_map("function_exists", '.var_export([
+            $this->assertSame(array_fill(0, 6, true), $this->pmssRunRepoInlinePhpRequireJson('scripts/lib/update/'.$entry,
+                'echo json_encode(array_map("function_exists", '.var_export([
                     'pmssSelectDpkgSelectionsBaseline', 'pmssWriteSanitisedDpkgSelectionsTempFile',
                     'pmssDpkgSelectionsSanitise', 'pmssDpkgSelectionsLogSummary',
                     'pmssDpkgSelectionsDrop', 'pmssHostHasIntelDisplayPciDevice',
-                ], true).'));';
-            $this->assertSame(array_fill(0, 6, true), $this->pmssRunInlinePhpJson($script));
+                ], true).'));'));
         }
     }
 }
