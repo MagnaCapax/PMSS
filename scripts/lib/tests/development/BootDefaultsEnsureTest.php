@@ -19,6 +19,8 @@ class BootDefaultsEnsureTest extends TestCase
         $cases = [
             ['label' => 'add-hidepid', 'fstab' => "proc /proc proc defaults 0 0\n", 'grub' => 'GRUB_CMDLINE_LINUX_DEFAULT="quiet '.$option.'"', 'expectFstab' => 'hidepid=2', 'expectGrub' => $option],
             ['label' => 'replace-hidepid', 'fstab' => "proc /proc proc defaults,hidepid=1 0 0\n", 'grub' => 'GRUB_CMDLINE_LINUX_DEFAULT="quiet '.$option.'"', 'expectFstab' => 'hidepid=2', 'rejectFstab' => 'hidepid=1'],
+            ['label' => 'remove-group', 'fstab' => "proc /proc proc defaults,hidepid=2,gid=500 0 0\n", 'grub' => 'GRUB_CMDLINE_LINUX_DEFAULT="quiet '.$option.'"', 'expectFstab' => "defaults,hidepid=2\t0\t0", 'rejectFstab' => 'gid='],
+            ['label' => 'remove-all-groups', 'fstab' => "proc /proc proc defaults,gid=500,hidepid=1,gid=1065,gid=0 0 0\n", 'grub' => 'GRUB_CMDLINE_LINUX_DEFAULT="quiet '.$option.'"', 'expectFstab' => "defaults,hidepid=2\t0\t0", 'rejectFstab' => 'gid='],
             ['label' => 'append-proc', 'fstab' => "UUID=abc /home ext4 defaults 0 0\n", 'grub' => 'GRUB_CMDLINE_LINUX_DEFAULT="quiet '.$option.'"', 'expectFstab' => "proc\t/proc\tproc\tdefaults,hidepid=2\t0\t0"],
             ['label' => 'append-option', 'fstab' => "proc /proc proc defaults,hidepid=2 0 0\n", 'grub' => 'GRUB_CMDLINE_LINUX_DEFAULT="quiet"', 'expectGrub' => $option],
             ['label' => 'add-grub-line', 'fstab' => "proc /proc proc defaults,hidepid=2 0 0\n", 'grub' => '# empty', 'expectGrub' => 'GRUB_CMDLINE_LINUX_DEFAULT="'.$option.'"'],
@@ -63,6 +65,28 @@ class BootDefaultsEnsureTest extends TestCase
 
         $updatedGrub = (string) file_get_contents($grub);
         $this->assertStringContainsAllStrings(['console=tty0', 'console=ttyS0,115200n8', 'GRUB_TERMINAL="console serial"', 'GRUB_SERIAL_COMMAND="serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1"'], $updatedGrub);
+    }
+
+    public function testFstabPrefixRemovalIsCompleteLocalAndIdempotent(): void
+    {
+        foreach (['defaults,hidepid=2,gid=500', 'gid=500,defaults,hidepid=2',
+            'defaults,gid=proc,hidepid=2,gid=1065', 'defaults,gid=,hidepid=2,gid=0',
+            'defaults,hidepid=2'] as $options) {
+            $lines = ['proc /proc proc '.$options.' 0 0', 'tmpfs /other tmpfs defaults,gid=500 0 0'];
+            $other = $lines[1];
+            $plan = \pmssFstabMountOptionsEnsure($lines, '/proc', [], [], false, 'proc',
+                ['hidepid=' => 'hidepid=2'], true, ['gid=']);
+            $this->assertSame(['defaults', 'hidepid=2'], $plan['options'], $options);
+            $this->assertSame($other, $lines[1]);
+            $again = \pmssFstabMountOptionsEnsure($lines, '/proc', [], [], false, 'proc',
+                ['hidepid=' => 'hidepid=2'], true, ['gid=']);
+            $this->assertFalse($again['changed']);
+        }
+        // Prefix removal remains generic; existing callers can omit it entirely.
+        $lines = ['tmpfs /tmp tmpfs defaults,size=1G,size=2G,nosuid 0 0'];
+        $plan = \pmssFstabMountOptionsEnsure($lines, '/tmp', [], [], false, null, [], true, ['size=']);
+        $this->assertSame(['defaults', 'nosuid'], $plan['options']);
+        $this->assertSame(['size=1G', 'size=2G'], $plan['removed']);
     }
 
     public function testBootDefaultsNormalizesExtraGrubInputs(): void

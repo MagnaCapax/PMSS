@@ -6,6 +6,7 @@
  * Policy list: pmssSeedboxSystemServiceSpecs().
  * See scripts/lib/update/services/systemd.php for the current list.
  * This is a drift guard against package manager actions and manual starts.
+ * Also re-checks account-isolation host state between updates.
  *
  * @license GPL-3.0-only
  * @author PMSS Team
@@ -13,10 +14,13 @@
 
 require_once __DIR__.'/../lib/update/services/systemd.php';
 require_once __DIR__.'/../lib/update/services/systemd/recovery.php';
+require_once __DIR__.'/../lib/update/systemPrep/isolationRecheck.php';
 
 if (!pmssTestModeEnabled()) {
     requireRoot();
 }
+
+pmssIsolationStateRecheck();
 
 if (!pmssSystemdRuntimeAvailable()) {
     exit(0);

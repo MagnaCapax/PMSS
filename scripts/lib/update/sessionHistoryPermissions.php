@@ -4,8 +4,9 @@
 /**
  * Remove only other-read from existing session records and related binaries.
  * The root argument keeps development tests away from host paths.
+ * The optional logger reports each completed permission repair.
  */
-function pmssSessionHistoryPermissionsHarden(string $root = ''): bool
+function pmssSessionHistoryPermissionsHarden(string $root = '', ?callable $logger = null): bool
 {
     if (getenv('PMSS_DRY_RUN') === '1') {
         return true;
@@ -32,6 +33,9 @@ function pmssSessionHistoryPermissionsHarden(string $root = ''): bool
         $mode = $stats['mode'];
         if (($mode & 0170000) !== 0100000 || (($mode & 0004) !== 0 && !@chmod($target, ($mode & 07777) & ~0004))) {
             throw new RuntimeException('Cannot harden permissions: '.$path);
+        }
+        if (($mode & 0004) !== 0 && $logger !== null) {
+            $logger(sprintf('[REPAIR] %s granted other-read; mode %04o -> %04o', $path, $mode & 07777, ($mode & 07777) & ~0004));
         }
     }
 

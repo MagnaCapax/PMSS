@@ -37,9 +37,10 @@ function pmssFstabMountEntryRead(array $lines, string $mountPoint, ?string $fsTy
  * Apply an option plan to the first matching fstab entry.
  *
  * @param array<string,string> $replacePrefixedOptions
+ * @param string[] $removePrefixedOptions Option prefixes to remove entirely.
  * @return ?array{columns:array<int,string>,options:array<int,string>,added:array<int,string>,removed:array<int,string>,changed:bool,index:int}
  */
-function pmssFstabMountOptionsEnsure(array &$lines, string $mountPoint, array $requiredOptions = [], array $removeOptions = [], bool $dropDefaultsOnly = false, ?string $fsType = null, array $replacePrefixedOptions = [], bool $collapseDuplicates = true): ?array
+function pmssFstabMountOptionsEnsure(array &$lines, string $mountPoint, array $requiredOptions = [], array $removeOptions = [], bool $dropDefaultsOnly = false, ?string $fsType = null, array $replacePrefixedOptions = [], bool $collapseDuplicates = true, array $removePrefixedOptions = []): ?array
 {
     if (($entry = pmssFstabMountEntryRead($lines, $mountPoint, $fsType)) === null) return null;
     $plan = pmssConfigOptionsUpdatePlan($entry['columns'][3], $requiredOptions, $removeOptions, $dropDefaultsOnly);
@@ -54,6 +55,16 @@ function pmssFstabMountOptionsEnsure(array &$lines, string $mountPoint, array $r
         if (!$replaced) $updated[] = $replacement;
         $plan['options'] = $updated;
     }
+    // Prefix removals cover every value, including repeated mount options.
+    foreach ($removePrefixedOptions as $prefix) {
+        foreach ($plan['options'] as $index => $option) {
+            if ($prefix !== '' && strpos($option, $prefix) === 0) {
+                $plan['removed'][] = $option;
+                unset($plan['options'][$index]);
+            }
+        }
+    }
+    $plan['options'] = array_values($plan['options']);
     $plan['columns'] = $entry['columns'];
     $plan['columns'][3] = implode(',', $plan['options']);
     $plan['changed'] = $plan['columns'][3] !== $entry['columns'][3];

@@ -33,7 +33,7 @@ function pmssBootDefaultsEnsureProcHidepid(string $fstabPath, callable $log): vo
     $lines = pmssFstabLinesRead($fstabPath, $log, '/proc hidepid enforcement');
     if ($lines === null) return;
 
-    $plan = pmssFstabMountOptionsEnsure($lines, '/proc', [], [], false, 'proc', ['hidepid=' => 'hidepid=2']);
+    $plan = pmssFstabMountOptionsEnsure($lines, '/proc', [], [], false, 'proc', ['hidepid=' => 'hidepid=2'], true, ['gid=']);
     if ($plan === null) {
         $lines[] = "proc\t/proc\tproc\tdefaults,hidepid=2\t0\t0";
         $log('Added /proc mount with hidepid=2 to '.$fstabPath);

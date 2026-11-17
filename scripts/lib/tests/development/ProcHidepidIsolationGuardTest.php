@@ -18,14 +18,15 @@ class ProcHidepidIsolationGuardTest extends TestCase
 {
     public function testProcMountEnforcesHidepid2WithoutGidBypass(): void
     {
-        // bootDefaults.php is the sole enforcer of the /proc hidepid=2 mount.
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/systemPrep/bootDefaults.php', [
+        // Boot convergence must remove group options without adding any value.
+        $source = $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/systemPrep/bootDefaults.php', [
             "['hidepid=' => 'hidepid=2']",
+            "true, ['gid=']",
             'defaults,hidepid=2',
             'remount,hidepid=2',
-        ], [
-            'gid=' => 'bootDefaults.php must NOT add a gid= option to the /proc mount: gid=<group> exempts that group from hidepid and exposes every tenant\'s /proc (the 2026-06-30 hole). See ADR-0027.',
         ]);
+        $this->assertStringNotContainsString('gid=', str_replace("['gid=']", '', $source),
+            'Boot convergence may only mention the group-option removal prefix. See ADR 0027.');
     }
 
     public function testHostEnvironmentAdvisoryDoesNotSuggestRemovingHidepid(): void
@@ -55,13 +56,7 @@ class ProcHidepidIsolationGuardTest extends TestCase
             if ($src === false) {
                 continue;
             }
-            // Target the bypass MECHANISM, not any prose mention of it (a comment that
-            // documents the hole is legitimate). The hole needs a 'proc' group (groupadd)
-            // and/or the /proc mount carrying a gid= exemption alongside hidepid=.
-            if (preg_match('/groupadd\s+(?:-\S+\s+)*proc\b/', $src) === 1
-                || preg_match('/\b(?:hidepid=\S*,\S*gid=|gid=\S*,\S*hidepid=)/', $src) === 1
-                || preg_match('#\b(?:mount|remount)\b[^\n\r]*\bgid=proc\b#', $src) === 1
-            ) {
+            if ($this->hasProcGroupExemption($src, $path === $root.'/lib/update/systemPrep/isolationRecheck.php')) {
                 $offenders[] = substr($path, strlen($root) + 1);
             }
         }
@@ -71,5 +66,28 @@ class ProcHidepidIsolationGuardTest extends TestCase
             $offenders,
             'Proc-group / gid=proc hidepid bypass (cross-tenant /proc exposure hole, ADR-0027) found in: '.implode(', ', $offenders)
         );
+    }
+
+    public function testGroupOptionDetectionOnlyAllowsTheExactRuntimeReset(): void
+    {
+        $reset = "'mount -o remount,hidepid=2,gid=0 /proc'";
+        $this->assertFalse($this->hasProcGroupExemption($reset, true));
+        $this->assertTrue($this->hasProcGroupExemption($reset, false));
+        foreach (['hidepid=2,gid=1065', 'gid=1065,hidepid=2', 'hidepid=2,gid=01',
+            'hidepid=2,gid=00', 'hidepid=2,gid=proc', 'hidepid=2,gid=0,nosuid',
+            'groupadd proc', 'mount -o gid=proc /proc'] as $options) {
+            $source = '<?php $command = '.var_export('mount -o '.$options.' /proc', true).';';
+            $this->assertTrue($this->hasProcGroupExemption($source, true), $options);
+        }
+        $this->assertTrue($this->hasProcGroupExemption($reset."; mount -o hidepid=2,gid=1065 /proc", true));
+    }
+
+    /** Preserve the existing detection, allowing only the guard's exact reset command. */
+    private function hasProcGroupExemption(string $source, bool $allowReset): bool
+    {
+        if ($allowReset) $source = str_replace("'mount -o remount,hidepid=2,gid=0 /proc'", '', $source);
+        return preg_match('/groupadd\s+(?:-\S+\s+)*proc\b/', $source) === 1
+            || preg_match('/\b(?:hidepid=\S*,\S*gid=|gid=\S*,\S*hidepid=)/', $source) === 1
+            || preg_match('#\b(?:mount|remount)\b[^\n\r]*\bgid=proc\b#', $source) === 1;
     }
 }
