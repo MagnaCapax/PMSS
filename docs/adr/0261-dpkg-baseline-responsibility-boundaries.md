@@ -55,6 +55,24 @@ configuration has one retry gate rather than repeated failure dispatch.
   availability. They execute only on testing machines. Devbox checks are changed
   PHP syntax and source/reference review; no package commands run here.
 
+## Package observation safety follow-up (2026-11-17)
+
+Read-only probes reject NUL-corrupted observations before normalization or
+matching. A corrupt selected dpkg field line returns the existing empty string;
+later lines remain ignored. A corrupt `apt-cache pkgnames` capture cannot form a
+trusted name set, so it uses the existing per-package policy fallback. A corrupt
+policy capture returns and caches `false`, even when a valid candidate precedes
+the corrupt row. PCI class/vendor corruption skips that device without hiding
+later valid devices.
+
+Valid bytes, command construction, first-line selection, architecture handling,
+legacy policy output without a candidate, caching and hardware matching retain
+their existing behavior. No package mutation, logging or public interface is
+added. `PackageStateInputSafetyTest` intercepts all commands and sysfs reads to
+cover corruption positions, partial name sets, fallback results, cached refusals
+and later valid devices. These cases execute only on testing machines; devbox
+verification uses changed-file PHP syntax and source review.
+
 ## References
 
 - [Canonical package baseline](0042-dpkg-selections-baseline-is-canonical-clean.md)

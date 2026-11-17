@@ -3,7 +3,7 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 
-/** Package and PCI input boundaries without invoking package tools or reading sysfs. */
+/** Package and PCI boundaries without invoking package tools or reading sysfs. */
 class PackageStateInputSafetyTest extends TestCase
 {
     public function testNulInputsNeverReachPackageOrFilesystemProbes(): void
@@ -49,6 +49,47 @@ PHP;
             $this->runFixture($body, ['names' => [' FIXTUR01 ', '']]));
     }
 
+    public function testFieldQueriesRejectCorruptSelectedLinesBeforeTrimming(): void
+    {
+        foreach (["\0", "\0".'1.2-3', "1.2\0-3", "1.2-3\0", "1.2-3\0suffix"] as $line) {
+            $this->assertSame(['', [['exec', "dpkg-query -W -f='\${Version}' 'fixtur01' 2>/dev/null"]]],
+                $this->runFixture('$results = pmssPackageVersion("fixtur01");', ['output' => [$line]]));
+        }
+        // Only the first line belongs to the legacy field-query contract.
+        $this->assertSame(['1.2-3', [['exec', "dpkg-query -W -f='\${Version}' 'fixtur01' 2>/dev/null"]]],
+            $this->runFixture('$results = pmssPackageVersion("fixtur01");', ['output' => [' 1.2-3 ', "ignored\0"]]));
+    }
+
+    public function testCorruptNameSetsUsePolicyFallbackWithoutCachingPartialEvidence(): void
+    {
+        foreach (["\0", "\0fixtur01", "fix\0tur01", "fixtur01\0", "fixtur01\0suffix"] as $line) {
+            foreach ([['Candidate: 1.2-3', true], ['Candidate: (none)', false]] as [$policy, $expected]) {
+                // Reject both a corrupted matching row and any valid prefix of a corrupt set.
+                foreach ([[$line, 'fixtur01'], ['fixtur01', $line]] as $names) {
+                    $this->assertSame([[$expected, $expected], [
+                        ['exec', 'apt-cache pkgnames 2>/dev/null'],
+                        ['exec', "apt-cache policy 'fixtur01' 2>/dev/null"],
+                    ]], $this->runFixture('$results = [pmssPackageAvailable("fixtur01"), pmssPackageAvailable("fixtur01")];',
+                        ['names' => $names, 'output' => [$policy]]));
+                }
+            }
+        }
+    }
+
+    public function testCorruptPolicyOutputCannotCertifyAvailability(): void
+    {
+        foreach (["\0", "\0Candidate: 1.2-3", "Candidate: 1.2\0-3", "Candidate: 1.2-3\0", "other\0suffix"] as $line) {
+            // Corruption on either side of an otherwise valid candidate invalidates the capture.
+            foreach ([[$line, 'Candidate: 1.2-3'], ['Candidate: 1.2-3', $line]] as $output) {
+                $this->assertSame([[false, false], [
+                    ['exec', 'apt-cache pkgnames 2>/dev/null'],
+                    ['exec', "apt-cache policy 'fixtur01' 2>/dev/null"],
+                ]], $this->runFixture('$results = [pmssPackageAvailable("fixtur01"), pmssPackageAvailable("fixtur01")];',
+                    ['output' => $output]));
+            }
+        }
+    }
+
     public function testAvailabilityPolicyFallbackRetainsFailureResultsAndCache(): void
     {
         foreach ([
@@ -85,6 +126,26 @@ PHP;
         }
         $this->assertSame([false, [['glob', '/fixture/missing/*/class']]],
             $this->runFixture('$results = pmssHostHasIntelDisplayPciDevice("/fixture/missing");'));
+    }
+
+    public function testCorruptPciValuesDoNotHideLaterValidDevices(): void
+    {
+        $path = '/fixture/pci/0000:00:02.0/class';
+        $later = '/fixture/pci/0000:00:03.0/class';
+        foreach (['class' => '0x030000', 'vendor' => '0x8086'] as $field => $valid) {
+            foreach (["\0", "\0".$valid, substr($valid, 0, 4)."\0".substr($valid, 4), $valid."\0", $valid."\0suffix"] as $value) {
+                $files = [$path => '0x030000', dirname($path).'/vendor' => '0x8086'];
+                $files[dirname($path).'/'.$field] = $value;
+                $events = [['glob', '/fixture/pci/*/class'], ['read', $path], ['read', dirname($path).'/vendor']];
+                $this->assertSame([false, $events],
+                    $this->runFixture('$results = pmssHostHasIntelDisplayPciDevice("/fixture/pci");',
+                        ['paths' => [$path], 'files' => $files]));
+                $files += [$later => " 0X030000\n", dirname($later).'/vendor' => " 0X8086\n"];
+                $this->assertSame([true, array_merge($events, [['read', $later], ['read', dirname($later).'/vendor']])],
+                    $this->runFixture('$results = pmssHostHasIntelDisplayPciDevice("/fixture/pci");',
+                        ['paths' => [$path, $later], 'files' => $files]));
+            }
+        }
     }
 
     /** Intercept every external probe; each child starts with fresh static caches. */

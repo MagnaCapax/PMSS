@@ -26,7 +26,8 @@ function pmssPackageQueryField(string $package, string $field): string
         return '';
     }
     exec('dpkg-query -W -f='.escapeshellarg('${'.$field.'}').' '.escapeshellarg($package).' 2>/dev/null', $output, $rc);
-    return $rc === 0 ? trim($output[0] ?? '') : '';
+    // Check the selected raw line before trim() can hide corrupted edge bytes.
+    return $rc === 0 && strpos($output[0] ?? '', "\0") === false ? trim($output[0] ?? '') : '';
 }
 
 /** List packages whose daemon binaries can be skewed by an in-place Docker update. */
@@ -78,7 +79,8 @@ function pmssPackageAvailable(string $package): bool
         $out = [];
         exec('apt-cache pkgnames 2>/dev/null', $out, $rc);
         $availableSet = [];
-        if ($rc === 0 && !empty($out)) {
+        // An incomplete name set cannot prove absence; use the existing policy fallback.
+        if ($rc === 0 && !empty($out) && strpos(implode("\n", $out), "\0") === false) {
             foreach ($out as $name) {
                 $name = strtolower(trim($name));
                 if ($name !== '') {
@@ -93,7 +95,8 @@ function pmssPackageAvailable(string $package): bool
     }
 
     exec('apt-cache policy '.escapeshellarg($package).' 2>/dev/null', $output, $rc);
-    if ($rc !== 0 || empty($output)) {
+    // Even corruption after a candidate row invalidates the captured observation.
+    if ($rc !== 0 || empty($output) || strpos(implode("\n", $output), "\0") !== false) {
         return $cache[$package] = false;
     }
 
@@ -117,6 +120,7 @@ function pmssHostHasIntelDisplayPciDevice(string $devicesPath = '/sys/bus/pci/de
         $class = @file_get_contents($classPath);
         $vendor = @file_get_contents(dirname($classPath).'/vendor');
         if (is_string($class) && is_string($vendor)
+            && strpos($class, "\0") === false && strpos($vendor, "\0") === false
             && strpos(strtolower(trim($class)), '0x03') === 0
             && strtolower(trim($vendor)) === '0x8086') {
             return true;
