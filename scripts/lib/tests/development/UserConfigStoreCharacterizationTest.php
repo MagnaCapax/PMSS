@@ -39,12 +39,10 @@ class UserConfigStoreCharacterizationTest extends TestCase
     public function testFeatureDefaultsAndExplicitValuesRetainTheirDifferentPolicies(): void
     {
         foreach ([null, '', 'FALSE', '0', ' No ', 'off', 0, false, [], 'yes', 1, ['x']] as $value) {
-            $enabled = in_array($value, ['yes', 1, ['x']], true);
-            $payload = $this->readPayload(array_fill_keys(
-                ['dockerEnabled', 'lighttpdEnabled', 'panelSessionLogin', 'scheduledConfigBackup'], $value));
-            foreach (['dockerEnabled', 'lighttpdEnabled', 'panelSessionLogin', 'scheduledConfigBackup'] as $key) {
-                $this->assertSame($enabled, $payload[$key], $key.' '.json_encode($value));
-            }
+            $expected = array_fill_keys(['dockerEnabled', 'lighttpdEnabled', 'panelSessionLogin', 'scheduledConfigBackup'],
+                in_array($value, ['yes', 1, ['x']], true));
+            $payload = $this->readPayload(array_fill_keys(array_keys($expected), $value));
+            $this->pmssAssertArraySubsetSame($expected, $payload, json_encode($value).' ');
         }
         foreach ([0 => true, 244 => false, 245 => true, 512 => true] as $ram => $enabled) {
             $this->assertSame($enabled, $this->readPayload(['ramMiB' => $ram])['dockerEnabled']);

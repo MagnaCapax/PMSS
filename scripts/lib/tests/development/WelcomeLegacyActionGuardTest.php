@@ -43,9 +43,8 @@ PHP;
                 var_export($guard, true), var_export($sentinel, true), var_export($sentinel, true)
             ));
             $this->assertSame(0, $run['rc']);
-            $result = $this->pmssDecodeJsonArray($run['output']);
-            $this->assertSame($case === 'GET' ? 405 : ($case === 'POST' ? 403 : 200), $result[0]);
-            $this->assertSame($case === 'POST-XHR', $result[1]);
+            $this->pmssAssertArraySubsetSame([$case === 'GET' ? 405 : ($case === 'POST' ? 403 : 200), $case === 'POST-XHR'],
+                $this->pmssDecodeJsonArray($run['output']));
         }
     }
 }

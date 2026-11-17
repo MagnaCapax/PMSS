@@ -47,8 +47,8 @@ PHP
         );
 
         foreach ($results as $case => $result) {
-            $this->assertSame($case === 'open-failure' ? [] : ['directory-handle'], $result['closed'], $case);
-            $this->assertTrue($result['sameThrowable'], $case);
+            $this->pmssAssertArraySubsetSame(['closed' => $case === 'open-failure' ? [] : ['directory-handle'],
+                'sameThrowable' => true], $result, $case.' ');
             if ($case === 'exception' || $case === 'error') {
                 $this->assertSame(1, count($result['logs']), 'Failed scans must not report a partial count');
             } else {

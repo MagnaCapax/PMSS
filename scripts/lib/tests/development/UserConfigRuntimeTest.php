@@ -51,10 +51,10 @@ class UserConfigRuntimeTest extends TestCase
 
     public function testCgroupApplyFailureMessageIsSingleLine(): void
     {
-        $message = \pmssUserConfigCgroupApplyFailureMessage("ali\nce", 7);
+        $message = \pmssUserConfigCgroupApplyFailureMessage("fixtur\n01", 7);
 
         $this->assertSame(
-            'Warning: cgroup configuration failed for ali?ce (rc=7); update-step2 will check and retry slice policy drift',
+            'Warning: cgroup configuration failed for fixtur?01 (rc=7); update-step2 will check and retry slice policy drift',
             $message
         );
     }
@@ -62,7 +62,7 @@ class UserConfigRuntimeTest extends TestCase
     public function testSparseModeHelpersPreserveLegacyContracts(): void
     {
         $modes = array();
-        foreach ([[array('', 'alice', '1024', '200'), false, false], [array('', 'alice'), false, true], [array('', 'alice'), true, false], [array('', 'alice'), true, true], [array('', 'alice', '0', '200'), false, false], [array(''), true, true]] as $case) {
+        foreach ([[array('', 'fixtur01', '1024', '200'), false, false], [array('', 'fixtur01'), false, true], [array('', 'fixtur01'), true, false], [array('', 'fixtur01'), true, true], [array('', 'fixtur01', '0', '200'), false, false], [array(''), true, true]] as $case) {
             $modes[] = \pmssUserConfigInvocationMode($case[0], $case[1], $case[2]);
         }
         $this->assertSame(array('full', 'named', 'welcome', 'named', '', ''), $modes);
@@ -71,20 +71,17 @@ class UserConfigRuntimeTest extends TestCase
         $this->assertSame('Error: missing existing quota; rerun full userConfig.php first.', \pmssUserConfigBaselineError(array('ramMiB' => '1024', 'quota' => 'bad'), array('ramMiB', 'quota')));
 
         $existing = array('ramMiB' => 2048, 'quota' => 500, 'CPUWeight' => 100, 'trafficCapMbit' => 90, 'trafficLimit' => 999);
-        $result = \pmssUserConfigNamedModeUser(array('name' => 'alice', 'memory' => 0, 'quota' => 0, 'trafficLimit' => null), $existing, array('CPUWeight' => 400, 'IOWeight' => 300));
+        $result = \pmssUserConfigNamedModeUser(array('name' => 'fixtur01', 'memory' => 0, 'quota' => 0, 'trafficLimit' => null), $existing, array('CPUWeight' => 400, 'IOWeight' => 300));
 
-        $this->assertSame(
-            array(2048, 500, 400, 300, 90, null),
-            array($result['memory'], $result['quota'], $result['CPUWeight'], $result['IOWeight'], $result['trafficCapMbit'], $result['trafficLimit'])
-        );
+        $this->pmssAssertArraySubsetSame(array('memory' => 2048, 'quota' => 500, 'CPUWeight' => 400,
+            'IOWeight' => 300, 'trafficCapMbit' => 90, 'trafficLimit' => null), $result);
 
-        $store = new class { public function applyFallbacks(string $username, array $payload): array { return array_merge($payload, array('billingServiceId' => $username === 'alice' ? 123 : 0, 'billingClientId' => 456)); } };
-        $payload = \pmssUserConfigPayloadBuild($store, array('rtorrentPort' => '5050', 'welcomeMessage' => 'kept'), array('name' => 'alice', 'memory' => 1024, 'quota' => 200, 'CPUWeight' => 300, 'trafficCapMbit' => 150), array('CPUWeight' => true, 'trafficCapMbit' => true), false);
+        $store = new class { public function applyFallbacks(string $username, array $payload): array { return array_merge($payload, array('billingServiceId' => $username === 'fixtur01' ? 123 : 0, 'billingClientId' => 456)); } };
+        $payload = \pmssUserConfigPayloadBuild($store, array('rtorrentPort' => '5050', 'welcomeMessage' => 'kept'), array('name' => 'fixtur01', 'memory' => 1024, 'quota' => 200, 'CPUWeight' => 300, 'trafficCapMbit' => 150), array('CPUWeight' => true, 'trafficCapMbit' => true), false);
 
-        $this->assertSame(
-            array(1024, 5050, 200, 250, 0, 300, 150, 123, 456, false, 'kept'),
-            array($payload['ramMiB'], $payload['rtorrentPort'], $payload['quota'], $payload['quotaBurst'], $payload['trafficLimit'], $payload['CPUWeight'], $payload['trafficCapMbit'], $payload['billingServiceId'], $payload['billingClientId'], $payload['dockerEnabled'], $payload['welcomeMessage'])
-        );
+        $this->pmssAssertArraySubsetSame(array('ramMiB' => 1024, 'rtorrentPort' => 5050, 'quota' => 200,
+            'quotaBurst' => 250, 'trafficLimit' => 0, 'CPUWeight' => 300, 'trafficCapMbit' => 150,
+            'billingServiceId' => 123, 'billingClientId' => 456, 'dockerEnabled' => false, 'welcomeMessage' => 'kept'), $payload);
     }
 
     public function testDiskQuotaApplyIsReservedForFullMode(): void

@@ -17,12 +17,10 @@ class NetconsoleConfigureTest extends TestCase
             'unsafe interface' => ['6665@192.0.2.10/eth0 bad,6666@192.0.2.20/aa:bb:cc:dd:ee:ff', null],
         ] as $label => [$spec, $expected]) {
             $target = \pmssNetconsoleTargetFromSpec($spec);
-            $actual = $target === null ? null : [
-                'interface' => $target['interface'],
-                'targetIp' => $target['targetIp'],
-                'targetMac' => $target['targetMac'],
-            ];
-            $this->assertEquals($expected, $actual, $label);
+            $this->assertSame($expected === null, $target === null, $label);
+            if ($expected !== null) {
+                $this->pmssAssertArraySubsetSame($expected, $target, $label.': ');
+            }
         }
     }
 
