@@ -73,12 +73,11 @@ append logs to `/var/log/pmss/<script>.log`. Highlights include:
   it exceeds 100 MiB so long-lived reverse-proxied web UIs do not silently
   consume user quota. The root cron template runs it hourly and logs trims to
   `/var/log/pmss/lighttpdAccessLogTrim.log`.
-- `checkQbittorrentInstances.php` – Restart qBittorrent if processes exit. When
-  `/etc/seedbox/config/qbittorrentWebuiEnforce.enabled` exists, reconcile WebUI
-  settings before the stopped-config and restart steps. A changed file causes
-  one bounded native-daemon stop; the existing watchdog then follows its normal
-  start path. Remove the marker to turn off this reconciliation. Write failures
-  leave the daemon running.
+- `checkQbittorrentInstances.php` – Restart qBittorrent if processes exit.
+  Reconcile WebUI settings (ADR 0102) before the stopped-config and restart
+  steps. A changed file causes one bounded native-daemon stop; the existing
+  watchdog then follows its normal start path. Write failures leave the daemon
+  running.
 
   Enabled native accounts also receive a metadata-only scan of `*.fastresume`
   in `BT_backup` under `~/.local/share/qBittorrent`, the legacy

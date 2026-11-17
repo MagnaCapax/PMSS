@@ -53,11 +53,9 @@ function pmssQbittorrentManagedConfigEntries(string $compatFamily = ''): array
     if ($diskIoType !== null) {
         $entries[] = ['section' => 'BitTorrent', 'key' => 'Session\\DiskIOType', 'value' => $diskIoType];
     }
-    // Reconcile these with the running daemon only on hosts opted into the rollout.
-    if (is_file('/etc/seedbox/config/qbittorrentWebuiEnforce.enabled')) {
-        $entries[] = ['section' => 'Preferences', 'key' => 'WebUI\\LocalHostAuth', 'value' => 'true'];
-        $entries[] = ['section' => 'Preferences', 'key' => 'WebUI\\AuthSubnetWhitelistEnabled', 'value' => 'false'];
-    }
+    // Reconciled with the running daemon by checkQbittorrentInstances.php (ADR 0102).
+    $entries[] = ['section' => 'Preferences', 'key' => 'WebUI\\LocalHostAuth', 'value' => 'true'];
+    $entries[] = ['section' => 'Preferences', 'key' => 'WebUI\\AuthSubnetWhitelistEnabled', 'value' => 'false'];
     return $entries;
 }
 

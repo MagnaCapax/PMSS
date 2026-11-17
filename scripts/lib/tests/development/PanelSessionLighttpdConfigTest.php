@@ -14,7 +14,7 @@ class PanelSessionLighttpdConfigTest extends TestCase
     {
         $config = str_replace(
             ["##username", "##serverPort", "##rclonePort", "##qbittorrentPort", "##PMSS_WEBDAV_WWW_POLICY##", "##PMSS_TRANSMISSION_PROXY##", "##PMSS_AGENT_WEB_LOGIN_REQUIRE##"],
-            [$user, 31234, 32345, 33456, \pmssWebdavWwwPolicyBlock($user), '', ''],
+            [$user, 31234, 32345, 33456, \pmssWebdavWwwPolicyBlock($user), '', \pmssAgentWebLoginRequireSuffix($user)],
             $template
         );
         $config = preg_replace(

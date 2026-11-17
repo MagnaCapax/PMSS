@@ -5,7 +5,7 @@ Category: security
 
 ## Status
 
-Accepted for default-off delivery; per-host enablement pending canary review.
+Accepted. Default on since 2026-11-17 (see the amendment below).
 
 ## Context
 
@@ -98,3 +98,15 @@ credential separation, logging/redaction, endpoints and listener binds retain
 their existing behavior. The original [CVE-2023-30801 advisory](https://www.vulncheck.com/advisories/qbittorrent-default-creds)
 documents WebUI default credentials leading to code execution; this cleanup
 does not expand access to that interface or to account files.
+
+## Amendment (2026-11-17): default on
+
+`WebUI\LocalHostAuth=true` and `WebUI\AuthSubnetWhitelistEnabled=false` are
+always in the managed set, and the watchdog reconciliation runs on every host.
+`/etc/seedbox/config/qbittorrentWebuiEnforce.enabled` is no longer read and
+update removes it (ADR 0272); removing a host file no longer turns this off.
+New configs already received these keys. The marker had been on 48 hosts since
+late October 2026, with the bounded stop (at most once per 24 hours per
+account) unchanged. A config without a WebUI password line receives the
+placeholder value described above, and the panel asks the account for a new
+password.

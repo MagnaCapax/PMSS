@@ -5,7 +5,7 @@ Category: security
 
 ## Status
 
-Accepted (stage 1 + stage 2 implemented, default-OFF; enabled per host by marker; pilot-verified on Debian 12 / kernel 6.1)
+Accepted (stage 1 + stage 2 implemented; default on since 2026-11-17, see the amendment below; verified on Debian 12 / kernel 6.1)
 
 Account-name visibility in this ADR is superseded in part by ADR 0118.
 
@@ -125,6 +125,30 @@ next boot restore stock state.
 - **Follow-ups:** verification of the CO-RE object loading on the Debian 12 / kernel
   6.1 fleet at pilot time (fail-open covers a non-load); a uid<1000 reader census on
   the first pilot host; a later amendment if the default is ever changed.
+
+## Amendment (2026-11-17): default on
+
+Every host applies both stages. No host file is read: update removes
+`/etc/seedbox/config/socket-table-privacy.enabled` (ADR 0272), and the disable
+path that restored `0444` is gone. Update installs an autoattach-capable
+`bpftool` on every Debian 12 host from `bookworm-backports` (the source is in
+`template.sources.bookworm`). The loader still fails open, so a host where that
+install fails runs stage 1 only.
+
+Evidence from the hosts that carried the marker (2026-11-17): six hosts, the
+oldest since 2026-09-25. On five of them the only non-root system processes
+(uid < 1000) were `dbus`, `ntpd`, `proftpd`, `sshd`, `vnstatd` and nginx's
+`www-data`, the journal held no line naming a `/proc/net` table in 14 days, and
+the stage 2 filter was loaded. This is the uid < 1000 reader census the
+follow-ups above asked for.
+
+Cost, unchanged from the Consequences above: an account no longer sees its own
+established connections with `ss -tn` or in `/proc/net` (#1149); the listening
+views (`ss -tln`, `ss -tlnp`) still work.
+
+Correction: the Consequences line saying `bpftool` was installed fleet-wide was
+inaccurate before this amendment; it was installed only on hosts with the
+marker. From this release it is accurate.
 
 ## References
 

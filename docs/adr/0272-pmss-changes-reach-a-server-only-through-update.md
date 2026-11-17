@@ -46,16 +46,17 @@ Existing host-file switches are reviewed against this rule:
 
 - `qbittorrentLoopbackOwnerGuard.enabled` (ADR 0259): removed by this change.
 - `pikkumiesPreinstall.enabled` (ADR 0090): removed as a requirement by this change.
-- `pikkumiesEternals.enabled` (ADR 0128): still a host file; the feature has an open defect and stays off until a release fixes it, then it is switched on in code.
-- `socket-table-privacy.enabled` (ADR 0068): review individually; either make it the default in a release or document it as per-host configuration.
-- `qbittorrentWebuiEnforce.enabled` (ADR 0102): review individually; either make it the default in a release or document it as per-host configuration.
-- `agentWebLogin.enabled` (ADR 0151): review individually; either make it the default in a release or document it as per-host configuration.
-- `ext4-group-prealloc.enabled` (ADR 0170): review individually; either make it the default in a release or document it as per-host configuration.
+- `pikkumiesEternals.enabled` (ADR 0128): still a host file until the release that moves its two web interfaces under the account panel path (ADR 0150); that release switches it on in code.
+- `socket-table-privacy.enabled` (ADR 0068): default on since 2026-11-17; update removes the file.
+- `qbittorrentWebuiEnforce.enabled` (ADR 0102): default on since 2026-11-17; update removes the file.
+- `agentWebLogin.enabled` (ADR 0151): default on since 2026-11-17; update removes the file.
+- `ext4-group-prealloc.enabled` (ADR 0170): the workaround is removed (2026-11-17); update removes the file.
 - `arp-keepalive` (ADR 0069): a per-host address setting, so it is configuration.
 - `mdadmCheckarrayMinDays` (ADR 0091): a per-host interval setting, so it is configuration.
 
 This decision supersedes the marker-staging part of ADR 0090's amendment and
-the marker in ADR 0259. It does not change the other switches listed above.
+the marker in ADR 0259. The 2026-11-17 release retires the markers of ADRs
+0068, 0102, 0151 and 0170 the same way.
 
 ## Consequences
 

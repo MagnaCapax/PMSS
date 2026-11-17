@@ -51,8 +51,6 @@ function pmssQbittorrentWebUiAuthNativePids(string $user, array $ops = []): arra
 /** Return true only when this pass issued a bounded native-daemon stop. */
 function pmssQbittorrentWebUiAuthEnsure(string $user, string $home, array $ops = []): bool
 {
-    $enabled = $ops['enabled'] ?? static function (): bool { return is_file('/etc/seedbox/config/qbittorrentWebuiEnforce.enabled'); };
-    if (!$enabled()) return false;
     $contextSafe = $ops['contextSafe'] ?? 'pmssTorrentPortUserHomeContextIsSafe';
     $pathSafe = $ops['pathSafe'] ?? 'pmssUserFilePathIsSafe';
     $configPath = rtrim($home, '/').'/.config/qBittorrent/qBittorrent.conf';

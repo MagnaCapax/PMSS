@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * PMSS opt-in socket-table privacy: BPF-LSM filter for NETLINK_SOCK_DIAG.
+ * PMSS socket-table privacy: BPF-LSM filter for NETLINK_SOCK_DIAG.
  *
- * Part of the opt-in per-host socket-table privacy feature (docs/adr/0068). Loaded
- * only when /etc/seedbox/config/socket-table-privacy.enabled is present and the host
- * carries a BPF-capable LSM stack + kernel BTF; the loader fails open otherwise.
+ * Part of the socket-table privacy feature (docs/adr/0068, default on). Loaded
+ * on every host that carries a BPF-capable LSM stack + kernel BTF and an
+ * autoattach-capable bpftool; the loader fails open otherwise.
  *
  * Accounts with uid >= 1000 (customer accounts, their subordinate uid ranges via
  * /etc/subuid, and nobody) may still list listening and unconnected sockets (what

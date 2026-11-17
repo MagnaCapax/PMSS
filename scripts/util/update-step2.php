@@ -374,9 +374,9 @@ if ($letsEncryptEmail === null) {
 // Drop obsolete global autodl configuration
 if (file_exists('/etc/autodl.cfg')) { unlink('/etc/autodl.cfg'); }
 
-// Owner rules follow the installed release; remove only the obsolete file or link (ADR 0272).
-runStep('Removing obsolete qBittorrent loopback owner marker',
-    'path=/etc/seedbox/config/qbittorrentLoopbackOwnerGuard.enabled; if [ -L "$path" ] || [ -f "$path" ]; then rm -f -- "$path"; fi');
+// These features follow the installed release; remove only the obsolete file or link (ADR 0272).
+runStep('Removing retired host marker files',
+    'for path in /etc/seedbox/config/qbittorrentLoopbackOwnerGuard.enabled /etc/seedbox/config/socket-table-privacy.enabled /etc/seedbox/config/qbittorrentWebuiEnforce.enabled /etc/seedbox/config/agentWebLogin.enabled /etc/seedbox/config/ext4-group-prealloc.enabled; do if [ -L "$path" ] || [ -f "$path" ]; then rm -f -- "$path"; fi; done');
 
 // Legacy daemons that should never run globally.
 foreach (['btsync', 'rslsync', 'pyload', 'sabnzbdplus'] as $legacySvc) {
@@ -464,16 +464,14 @@ pmssRunProfiledCallable('Ensuring network template baseline', 'pmssEnsureNetwork
 runStep('Reapplying network configuration', '/scripts/util/setupNetwork.php');
 pmssRunProfiledCallable('Hardening access to session and network binaries', 'pmssSessionHistoryPermissionsHarden', [], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);
 pmssRunProfiledCallable('Hardening access to the atop archive directory', 'pmssProcessArchiveDirHarden', [], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);
-// Opt-in only (marker /etc/seedbox/config/socket-table-privacy.enabled). With no marker this
-// restores stock /proc/net modes and is a no-op — inert until the operator enables it per host.
-pmssRunProfiledCallable('Applying socket-table privacy (opt-in)', 'pmssSocketTablePrivacyApply', ['logmsg'], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);
-// Stage 2: the sock_diag BPF-LSM filter. First ensure an autoattach-capable bpftool when the
-// feature is enabled (Debian 12 main ships 7.1.0 which cannot attach LSM programs — install 7.5
-// from bookworm-backports); then run the loader. The loader self-gates on the same marker and
-// FAILS OPEN (exit 0) on any host lacking the marker, bpftool, kernel BTF, or a bpf LSM — so it
-// can never block the update; it unloads when the feature is disabled. See docs/adr/0068.
-pmssRunProfiledCallable('Ensuring bpftool for socket-table privacy (opt-in)', 'pmssSocketTablePrivacyEnsureBpftool', ['logmsg'], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);
-runStep('Loading socket-table privacy filter (opt-in)', 'sh /scripts/lib/update/systemPrep/bpf/socket-privacy-load.sh');
+// Socket-table privacy (ADR 0068): /proc/net tables root-only + no TCP metrics persistence.
+pmssRunProfiledCallable('Applying socket-table privacy', 'pmssSocketTablePrivacyApply', ['logmsg'], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);
+// Stage 2: the sock_diag BPF-LSM filter. First ensure an autoattach-capable bpftool (Debian 12
+// main ships 7.1.0 which cannot attach LSM programs — install 7.5 from bookworm-backports); then
+// run the loader. The loader FAILS OPEN (exit 0) on any host lacking bpftool, kernel BTF, or a
+// bpf LSM, so it can never block the update. See docs/adr/0068.
+pmssRunProfiledCallable('Ensuring bpftool for socket-table privacy', 'pmssSocketTablePrivacyEnsureBpftool', ['logmsg'], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);
+runStep('Loading socket-table privacy filter', 'sh /scripts/lib/update/systemPrep/bpf/socket-privacy-load.sh');
 
 // Cleanup legacy runtime metadata that should never have shipped with snapshots.
 if (is_dir('/etc/seedbox/config/app-versions')) { runStep('Removing legacy app version records', 'rm -rf '.escapeshellarg('/etc/seedbox/config/app-versions')); }

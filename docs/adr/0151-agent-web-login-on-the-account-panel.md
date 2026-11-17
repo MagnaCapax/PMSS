@@ -5,7 +5,7 @@ Category: security
 
 ## Status
 
-Accepted for default-off delivery; per-host enablement by operator marker.
+Accepted. Default on since 2026-11-17 (see the amendment below).
 Amends ADR 0053 (Security Analysis, "no second password store").
 
 ## Context
@@ -139,3 +139,13 @@ or used by that path.
 - `scripts/lib/lighttpd/agentWebLogin.php`, `scripts/lib/lighttpd/configRender.php`
 - `scripts/lib/tests/development/AgentWebLoginTest.php`
 - ADR 0053, ADR 0068, ADR 0102, ADR 0121, ADR 0122
+
+## Amendment (2026-11-17): default on
+
+Every account's `/user-<account>/` `require` names its agent login. No host
+file is read: update removes `/etc/seedbox/config/agentWebLogin.enabled`
+(ADR 0272); no host had it. PMSS still writes no htpasswd line for the name, so
+it admits no one until the support tool adds a line for a check and removes it
+afterwards. The update that ships this rewrites each account's
+`~/.lighttpd.conf` once, and the account can read the extra name there (the
+name is not a secret, as above). The `/webdav-<account>/` zone is unchanged.

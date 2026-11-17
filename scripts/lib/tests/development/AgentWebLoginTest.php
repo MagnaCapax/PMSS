@@ -2,9 +2,9 @@
 /**
  * Agent web login on the /user-<account>/ area (ADR 0151).
  *
- * Pins the derived login name, the byte-identical default render, the single
- * changed require line with the host marker, and (when lighttpd and curl are
- * installed) a live Basic-auth round trip with the UTF-8 login name.
+ * Pins the derived login name, the single changed require line against the
+ * template without the placeholder, and (when lighttpd and curl are installed)
+ * a live Basic-auth round trip with the UTF-8 login name.
  */
 
 namespace PMSS\Tests;
@@ -20,24 +20,12 @@ class AgentWebLoginTest extends TestCase
         return \pmssLighttpdRenderUserConfig($template, 'testuser', 31234, 32345, 33456, ['maxProcs' => 2, 'children' => 6], [], false);
     }
 
-    /** Render with the marker either present (a regular file) or absent. */
-    private function renderWithMarker(bool $present, ?string $template = null): string
-    {
-        $marker = $this->pmssMakeTempDir('pmss-agent-login-', 0700).'/agentWebLogin.enabled';
-        if ($present) {
-            file_put_contents($marker, '');
-        }
-        $this->pmssTrackEnvOverrides(['PMSS_AGENT_WEB_LOGIN_MARKER' => $marker]);
-
-        return $this->render($template ?? $this->pmssReadRepoFile('etc/seedbox/config/template.lighttpd'));
-    }
-
     /** Lines that differ between two renders, as "-old" / "+new". */
     private function changedLines(string $before, string $after): array
     {
         $old = explode("\n", $before);
         $new = explode("\n", $after);
-        $this->assertSame(count($old), count($new), 'the marker must not add or remove lines');
+        $this->assertSame(count($old), count($new), 'the agent login must not add or remove lines');
         $changed = [];
         foreach ($old as $i => $line) {
             if ($line !== $new[$i]) {
@@ -72,46 +60,24 @@ class AgentWebLoginTest extends TestCase
     {
         foreach (['', 'Testuser', '1abc', 'toolongname', "testuser\n", 'a|user=b', 'a"b', 'a b', '../x'] as $user) {
             $this->assertSame('', \pmssAgentWebLoginName($user), 'invalid: '.json_encode($user));
-            $this->assertSame('', \pmssAgentWebLoginRequireSuffix($user, __FILE__), 'no suffix even with a marker: '.json_encode($user));
+            $this->assertSame('', \pmssAgentWebLoginRequireSuffix($user), 'no suffix: '.json_encode($user));
         }
     }
 
-    public function testRequireSuffixFollowsTheMarker(): void
+    /** Default-on since 2026-11-17 (ADR 0151): no host marker file decides the suffix. */
+    public function testRequireSuffixNamesTheAgentLogin(): void
     {
-        $dir = $this->pmssMakeTempDir('pmss-agent-login-', 0700);
-        $this->assertSame('', \pmssAgentWebLoginRequireSuffix('testuser', $dir.'/absent'));
-        $this->assertSame('', \pmssAgentWebLoginRequireSuffix('testuser', $dir), 'a directory is not the marker');
-        file_put_contents($dir.'/agentWebLogin.enabled', '');
-        $this->assertSame('|user='.self::AGENT_LOGIN, \pmssAgentWebLoginRequireSuffix('testuser', $dir.'/agentWebLogin.enabled'));
-        $this->pmssTrackEnvOverrides(['PMSS_AGENT_WEB_LOGIN_MARKER' => $dir.'/agentWebLogin.enabled']);
-        $this->assertSame($dir.'/agentWebLogin.enabled', \pmssAgentWebLoginMarkerPath());
-        $this->assertTrue(\pmssAgentWebLoginEnabled());
+        $this->assertSame('|user='.self::AGENT_LOGIN, \pmssAgentWebLoginRequireSuffix('testuser'));
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/lighttpd/agentWebLogin.php', [], ['agentWebLogin.enabled']);
     }
 
-    public function testDefaultMarkerPathIsUnderSeedboxConfig(): void
-    {
-        $this->pmssTrackEnvOverrides(['PMSS_AGENT_WEB_LOGIN_MARKER' => null]);
-        $this->assertSame('/etc/seedbox/config/agentWebLogin.enabled', \pmssAgentWebLoginMarkerPath());
-        $this->assertTrue(!is_file($this->pmssRepoPath('etc/seedbox/config/agentWebLogin.enabled')), 'the marker is never shipped');
-    }
-
-    public function testRenderWithoutMarkerIsByteIdenticalToThePreviousTemplate(): void
+    public function testRenderChangesOnlyThePanelRequireLine(): void
     {
         $template = $this->pmssReadRepoFile('etc/seedbox/config/template.lighttpd');
         $this->pmssAssertRepoFileSubstringCount('etc/seedbox/config/template.lighttpd', '##PMSS_AGENT_WEB_LOGIN_REQUIRE##', 1);
         // The template before ADR 0151 is this one without the placeholder.
-        $previous = str_replace('##PMSS_AGENT_WEB_LOGIN_REQUIRE##', '', $template);
-        $rendered = $this->renderWithMarker(false, $template);
-
-        $this->assertSame($this->renderWithMarker(false, $previous), $rendered);
-        $this->assertSame(2, substr_count($rendered, '"require" => "user=testuser"'."\n"));
-        $this->assertStringContainsAndOmitsStrings([], ['pm-v', '##PMSS_AGENT_WEB_LOGIN_REQUIRE##'], $rendered);
-    }
-
-    public function testRenderWithMarkerChangesOnlyThePanelRequireLine(): void
-    {
-        $without = $this->renderWithMarker(false);
-        $with = $this->renderWithMarker(true);
+        $without = $this->render(str_replace('##PMSS_AGENT_WEB_LOGIN_REQUIRE##', '', $template));
+        $with = $this->render($template);
 
         $this->assertSame([
             '-        "require" => "user=testuser"',
@@ -124,6 +90,7 @@ class AgentWebLoginTest extends TestCase
             '"require" => "user=testuser"'."\n",
         ], $with);
         $this->assertSame(1, substr_count($with, self::AGENT_LOGIN), 'WebDAV stays account-only');
+        $this->assertStringContainsAndOmitsStrings([], ['##PMSS_AGENT_WEB_LOGIN_REQUIRE##'], $with);
     }
 
     /** Live check: lighttpd mod_auth with the UTF-8 login in require and in the htpasswd file. */
@@ -136,7 +103,7 @@ class AgentWebLoginTest extends TestCase
             throw new SkipTest('needs lighttpd, mod_authn_file and curl (lighttpd='.var_export($lighttpd, true)
                 .' curl='.var_export($curl, true).' mod_authn_file='.count($authn).')');
         }
-        if (!preg_match('/^auth\.require = \(.*?^\)$/ms', $this->renderWithMarker(true), $block)) {
+        if (!preg_match('/^auth\.require = \(.*?^\)$/ms', $this->render($this->pmssReadRepoFile('etc/seedbox/config/template.lighttpd')), $block)) {
             $this->fail('rendered auth.require block not found');
         }
 

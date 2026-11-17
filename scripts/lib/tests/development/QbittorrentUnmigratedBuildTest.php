@@ -28,7 +28,7 @@ final class QbittorrentUnmigratedBuildTest extends TestCase
         $safe = self::pmssMakeCallbacks(['safe' => true])['safe'];
         $this->assertSame($config, \pmssQbittorrentWebUiAuthForce($config, '5.3.0'));
         $this->assertFalse(\pmssQbittorrentWebUiAuthEnsure('alice', $home, ['build' => '5.3.0',
-            'enabled' => $safe, 'contextSafe' => $safe, 'pathSafe' => $safe,
+            'contextSafe' => $safe, 'pathSafe' => $safe,
             'stateDir' => $home.'/run', 'write' => static function (): void { throw new \RuntimeException('Owner hash replaced'); }]));
         $this->assertFalse(\pmssQbittorrentFrontendPasswordRequired($path, $safe, '5.3.0'));
         $this->assertSame('23456', \pmssQbittorrentWebUiValue($config, 'Port', '5.3.0'));

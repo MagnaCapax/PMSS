@@ -4,7 +4,7 @@ Date: 2026-10-24
 Category: architecture
 
 ## Status
-Accepted, default off. Host measurement and canary remain tracked in #1147.
+Superseded 2026-11-17: the workaround is removed (see the amendment below). Measurement remains tracked in #1147.
 
 ## Context
 Older ext4 allocators send stripe-multiple requests through an aligned scan
@@ -66,3 +66,19 @@ write/readback failures, multiple superblocks and the marker gate.
 - #1164 (code), #1147 (measurement and canary)
 - [Opt-in marker precedent](0068-opt-in-tenant-socket-table-privacy.md)
 - [Upstream allocator fix](https://github.com/torvalds/linux/commit/1f6bc02f1848)
+
+## Amendment (2026-11-17): removed
+
+The helper `scripts/lib/update/systemPrep/ext4Prealloc.sh`, its boot-tuning
+block, the `ext4_group_prealloc` audit key and its test are deleted. Update
+removes `/etc/seedbox/config/ext4-group-prealloc.enabled` (ADR 0272).
+
+One host carried the marker, and the mechanism is still unproven (#1147). A
+trial of this kind is one `sysfs` write by an administrator on the host under
+test; it does not need a release-managed switch present on every host.
+Upstream commit 1f6bc02f1848 is in mainline and the 6.6.y stable series; the
+6.1.y series did not carry it on 2026-11-17.
+
+As the Consequences above state, removing the marker does not restore live
+state: a host where the value was written keeps it until the filesystem is next
+mounted.

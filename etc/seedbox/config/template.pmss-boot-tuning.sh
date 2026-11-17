@@ -74,8 +74,7 @@ write_hardware_summary() {
     "nvme_scheduler": "none",
     "nvme_read_ahead_kb": 128,
     "bcache_scheduler": "bfq",
-    "bcache_read_ahead_kb": 4096,
-    "ext4_group_prealloc": ${ext4_prealloc_audit:-[]}
+    "bcache_read_ahead_kb": 4096
   }
 }
 EOF
@@ -185,28 +184,15 @@ for disk in /sys/block/bcache*; do
 	write_sys "$disk/queue/read_ahead_kb" 4096
 done
 
-# Opt-in socket-table privacy (managed by scripts/lib/update/systemPrep/socketTablePrivacy.php).
+# Socket-table privacy (ADR 0068; managed by scripts/lib/update/systemPrep/socketTablePrivacy.php).
 # The /proc/net table modes are per-network-namespace kernel state that resets on reboot, so
-# reapply the root-only mode here when the operator marker is present. No marker = untouched.
-if [ -f /etc/seedbox/config/socket-table-privacy.enabled ]; then
-	for t in tcp tcp6 udp udp6 udplite udplite6 raw raw6 icmp icmp6; do
-		[ -e "/proc/net/$t" ] && chmod 0440 "/proc/net/$t" 2>/dev/null || true
-	done
-fi
+# reapply the root-only mode here.
+for t in tcp tcp6 udp udp6 udplite udplite6 raw raw6 icmp icmp6; do
+	[ -e "/proc/net/$t" ] && chmod 0440 "/proc/net/$t" 2>/dev/null || true
+done
 # Stage 2: reload the sock_diag BPF-LSM filter (BPF state does not survive a reboot).
-# The loader self-gates on the marker and fails open, so this is safe to call unconditionally.
+# The loader fails open, so a missing precondition never blocks boot.
 [ -x /bin/sh ] && sh /scripts/lib/update/systemPrep/bpf/socket-privacy-load.sh 2>/dev/null || true
-
-# Opt-in only: no ext4 discovery or helper execution without the host marker.
-if [ -f /etc/seedbox/config/ext4-group-prealloc.enabled ]; then
-	# shellcheck source=scripts/lib/update/systemPrep/ext4Prealloc.sh
-	if [ -r /scripts/lib/update/systemPrep/ext4Prealloc.sh ]; then
-		. /scripts/lib/update/systemPrep/ext4Prealloc.sh
-		ext4_prealloc_audit=$(pmss_ext4_prealloc_apply /proc/fs/ext4 /sys/fs/ext4 "$(uname -r)")
-	else
-		ext4_prealloc_audit='[{"result":"skip:missing-helper"}]'
-	fi
-fi
 
 # Record the detected host profile and the boot-time tuning targets for audits.
 write_hardware_summary

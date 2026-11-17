@@ -1,43 +1,28 @@
 <?php
 /**
- * Opt-in hardening of a tenant's view of the host's runtime socket state.
+ * Hardening of a tenant's view of the host's runtime socket state.
  *
  * On a shared host all accounts share one network namespace, so the kernel's
  * address-bearing /proc/net tables (and the saved TCP metrics cache) let one
  * account read another account's remote connection addresses. hidepid=2 and the
  * who/w/utmp/netstat mode hardening do not reach these kernel sources.
  *
- * When the operator places the marker file, this applier restricts the
- * address-bearing /proc/net tables to root and stops the kernel from persisting
- * the per-peer TCP metrics cache. Root and PMSS tooling are unaffected. With no
- * marker (the default) it restores the kernel's stock 0444 mode and removes the
- * sysctl drop-in, so the feature is inert until explicitly enabled.
+ * This applier restricts the address-bearing /proc/net tables to root and stops
+ * the kernel from persisting the per-peer TCP metrics cache, on every host (ADR
+ * 0068, default since 2026-11-17). Root and PMSS tooling are unaffected.
  *
  * The /proc/net modes are per-network-namespace kernel state that resets on
  * reboot; template.pmss-boot-tuning.sh reapplies them at boot. This module is
- * the update-time applier and the single source of the marker path + table list.
+ * the update-time applier and the single source of the table list.
  *
- * The `ss` / NETLINK_SOCK_DIAG channel is not closed here (a kernel-side filter
- * is required and is tracked separately); enabling this module alone reduces,
- * but does not eliminate, cross-account visibility of remote addresses.
+ * The `ss` / NETLINK_SOCK_DIAG channel is handled by the BPF-LSM filter in bpf/
+ * (stage 2), loaded by bpf/socket-privacy-load.sh, which fails open.
  *
  * @license GPL-3.0-only
  */
 
 require_once __DIR__.'/../managedPath.php';
 require_once __DIR__.'/../../pathSafety.php';
-
-/** Operator-set marker; its presence enables the feature on this host. */
-function pmssSocketTablePrivacyMarkerPath(): string
-{
-    return pmssResolvePathFromEnv('PMSS_SOCKET_TABLE_PRIVACY_MARKER', '/etc/seedbox/config/socket-table-privacy.enabled');
-}
-
-/** True when the operator has enabled the feature on this host. */
-function pmssSocketTablePrivacyEnabled(?string $markerPath = null): bool
-{
-    return is_file($markerPath ?? pmssSocketTablePrivacyMarkerPath());
-}
 
 /** Address-bearing /proc/net tables, relative to the proc-net root. */
 function pmssSocketTablePrivacyTables(): array
@@ -68,13 +53,12 @@ function pmssSocketTablePrivacyBpftoolHasAutoattach(): bool
 }
 
 /**
- * Ensure an autoattach-capable bpftool is present when the feature is enabled.
+ * Ensure an autoattach-capable bpftool is present.
  *
  * Stage 2 (the sock_diag BPF-LSM filter) can only be attached by bpftool >= 7.5.
  * On Debian 12 that means bookworm-backports; elsewhere the main archive already
  * carries a new enough build. Runs at update time only (never at boot — apt must
- * not run from the boot loader) and only when the operator marker is present, so
- * non-enabled hosts install nothing. Fail-soft: if a capable bpftool cannot be
+ * not run from the boot loader). Fail-soft: if a capable bpftool cannot be
  * installed the loader fails open and the host runs stage 1 only.
  *
  * Returns true when an autoattach-capable bpftool is present after this call.
@@ -82,9 +66,6 @@ function pmssSocketTablePrivacyBpftoolHasAutoattach(): bool
 function pmssSocketTablePrivacyEnsureBpftool(?callable $logger = null, ?int $distroVersion = null): bool
 {
     $log = $logger ?: 'logMessage';
-    if (!pmssSocketTablePrivacyEnabled()) {
-        return false;
-    }
     if (pmssSocketTablePrivacyBpftoolHasAutoattach()) {
         return true;
     }
@@ -107,14 +88,7 @@ function pmssSocketTablePrivacyEnsureBpftool(?callable $logger = null, ?int $dis
 
 /**
  * Set every existing address-bearing /proc/net table to $mode.
- * 0440 hides remote addresses from non-root; 0444 is the kernel's stock mode.
- * Returns the count of tables actually changed.
- *
- * The restore direction (0444) is deliberately NON-WIDENING: it only touches a
- * table currently at exactly 0440 (this feature's own signature mode). A table
- * left at any other mode by the kernel or a future hardening layer is not
- * loosened back to 0444 — so disabling this feature can never widen access
- * beyond what it originally restricted.
+ * 0440 hides remote addresses from non-root. Returns the count of tables changed.
  */
 function pmssSocketTablePrivacyChmodProcNet(int $mode, ?string $procNetRoot = null): int
 {
@@ -133,11 +107,6 @@ function pmssSocketTablePrivacyChmodProcNet(int $mode, ?string $procNetRoot = nu
         if ($current === $mode) {
             continue;
         }
-        // Restore (widen to 0444) ONLY our own 0440 mark; never loosen a table
-        // the kernel or another layer set more restrictively.
-        if ($mode === 0444 && $current !== 0440) {
-            continue;
-        }
         if (@chmod($path, $mode)) {
             $changed++;
         }
@@ -146,35 +115,19 @@ function pmssSocketTablePrivacyChmodProcNet(int $mode, ?string $procNetRoot = nu
 }
 
 /**
- * Apply the feature when enabled, or restore stock state when disabled.
- *
- * Enabled  -> /proc/net tables 0440 + sysctl drop-in (tcp_no_metrics_save=1) +
- *             flush the existing metrics cache.
- * Disabled -> /proc/net tables restored to 0444 + drop-in removed.
+ * Apply the feature: /proc/net tables 0440 + sysctl drop-in
+ * (tcp_no_metrics_save=1) + flush the existing metrics cache.
  *
  * Idempotent and side-effect-scoped: it never touches anything but the tables,
  * the one drop-in, and the metrics cache. Returns a status array for logging.
  */
-function pmssSocketTablePrivacyApply(?callable $logger = null, ?string $markerPath = null, ?string $procNetRoot = null, ?string $sysctlDropin = null): array
+function pmssSocketTablePrivacyApply(?callable $logger = null, ?string $procNetRoot = null, ?string $sysctlDropin = null): array
 {
     $log = $logger ?: 'logMessage';
-    $enabled = pmssSocketTablePrivacyEnabled($markerPath);
     $sysctlDropin = $sysctlDropin ?? pmssSocketTablePrivacySysctlDropinPath();
 
-    if (!$enabled) {
-        $restored = pmssSocketTablePrivacyChmodProcNet(0444, $procNetRoot);
-        $removed = false;
-        if (is_file($sysctlDropin)) {
-            $removed = @unlink($sysctlDropin);
-        }
-        if ($restored > 0 || $removed) {
-            $log('Socket-table privacy disabled: restored '.$restored.' /proc/net tables to stock mode'.($removed ? ' and removed the metrics drop-in' : ''));
-        }
-        return ['enabled' => false, 'tables_changed' => $restored, 'metrics' => $removed ? 'removed' : 'unchanged'];
-    }
-
     $hidden = pmssSocketTablePrivacyChmodProcNet(0440, $procNetRoot);
-    $content = "# PMSS opt-in socket-table privacy: stop persisting the per-peer TCP metrics cache.\n# Managed by scripts/lib/update/systemPrep/socketTablePrivacy.php; remove the marker to revert.\nnet.ipv4.tcp_no_metrics_save = 1\n";
+    $content = "# PMSS socket-table privacy: stop persisting the per-peer TCP metrics cache.\n# Managed by scripts/lib/update/systemPrep/socketTablePrivacy.php (ADR 0068).\nnet.ipv4.tcp_no_metrics_save = 1\n";
     $metrics = 'unchanged';
     if (pmssInstallManagedPathFile($sysctlDropin, $content, 'Socket-table privacy sysctl drop-in', $log, ['mode' => 0644])) {
         $metrics = 'written';
@@ -183,6 +136,6 @@ function pmssSocketTablePrivacyApply(?callable $logger = null, ?string $markerPa
         runStep('Enabling TCP metrics privacy sysctl', 'sysctl -q -w net.ipv4.tcp_no_metrics_save=1 || true');
         runStep('Flushing saved TCP metrics cache', 'ip tcp_metrics flush all 2>/dev/null || true');
     }
-    $log('Socket-table privacy enabled: '.$hidden.' /proc/net tables restricted to root, TCP metrics persistence off ('.$metrics.')');
-    return ['enabled' => true, 'tables_changed' => $hidden, 'metrics' => $metrics];
+    $log('Socket-table privacy: '.$hidden.' /proc/net tables restricted to root, TCP metrics persistence off ('.$metrics.')');
+    return ['tables_changed' => $hidden, 'metrics' => $metrics];
 }

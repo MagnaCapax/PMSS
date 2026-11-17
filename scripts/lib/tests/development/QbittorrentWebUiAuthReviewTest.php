@@ -18,7 +18,7 @@ final class QbittorrentWebUiAuthReviewTest extends TestCase
             'stateDir' => $root.'/run',
             'now' => 100000,
         ] + self::pmssMakeCallbacks([
-            'enabled' => true, 'contextSafe' => true, 'pathSafe' => true,
+            'contextSafe' => true, 'pathSafe' => true,
             'read' => "[Preferences]\nWebUI\\LocalHostAuth=false\n", 'pids' => [123], 'mntNs' => 'mnt:[1]'
         ]) + self::pmssMakeCallbacks(['write' => true, 'signal' => true], $events);
     }

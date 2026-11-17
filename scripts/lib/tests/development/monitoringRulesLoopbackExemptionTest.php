@@ -105,12 +105,16 @@ class MonitoringRulesLoopbackExemptionTest extends TestCase
     public function testUpdateRemovesObsoleteMarkerWithoutFollowingLinks(): void
     {
         $source = $this->pmssReadRepoFile('scripts/util/update-step2.php');
-        $this->assertSame(1, preg_match("/runStep\('Removing obsolete qBittorrent loopback owner marker',\s*'([^']+)'\);/", $source, $matches));
+        $this->assertSame(1, preg_match("/runStep\('Removing retired host marker files',\s*'([^']+)'\);/", $source, $matches));
+        foreach (['qbittorrentLoopbackOwnerGuard', 'socket-table-privacy', 'qbittorrentWebuiEnforce', 'agentWebLogin', 'ext4-group-prealloc'] as $retired) {
+            $this->assertStringContainsString('/etc/seedbox/config/'.$retired.'.enabled', $matches[1], $retired.' marker must be removed by update');
+        }
         $root = $this->pmssMakeTempDir('pmss-loopback-cleanup-');
         $path = $root.'/marker';
         $this->pmssWriteFile($root.'/target', 'keep');
         $this->pmssEnsureDir($root.'/directory');
-        $command = str_replace('/etc/seedbox/config/qbittorrentLoopbackOwnerGuard.enabled', escapeshellarg($path), $matches[1]);
+        $command = preg_replace('/for path in [^;]+;/', 'for path in '.escapeshellarg($path).';', $matches[1], 1, $replaced);
+        $this->assertSame(1, $replaced, 'the test must replace every live path with its temp path');
         foreach (['missing', 'file', 'link', 'dangling', 'directory-link', 'directory'] as $kind) {
             if ($kind === 'file') $this->pmssWriteFile($path, '');
             if ($kind === 'link') symlink($root.'/target', $path);

@@ -31,7 +31,7 @@ final class QbittorrentWebUiAuthStateTest extends TestCase
             'stateDir' => $root.'/run',
             // A fixed clock makes the daily interval deterministic.
             'now' => $now,
-        ] + self::pmssMakeCallbacks(['enabled' => true, 'contextSafe' => true, 'pathSafe' => true,
+        ] + self::pmssMakeCallbacks(['contextSafe' => true, 'pathSafe' => true,
             'exe' => $native, 'mntNs' => 'mnt:[1]']);
         return $opts;
     }

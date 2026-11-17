@@ -1,12 +1,11 @@
 # Socket-table privacy BPF-LSM filter
 
-Part of the opt-in per-host socket-table privacy feature — see `docs/adr/0068`.
+Part of the socket-table privacy feature (default on) — see `docs/adr/0068`.
 
 ## What it is
 
-`sockdiag_filter.bpf.c` is a small BPF-LSM program on the `netlink_send` hook. When
-the host has enabled the feature (`/etc/seedbox/config/socket-table-privacy.enabled`),
-it stops unprivileged accounts (uid ≥ 1000, covering tenants, their `/etc/subuid`
+`sockdiag_filter.bpf.c` is a small BPF-LSM program on the `netlink_send` hook. It
+stops unprivileged accounts (uid ≥ 1000, covering tenants, their `/etc/subuid`
 ranges, and `nobody`) from dumping **connected** socket rows via `NETLINK_SOCK_DIAG`
 (the interface `ss` uses) — those rows carry a peer's remote address. It still allows
 the **listening/unconnected** dumps that `ss -tln` / `ss -tlnp` send (finding a free
@@ -48,7 +47,7 @@ bpftool prog loadall sockdiag_filter.bpf.o /sys/fs/bpf/pmss-test autoattach && r
 ## Toolchain
 
 An autoattach-capable `bpftool` (>= 7.5) is required to attach the program. It is installed
-on demand (only when the feature is enabled) by `pmssSocketTablePrivacyEnsureBpftool()` in
+on demand by `pmssSocketTablePrivacyEnsureBpftool()` in
 `../socketTablePrivacy.php`: from **bookworm-backports** on Debian 12 (main ships 7.1.0,
 which lacks `autoattach` and cannot attach LSM programs), from the main archive elsewhere.
 Debian 11 (`bpftool` 5.10, no `autoattach`) runs **stage 1 only**; the loader fails open.

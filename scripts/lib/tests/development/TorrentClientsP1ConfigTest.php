@@ -31,5 +31,8 @@ final class TorrentClientsP1ConfigTest extends TestCase
         $this->assertSame('Posix', $find(\pmssQbittorrentManagedConfigEntries('4.6.7'), $key)[0]['value']);
         $this->assertSame('SimplePreadPwrite', $find(\pmssQbittorrentManagedConfigEntries('5.0.1'), $key)[0]['value']);
         $this->assertSame('true', $find(\pmssQbittorrentManagedConfigEntries('5.0.1'), 'WebUI\\CSRFProtection')[0]['value']);
+        // Default-on since 2026-11-17 (ADR 0102): no host marker file decides these.
+        $this->assertSame('true', $find(\pmssQbittorrentManagedConfigEntries('5.0.1'), 'WebUI\\LocalHostAuth')[0]['value']);
+        $this->assertSame('false', $find(\pmssQbittorrentManagedConfigEntries('5.0.1'), 'WebUI\\AuthSubnetWhitelistEnabled')[0]['value']);
     }
 }

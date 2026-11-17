@@ -75,16 +75,6 @@ final class QbittorrentWebUiAuthConfigTest extends TestCase
         $this->assertFalse(\pmssQbittorrentFrontendPasswordRequired($path, $callbacks['unsafe']));
     }
 
-    /** The rollout marker is the first check, before file access. */
-    public function testMarkerAbsentDoesNoWork(): void
-    {
-        $read = 0;
-        $this->assertFalse(\pmssQbittorrentWebUiAuthEnsure('alice', '/tmp/pmss-qbt-test/alice', [
-            'read' => static function () use (&$read) { $read++; return ''; },
-        ] + self::pmssMakeCallbacks(['enabled' => false])));
-        $this->assertSame(0, $read);
-    }
-
     /** A path the writer refuses must never reach the differ. */
     public function testWriterRefusedPathDoesNoReadOrStop(): void
     {
@@ -97,7 +87,7 @@ final class QbittorrentWebUiAuthConfigTest extends TestCase
         $reads = 0;
         $this->assertFalse(\pmssQbittorrentWebUiAuthEnsure('alice', $home, [
             'read' => static function () use (&$reads) { $reads++; return ''; },
-        ] + self::pmssMakeCallbacks(['enabled' => true, 'contextSafe' => true])));
+        ] + self::pmssMakeCallbacks(['contextSafe' => true])));
         $this->assertSame(0, $reads);
     }
 }
