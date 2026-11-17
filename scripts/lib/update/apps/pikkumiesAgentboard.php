@@ -2,10 +2,11 @@
 /** Install the verified baseline build of the account UI binary. */
 require_once __DIR__.'/remoteBinary.php';
 require_once __DIR__.'/../rootOwnedTree.php';
+require_once dirname(__DIR__, 2).'/lighttpd/userFileWrite.php';
 
 // Pin both values from one published release; an empty pin disables installation.
-const PMSS_PIKKUMIES_AGENTBOARD_VERSION = 'v0.36.0-pikkumies.5';
-const PMSS_PIKKUMIES_AGENTBOARD_SHA256 = 'a737049d1b3b5cd31c8652f7c710cf6ff4e8c0791e903d8b318e7183a472f30c';
+const PMSS_PIKKUMIES_AGENTBOARD_VERSION = 'v0.36.0-pikkumies.6';
+const PMSS_PIKKUMIES_AGENTBOARD_SHA256 = '54c59bc820f8dfa1cdaa93c5921148f8c2422ba74a260d6153dd4471de29eb6b';
 const PMSS_PIKKUMIES_AGENTBOARD_ROOT = '/opt/pikkumies-agentboard';
 
 /** An existing version is inspected only when its directory has the expected owner. */
@@ -145,18 +146,20 @@ function pmssPikkumiesAgentboardInstalled(string $version, string $sha256, strin
         && trim((string) @file_get_contents($stamp, false, null, 0, 256)) === pmssPikkumiesAgentboardStamp($sha256, $manifest);
 }
 
-/** Keep the update hook a logged no-op until the release has immutable pins. */
-function pmssPikkumiesAgentboardHostEnabled(string $marker = '/etc/seedbox/config/pikkumiesEternals.enabled'): bool
+/** Release state for the account runtime: every update writes it, so Eternals is on for every account. */
+function pmssPikkumiesEternalsReleaseStatePublish(string $path = '/etc/seedbox/config/pikkumiesEternals.enabled'): void
 {
-    return is_file($marker) && !is_link($marker);
+    if (getenv('PMSS_DRY_RUN') === '1') {
+        logmsg('[DRY RUN] Would publish Pikkumies Eternals release state');
+        return;
+    }
+    logmsg(pmssWriteManagedFile($path, "enabled\n", 'root', 'root', 0644)
+        ? '[OK] Pikkumies Eternals release state published' : '[WARN] Pikkumies Eternals release state write failed');
 }
 
 function pmssPikkumiesAgentboardInstall(): void
 {
-    if (!pmssPikkumiesAgentboardHostEnabled()) {
-        logmsg('[SKIP] Pikkumies Agentboard host marker is absent');
-        return;
-    }
+    pmssPikkumiesEternalsReleaseStatePublish();
     $version = PMSS_PIKKUMIES_AGENTBOARD_VERSION;
     $sha256 = PMSS_PIKKUMIES_AGENTBOARD_SHA256;
     if ($version === '' || $sha256 === '') {

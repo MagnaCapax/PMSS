@@ -26,6 +26,7 @@ function pmssMediaStackPortDefinitions(): array
         'autobrr' => array('path' => '.config/autobrr/config.toml', 'patterns' => array($iniPort)),
         'openclaw' => array('path' => '.openclaw/gateway.port', 'patterns' => array('/^([0-9]{1,5})(?:\r?\n|$)/')),
         'hermes' => array('path' => '', 'patterns' => array()),
+        'pikkumies-hermes' => array('path' => '', 'patterns' => array()),
         'qbittorrent' => array('path' => '', 'patterns' => array()),
         'qbittorrent-peer' => array('path' => '', 'patterns' => array()),
         'transmission' => array('path' => '', 'patterns' => array()),
@@ -38,10 +39,6 @@ function pmssMediaStackPortDefinitions(): array
             ),
         ),
     );
-    // The staged host marker owns B; reserve its loopback port only on enabled hosts.
-    if (is_file('/etc/seedbox/config/pikkumiesEternals.enabled')) {
-        $definitions['pikkumies-hermes'] = array('path' => '', 'patterns' => array());
-    }
     return $definitions;
 }
 

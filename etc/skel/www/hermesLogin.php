@@ -3,7 +3,7 @@
 $account = function_exists('posix_getpwuid') ? posix_getpwuid(posix_geteuid()) : false;
 $name = is_array($account) ? (string) ($account['name'] ?? '') : '';
 if (!preg_match('/^[a-z][a-z0-9]{0,7}$/D', $name)) { http_response_code(403); return; }
-$base = '/user-'.$name.'/hermes/';
+$base = '/user-'.$name.(($_GET['ui'] ?? '') === 'pikkumies' ? '/pikkumies-hermes/' : '/hermes/');
 $script = <<<'JS'
 (function () {
     var base = document.body.dataset.base;

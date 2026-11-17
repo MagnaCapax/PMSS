@@ -9,22 +9,17 @@ function pmssPikkumiesPanelAccount()
     return is_array($entry) ? array((string) ($entry['dir'] ?? ''), (string) ($entry['name'] ?? '')) : array('', '');
 }
 
-/** Use only the root-owned public billing identity used by the launcher. */
-function pmssPikkumiesPanelStateRead($home, $name, $marker = '/etc/seedbox/config/pikkumiesEternals.enabled',
-    $billingRoot = '/var/lib/pmss/public/billing', $ownerUid = 0)
+/** Account availability is independent of host release state and billing identity. */
+function pmssPikkumiesPanelStateRead($home, $name, $host = null)
 {
     $empty = array('visible' => false, 'origin' => '', 'mode' => 'simplified', 'off' => false);
-    if ($home === '' || !preg_match('/^[A-Za-z0-9._-]+$/D', $name)
-        || !is_file($marker) || is_link($marker)) return $empty;
-    $billing = $billingRoot.'/'.$name;
-    $stat = @lstat($billing);
-    $id = is_array($stat) && ($stat['mode'] & 0170000) === 0100000
-        && $stat['uid'] === $ownerUid && $stat['nlink'] === 1
-        ? trim((string) @file_get_contents($billing, false, null, 0, 64)) : '';
+    if ($home === '' || !preg_match('/^[A-Za-z0-9._-]+$/D', $name)) return $empty;
+    if ($host === null) $host = strtolower(trim((string) @shell_exec('/bin/hostname -f')));
+    if (!is_string($host) || preg_match('/^[a-z0-9.-]+\.[a-z]{2,}$/D', $host) !== 1) return $empty;
     $root = $home.'/.mcxPikkumies/pikkumies';
     $binary = $root.'/bin/pikkumies';
     $local = $root.'/local';
-    if (!preg_match('/^[1-9][0-9]*$/D', $id) || !is_file($binary)
+    if (!is_file($binary)
         || !is_executable($binary) || !is_dir($local)) return $empty;
     $off = is_file($local.'/eternals.off') || is_link($local.'/eternals.off');
     $modeFile = $home.'/.config/pmss/ui/pikkumies-interface';
@@ -32,7 +27,7 @@ function pmssPikkumiesPanelStateRead($home, $name, $marker = '/etc/seedbox/confi
         && trim((string) @file_get_contents($modeFile, false, null, 0, 32)) === 'power-user'
         ? 'power-user' : 'simplified';
     return array('visible' => !$off,
-        'origin' => 'https://'.substr(hash('sha256', 'mcx.fi:service:'.ltrim($id, '0')), 0, 16).'.mcx.fi:844',
+        'origin' => 'https://'.$host.'/user-'.$name.'/pikkumies/',
         'mode' => $mode, 'off' => $off);
 }
 

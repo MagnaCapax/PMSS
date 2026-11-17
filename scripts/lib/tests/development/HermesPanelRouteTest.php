@@ -5,7 +5,7 @@ require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 4).'/etc/skel/bin/pmssHermesRuntime.php';
 require_once dirname(__DIR__, 2).'/lighttpd/pikkumiesUi.php';
 require_once dirname(__DIR__, 2).'/nginxConfig/templates.php';
-require_once dirname(__DIR__, 2).'/nginxConfig/pikkumiesUi.php';
+require_once dirname(__DIR__, 2).'/nginxConfig/userConfigsGenerate.php';
 
 /** Panel prefix and authentication contracts; fixtures run only on the testing VM. */
 final class HermesPanelRouteTest extends TestCase
@@ -67,6 +67,8 @@ final class HermesPanelRouteTest extends TestCase
             'if ($http_origin = "https://$host")', '(?s)^GET:/user-qafix01/hermes/api/.*:(cross-site|same-site)$',
             'if ($pmss_hermes_request = "GET::")', 'limit_conn addr 32;',
             'if ($uri = /user-qafix01/hermes/api/cron/fire) { return 404; }'], $template);
+        $start = strpos($template, 'location ^~ /user-qafix01/hermes/');
+        $template = substr($template, $start, strpos($template, "\n}\n", $start) - $start);
         preg_match('/proxy_redirect ~([^ ]+) ([^;]+);/', $template, $redirect);
         preg_match('/proxy_cookie_path ~([^ ]+) ([^;]+);/', $template, $cookie);
         // lighttpd 1.4.69 mod_proxy.c reverses its mapping on already-prefixed Location and Path values.

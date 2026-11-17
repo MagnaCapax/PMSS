@@ -90,3 +90,10 @@ home marker ADR 0152 keeps for display, writes nothing and publishes nothing; th
 `welcome.php` is added to the R4 pin list in `scripts/testing/public-exposure-lint.php` as a display-only
 caller. The open decision on whether the `mcx.fi` records stay on by default (Consequences, above) is
 unchanged: if they become opt-in, this row must show only for accounts that turned the record on.
+
+## Amendment 2026-11-17: Pikkumies follows Decision 3
+
+Pikkumies now follows Decision 3, like Hermes: `/user-<u>/pikkumies/` and
+`/user-<u>/pikkumies-hermes/` use the existing panel address for every account,
+without a per-account public name or certificate. ADR 0128 records the removal
+of the former separate UI listeners and the default-on release state.

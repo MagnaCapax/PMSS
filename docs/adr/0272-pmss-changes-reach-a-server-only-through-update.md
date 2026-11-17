@@ -46,7 +46,7 @@ Existing host-file switches are reviewed against this rule:
 
 - `qbittorrentLoopbackOwnerGuard.enabled` (ADR 0259): removed by this change.
 - `pikkumiesPreinstall.enabled` (ADR 0090): removed as a requirement by this change.
-- `pikkumiesEternals.enabled` (ADR 0128): still a host file until the release that moves its two web interfaces under the account panel path (ADR 0150); that release switches it on in code.
+- `pikkumiesEternals.enabled` (ADR 0128, amendment 2026-11-17): release state rewritten by every PMSS update, root-owned 0644. Pikkumies and both screens default on through the account panel path (ADR 0150); removing the file by hand is unsupported.
 - `socket-table-privacy.enabled` (ADR 0068): default on since 2026-11-17; update removes the file.
 - `qbittorrentWebuiEnforce.enabled` (ADR 0102): default on since 2026-11-17; update removes the file.
 - `agentWebLogin.enabled` (ADR 0151): default on since 2026-11-17; update removes the file.

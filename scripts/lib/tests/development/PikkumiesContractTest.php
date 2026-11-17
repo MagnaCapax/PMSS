@@ -38,17 +38,13 @@ final class PikkumiesContractTest extends TestCase
         $this->assertSame([], $result['lines']);
     }
 
-    /** UI ports are fixed, distinct, privileged, and outside browser-denied ports. */
-    public function testUiPortsArePinned(): void
+    /** The panel route is the default for each account UI. */
+    public function testUiRoutesArePinned(): void
     {
         $fixture = $this->pmssReadJsonArrayFile(__DIR__.'/../fixtures/pikkumies-contract-v1.1.json');
-        $ports = array_map('intval', $fixture['ports']);
-        $badPorts = [0, 1, 7, 9, 21, 22, 23, 25, 53, 69, 80, 110, 143, 443, 445, 554, 600, 6665, 6666, 6667, 6668, 6669, 6697, 10080];
-        $this->assertSame([844, 845, 846], $ports);
-        $this->assertSame(3, count(array_unique($ports)));
-        foreach ($ports as $port) {
-            $this->assertSame(true, $port > 0 && $port < 1024);
-            $this->assertSame(false, in_array($port, $badPorts, true));
-        }
+        $this->assertSame(['/user-<u>/pikkumies/', '/user-<u>/pikkumies-hermes/', '/user-<u>/hermes/'], $fixture['routes']);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/www/pikkumiesOpen.php', [
+            "'/pikkumies-hermes/' : '/pikkumies/'", 'pmssPikkumiesOpenSocketLive($socket)',
+        ], ['pikkumiesEternals.enabled', 'CertificateState', 'TlsValid', 'mcx.fi']);
     }
 }

@@ -21,7 +21,7 @@ function pmssPikkumiesHermesCommand(array $paths, string $origin, int $port): st
         .'exec "$2" run dashboard --host 127.0.0.1 --port "$3" --no-open --skip-build';
     // Its own session: a process left in php-cgi's group dies when php-cgi recycles (live QA 2026-10-21).
     return '/usr/bin/setsid nohup /usr/bin/env -i HOME='.escapeshellarg($paths['home'])
-        .' PATH=/usr/local/bin:/usr/bin:/bin HERMES_DASHBOARD_PUBLIC_URL='.escapeshellarg($origin.'/')
+        .' PATH=/usr/local/bin:/usr/bin:/bin HERMES_DASHBOARD_PUBLIC_URL='.escapeshellarg($origin)
         .' HERMES_DASHBOARD_BASIC_AUTH_USERNAME='.escapeshellarg(basename($paths['home']))
         .' /bin/sh -c '.escapeshellarg($script).' sh '.escapeshellarg($paths['credentials'])
         .' '.escapeshellarg($paths['binary']).' '.escapeshellarg((string) $port)
@@ -31,7 +31,11 @@ function pmssPikkumiesHermesCommand(array $paths, string $origin, int $port): st
 /** Start through env -i; credentials are sourced from a validated 0600 file. */
 function pmssPikkumiesHermesStart(array $paths, string $origin): bool
 {
-    if (!preg_match('#^https://[0-9a-f]{16}\.mcx\.fi:845$#D', $origin)
+    $host = strtolower(trim((string) @shell_exec('/bin/hostname -f')));
+    $user = basename($paths['home']);
+    if (!preg_match('/^[a-z0-9.-]+\.[a-z]{2,}$/D', $host)
+        || !preg_match('/^[a-z][a-z0-9]{0,7}$/D', $user)
+        || $origin !== 'https://'.$host.'/user-'.$user.'/pikkumies-hermes/'
         || !is_file($paths['binary']) || is_link($paths['binary']) || !is_executable($paths['binary'])) return false;
     $port = pmssAgentReservedPort($paths['port']);
     if ($port === null) return false;
@@ -42,6 +46,14 @@ function pmssPikkumiesHermesStart(array $paths, string $origin): bool
     }
     if (!pmssPikkumiesHermesSchedule($paths) || pmssAgentCommandPath('ss') === '') return false;
     pmssPikkumiesHermesEnsure($paths);
+    // An existing dashboard must adopt the current panel URL before it is reused.
+    $pid = pmssAgentTcpListenerPid($port);
+    if ($pid !== null) {
+        $environment = @file_get_contents('/proc/'.$pid.'/environ');
+        if (!is_string($environment) || strpos("\0".$environment, "\0HERMES_DASHBOARD_PUBLIC_URL=".$origin."\0") === false) {
+            pmssPikkumiesHermesStop($paths);
+        }
+    }
     if (pmssPikkumiesHermesReady($paths)) {
         // A relay from before the sign-in exchange keeps forwarding but cannot sign in; replace it.
         return pmssHermesRelayCurrent($paths['relayPid'], $paths['socket'], $paths['credentials'])
@@ -89,6 +101,8 @@ function pmssPikkumiesSimplifiedStop(array $paths): void
         $pid = trim((string) @file_get_contents($file));
         if (!preg_match('/^[1-9][0-9]*$/D', $pid)) continue;
         $cmd = pmssAgentProcessCommandRead($pid);
-        if ($cmd !== null && strpos($cmd, '/opt/pikkumies-agentboard/agentboard') !== false) @posix_kill((int) $pid, SIGTERM);
+        if ($cmd !== null && preg_match('~(?:^|\x00)/opt/pikkumies-agentboard/(?:[A-Za-z0-9._-]+/)?agentboard(?:\x00|$)~D', $cmd)) {
+            @posix_kill((int) $pid, SIGTERM);
+        }
     }
 }

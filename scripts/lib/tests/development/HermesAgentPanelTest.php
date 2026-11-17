@@ -34,6 +34,13 @@ final class HermesAgentPanelTest extends TestCase
         $this->assertFalse(\pmssHermesPanelStatusRead($home)['installed']);
     }
 
+    public function testFixedPikkumiesChoiceUsesItsOwnPanelHandoff(): void
+    {
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/www/hermesLogin.php', [
+            "(\$_GET['ui'] ?? '') === 'pikkumies' ? '/pikkumies-hermes/' : '/hermes/'",
+            "new URL(base + '__pmss-session', location.origin)",
+        ], ['mcx.fi', ':845']);
+    }
     public function testUnknownActionAndLinkedInstallerRefuseLaunch(): void
     {
         $home = $this->pmssMakeTempDir('pmss-hermes-panel-');

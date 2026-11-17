@@ -10,7 +10,7 @@ class PanelSessionLighttpdConfigTest extends TestCase
         return ['maxProcs' => 2, 'children' => 6];
     }
 
-    private function legacyRender(string $template, string $user = 'alice'): string
+    private function legacyRender(string $template, string $user = 'fixtur01'): string
     {
         $config = str_replace(
             ["##username", "##serverPort", "##rclonePort", "##qbittorrentPort", "##PMSS_WEBDAV_WWW_POLICY##", "##PMSS_TRANSMISSION_PROXY##", "##PMSS_AGENT_WEB_LOGIN_REQUIRE##"],
@@ -29,7 +29,7 @@ class PanelSessionLighttpdConfigTest extends TestCase
     private function render(string $template, array $panelSessionLogin = []): string
     {
         return \pmssLighttpdRenderUserConfig(
-            $template, 'alice', 31234, 32345, 33456, $this->resources(), $panelSessionLogin
+            $template, 'fixtur01', 31234, 32345, 33456, $this->resources(), $panelSessionLogin
         );
     }
 
@@ -37,11 +37,30 @@ class PanelSessionLighttpdConfigTest extends TestCase
     {
         $template = $this->pmssReadRepoFile('etc/seedbox/config/template.lighttpd');
         $expected = $this->legacyRender($template);
+        // The panel's existing auth policy now also covers these default account mounts.
+        $expected .= "\n".<<<'LIGHTTPD'
+# The existing panel zone authenticates before Authorization is cleared.
+$HTTP["url"] =~ "^/user-fixtur01/pikkumies/" {
+    setenv.set-request-header = ( "Authorization" => "" )
+    proxy.server = ( "" => (( "socket" => "/home/fixtur01/.mcxPikkumies/pikkumies/local/ui/ui.sock" )) )
+    proxy.header = ( "upgrade" => "enable", "map-urlpath" => ( "/user-fixtur01/pikkumies/" => "/" ) )
+    server.max-read-idle = 3600
+    server.max-write-idle = 3600
+}
+$HTTP["url"] =~ "^/user-fixtur01/pikkumies-hermes/" {
+    setenv.set-request-header = ( "Authorization" => "" )
+    setenv.set-request-header += ( "X-Forwarded-Prefix" => "/user-fixtur01/pikkumies-hermes" )
+    proxy.server = ( "" => (( "socket" => "/home/fixtur01/.mcxPikkumies/pikkumies/local/ui/hermes/ui.sock" )) )
+    proxy.header = ( "upgrade" => "enable", "map-urlpath" => ( "/user-fixtur01/pikkumies-hermes/" => "/" ) )
+    server.max-read-idle = 3600
+    server.max-write-idle = 3600
+}
+LIGHTTPD;
         foreach ([[], ['enabled' => false, 'moduleLoadable' => true, 'gatePath' => '/tmp/unused.lua', 'gateExists' => true]] as $options) {
             $rendered = $this->render($template, $options);
             $this->assertSame($expected, $rendered, 'panelSessionLogin off must not change generated lighttpd config');
             $this->assertStringContainsAndOmitsStrings(
-                ['"/user-alice/"', '"/webdav-alice/"', '"method" => "basic"'],
+                ['"/user-fixtur01/"', '"/webdav-fixtur01/"', '"method" => "basic"'],
                 ['mod_magnet', 'magnet.attract-raw-url-to', 'auth.extern-authn', 'panelSessionLogin.php'],
                 $rendered
             );
@@ -59,7 +78,7 @@ class PanelSessionLighttpdConfigTest extends TestCase
             'gateExists' => true,
         ]);
         $this->assertStringContainsAndOmitsStrings(
-            ['"/user-alice/"', '"/webdav-alice/"', '"method" => "basic"'],
+            ['"/user-fixtur01/"', '"/webdav-fixtur01/"', '"method" => "basic"'],
             ['mod_magnet', 'magnet.attract-raw-url-to', 'auth.extern-authn'],
             $rendered
         );
@@ -75,7 +94,7 @@ class PanelSessionLighttpdConfigTest extends TestCase
             'gatePath' => $missingGate,
         ]);
         $this->assertStringContainsAndOmitsStrings(
-            ['"/user-alice/"', '"/webdav-alice/"', '"method" => "basic"'],
+            ['"/user-fixtur01/"', '"/webdav-fixtur01/"', '"method" => "basic"'],
             ['mod_magnet', 'magnet.attract-raw-url-to', 'auth.extern-authn'],
             $rendered
         );
@@ -93,34 +112,34 @@ class PanelSessionLighttpdConfigTest extends TestCase
         ]);
         $this->assertOrderedStrings(['"mod_magnet",', '"mod_auth",'], $rendered);
         $this->assertStringContainsAllStrings([
-            '$HTTP["url"] =~ "^/user-alice($|/)"',
+            '$HTTP["url"] =~ "^/user-fixtur01($|/)"',
             'auth.extern-authn = "enable"',
             'magnet.attract-raw-url-to = ( "'.$gate.'" )',
-            '"/user-alice/"',
-            '"/webdav-alice/"',
+            '"/user-fixtur01/"',
+            '"/webdav-fixtur01/"',
             '"method" => "basic"',
         ], $rendered);
         $this->assertSame(1, substr_count($rendered, 'magnet.attract-raw-url-to'));
         $this->assertSame(1, substr_count($rendered, 'mod_magnet'));
-        $this->assertStringNotContainsString('$HTTP["url"] =~ "^/webdav-alice', $this->magnetBlock($rendered));
+        $this->assertStringNotContainsString('$HTTP["url"] =~ "^/webdav-fixtur01', $this->magnetBlock($rendered));
     }
 
     public function testPanelSessionGateDeploysToUserLighttpdDirectoryBeforeRenderReference(): void
     {
         $root = $this->pmssMakeTempDir('pmss-panel-home-');
-        $home = $this->pmssEnsureDir($root.'/alice');
+        $home = $this->pmssEnsureDir($root.'/fixtur01');
         $this->pmssEnsureDir($home.'/.lighttpd');
         $module = $this->pmssWriteFile($this->pmssMakeTempDir('pmss-panel-module-').'/mod_magnet.so', 'module');
-        $this->assertTrue(\pmssLighttpdPanelSessionGateDeploy('alice', $home));
+        $this->assertTrue(\pmssLighttpdPanelSessionGateDeploy('fixtur01', $home));
         $gatePath = $home.'/.lighttpd/panelSessionGate.lua';
         $this->assertSame($this->pmssReadRepoFile('scripts/lib/lighttpd/panelSessionGate.lua'), (string) file_get_contents($gatePath));
         $this->assertSame(0600, fileperms($gatePath) & 0777);
 
-        $options = \pmssLighttpdPanelSessionLoginOptions('alice', $home, true, [$module]);
+        $options = \pmssLighttpdPanelSessionLoginOptions('fixtur01', $home, true, [$module]);
         $this->assertTrue(\pmssLighttpdPanelSessionLoginShouldEmit($options));
         $rendered = \pmssLighttpdRenderUserConfig(
             $this->pmssReadRepoFile('etc/seedbox/config/template.lighttpd'),
-            'alice',
+            'fixtur01',
             31234,
             32345,
             33456,

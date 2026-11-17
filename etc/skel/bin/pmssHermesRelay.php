@@ -137,9 +137,10 @@ function pmssHermesRelayLogin(string $token, string $credentials, string $user, 
     $backend = $password === null ? false : pmssHermesRelayConnect($port, $owner);
     if ($backend === false) return $deny;
     try {
-        $prefix = basename(dirname($credentials)) === '.hermes' ? '/user-'.$user.'/hermes' : '';
+        $prefix = basename(dirname($credentials)) === '.hermes'
+            ? '/user-'.$user.'/hermes' : '/user-'.$user.'/pikkumies-hermes';
         $body = (string) json_encode(array('provider' => 'basic', 'username' => $user, 'password' => $password, 'next' => $prefix.'/'));
-        // Native Hermes scopes __Secure- cookies to the panel mount; the Pikkumies relay retains its root cookie.
+        // Both Hermes dashboards scope their __Secure- cookies to their own panel mount.
         $request = "POST /auth/password-login HTTP/1.1\r\nHost: 127.0.0.1\r\nX-Forwarded-Proto: https\r\n"
             .($prefix === '' ? '' : 'X-Forwarded-Prefix: '.$prefix."\r\n")
             ."Content-Type: application/json\r\nContent-Length: ".strlen($body)."\r\nConnection: close\r\n\r\n".$body;
@@ -197,9 +198,10 @@ function pmssHermesRelayServe(string $socket, int $port, ?callable $owner = null
     $peers = array(); $streams = array(); $queue = array(); $ended = array();
     // Sign-in exchange: first bytes not yet classified, answers to close once sent, and both their time limits.
     $pending = array(); $finish = array(); $deadline = array();
-    // Backend response header blocks not yet complete, and the panel mount they are scoped to (vanilla Hermes only).
+    // Backend response header blocks not yet complete, and the panel mount they are scoped to (both Hermes dashboards).
     $head = array();
-    $prefix = basename(dirname($socket)) === '.hermes' && preg_match('/^[a-z][a-z0-9]{0,31}$/D', $user) === 1 ? '/user-'.$user.'/hermes' : '';
+    $prefix = preg_match('/^[a-z][a-z0-9]{0,31}$/D', $user) === 1
+        ? '/user-'.$user.(basename(dirname($socket)) === '.hermes' ? '/hermes' : '/pikkumies-hermes') : '';
     $close = static function (int $id) use (&$peers, &$streams, &$queue, &$ended, &$pending, &$finish, &$deadline, &$head): void {
         foreach (array($id, $peers[$id] ?? null) as $side) {
             if ($side === null || !isset($streams[$side])) continue;

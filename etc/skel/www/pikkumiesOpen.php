@@ -72,10 +72,10 @@ function pmssPikkumiesOpenStatusEmit($visible, $ready, $origin = '', $setup = fa
 }
 
 /** An account-local socket is live only when it accepts a connection. */
-function pmssPikkumiesOpenSocketLive($socket)
+function pmssPikkumiesOpenSocketLive($socket, $timeout = 0.3)
 {
     if (!is_file($socket) && !file_exists($socket)) return false;
-    $stream = @stream_socket_client('unix://'.$socket, $errno, $error, 0.3);
+    $stream = @stream_socket_client('unix://'.$socket, $errno, $error, $timeout);
     if (!is_resource($stream)) return false;
     fclose($stream);
     return true;
@@ -116,7 +116,6 @@ function pmssPikkumiesOpenTokenMint($directory)
     return $token;
 }
 
-/** Verify the published name against this host's TLS listener. */
 /** Run one account Pikkumies verb detached, once at a time (flock on $lock), appending its output to $log. */
 function pmssPikkumiesOpenBackground($binary, $verb, $lock, $log)
 {
@@ -127,66 +126,74 @@ function pmssPikkumiesOpenBackground($binary, $verb, $lock, $log)
         .' </dev/null >>'.escapeshellarg($log).' 2>&1 &');
 }
 
-function pmssPikkumiesOpenTlsValid($name, $port = 844)
+/** Record the four launch inputs, including the target of the published binary link. */
+function pmssPikkumiesOpenLaunchConfig($origin, $panelOrigin, $launcherUrl, $link = '/opt/pikkumies-agentboard/agentboard')
 {
-    if (!in_array($port, [443, 844, 845, 846], true)) return false;
-    $context = stream_context_create(['ssl' => [
-        'verify_peer' => true, 'verify_peer_name' => true, 'peer_name' => $name,
-        'SNI_enabled' => true, 'SNI_server_name' => $name,
-    ]]);
-    $stream = @stream_socket_client('ssl://127.0.0.1:'.$port, $errno, $error, 2,
-        STREAM_CLIENT_CONNECT, $context);
-    if (!is_resource($stream)) return false;
-    fclose($stream);
-    return true;
+    clearstatcache(true, $link);
+    $version = @readlink($link);
+    return is_string($version) ? json_encode(array('origin' => $origin, 'frameAncestor' => $panelOrigin,
+        'launcherUrl' => $launcherUrl, 'agentboard' => $version))."\n" : false;
 }
 
-/**
- * Report whether the permalink already serves a valid certificate. Never requests one: only the customer turns on a
- * public certificate, from Configure (ADR 0150).
- */
-function pmssPikkumiesOpenCertificateState($home, $local, $name, $host, $permalink, $port = 844)
-{
-    $serviceAddresses = @gethostbynamel($permalink);
-    $hostAddresses = @gethostbynamel($host);
-    if (!is_array($serviceAddresses) || !is_array($hostAddresses)
-        || array_intersect($serviceAddresses, $hostAddresses) === []) return 'pending';
-    $cache = $local.'/cert-probe-'.$port;
-    if (is_file($cache) && !is_link($cache) && time() - (int) @filemtime($cache) < 120) {
-        $valid = trim((string) @file_get_contents($cache)) === 'valid';
-    } else {
-        $valid = pmssPikkumiesOpenTlsValid($permalink, $port);
-        if (is_dir(dirname($cache)) && !is_link($cache)) {
-            @file_put_contents($cache, $valid ? 'valid' : 'pending');
-            @chmod($cache, 0600);
-        }
-    }
-    return $valid ? 'valid' : 'pending';
-}
-
-/** Check and spawn inside an account-local flock whose fd closes before the child. */
+/** Serialize replacement and start; only a live socket with matching launch inputs is reused. */
 function pmssPikkumiesOpenStart($binary, $local, $socket, $origin, $panelOrigin, $launcherUrl)
 {
     $ui = $local.'/ui';
     if (is_link($ui) || (!is_dir($ui) && !@mkdir($ui, 0700, true))) return false;
     @chmod($ui, 0700);
-    $lock = $ui.'/launch.lock';
-    $log = $ui.'/launcher.log';
-    $probe = '$s=@stream_socket_client("unix://".$argv[1],$e,$m,0.2); if (!is_resource($s)) exit(1); fclose($s);';
-    $script = 'if ! /usr/bin/php -r '.escapeshellarg($probe).' -- '.escapeshellarg($socket)
-        .' >/dev/null 2>&1; then rm -f -- '.escapeshellarg($socket).'; '
-        .'AGENTBOARD_LAUNCHER_URL='.escapeshellarg($launcherUrl).' '
-        .'AGENTBOARD_ALLOWED_ORIGIN='.escapeshellarg($origin).' '
-        .'AGENTBOARD_FRAME_ANCESTORS='.escapeshellarg($panelOrigin).' '
-        .escapeshellarg($binary).' ui start >>'.escapeshellarg($log).' 2>&1; fi';
-    $command = 'flock -x -w 5 -o '.escapeshellarg($lock).' sh -c '.escapeshellarg($script);
-    exec($command, $output, $rc);
-    if ($rc !== 0) return false;
-    for ($i = 0; $i < 30; $i++) {
-        if (pmssPikkumiesOpenSocketLive($socket)) return true;
-        usleep(100000);
+    $record = $ui.'/launch-config.json';
+    if (is_link($record) || is_link($ui.'/launch.lock')) return false;
+    $lock = @fopen($ui.'/launch.lock', 'c');
+    if (!is_resource($lock)) return false;
+    @chmod($ui.'/launch.lock', 0600);
+    try {
+        for ($attempt = 0; !flock($lock, LOCK_EX | LOCK_NB); ++$attempt) {
+            if ($attempt >= 50) return false;
+            usleep(100000);
+        }
+        $config = pmssPikkumiesOpenLaunchConfig($origin, $panelOrigin, $launcherUrl);
+        if ($config === false) return false;
+        if (pmssPikkumiesOpenSocketLive($socket)) {
+            if (is_file($record) && (fileperms($record) & 0777) === 0600
+                && @file_get_contents($record) === $config) return true;
+            // Use the account's existing PID and command-line checked stop path.
+            $runner = dirname(dirname(dirname($local))).'/bin/pikkumiesHermesUi.php';
+            if (!is_file($runner) || is_link($runner)) return false;
+            exec('/usr/bin/php '.escapeshellarg($runner).' stop-simplified >/dev/null 2>&1', $unused, $rc);
+            if ($rc !== 0) return false;
+            $deadline = microtime(true) + 3;
+            do {
+                $remaining = max(0.001, $deadline - microtime(true));
+                $live = pmssPikkumiesOpenSocketLive($socket, min(0.3, $remaining));
+                if (!$live) break;
+                usleep((int) (min(0.1, max(0, $deadline - microtime(true))) * 1000000));
+            } while (microtime(true) < $deadline);
+            if ($live) return false;
+        }
+        if (is_link($socket)) return false;
+        @unlink($socket);
+        $command = 'AGENTBOARD_LAUNCHER_URL='.escapeshellarg($launcherUrl)
+            .' AGENTBOARD_ALLOWED_ORIGIN='.escapeshellarg($origin)
+            .' AGENTBOARD_FRAME_ANCESTORS='.escapeshellarg($panelOrigin)
+            .' '.escapeshellarg($binary).' ui start >>'.escapeshellarg($ui.'/launcher.log').' 2>&1';
+        exec($command, $output, $rc);
+        if ($rc !== 0) return false;
+        for ($i = 0; $i < 30; $i++) {
+            if (pmssPikkumiesOpenSocketLive($socket)) {
+                $temp = @tempnam($ui, '.launch-config-');
+                if ($temp === false) return false;
+                $ok = @chmod($temp, 0600) && @file_put_contents($temp, $config) === strlen($config)
+                    && @rename($temp, $record);
+                if (!$ok) @unlink($temp);
+                return $ok;
+            }
+            usleep(100000);
+        }
+        return false;
+    } finally {
+        flock($lock, LOCK_UN);
+        fclose($lock);
     }
-    return false;
 }
 
 /** Account-owned standard Agentboard has its own socket, tokens, and data. */
@@ -272,6 +279,25 @@ function pmssHermesAgentboardStop($home)
     }
 }
 
+/** Hand one Welcome-bar question to Primary through `pikkumies ask`; returns its exit code, 1 when refused here. */
+function pmssPikkumiesOpenAsk($binary, $local, $body)
+{
+    $request = json_decode((string) $body, true);
+    $text = is_array($request) && is_string($request['text'] ?? null) ? $request['text'] : '';
+    $nonce = is_array($request) && is_string($request['nonce'] ?? null) ? $request['nonce'] : '';
+    if (trim($text) === '' || strlen($text) > 16000 || preg_match('/^[A-Za-z0-9_-]{16,64}$/D', $nonce) !== 1) return 1;
+    if (!is_file($binary) || !is_executable($binary) || !is_dir($local) || is_file($local.'/eternals.off')
+        || pmssPikkumiesOpenMoving($local)) return 1;
+    // The text goes on stdin only, never on a command line.
+    $process = @proc_open('/usr/bin/timeout -k 1s 10s '.escapeshellarg($binary).' ask '.escapeshellarg('--nonce='.$nonce),
+        [0 => ['pipe', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes);
+    if (!is_resource($process)) return 1;
+    fwrite($pipes[0], $text);
+    fclose($pipes[0]);
+    $code = proc_close($process);
+    return $code >= 0 && $code <= 6 ? $code : 1;
+}
+
 /** Older browsers may omit Fetch Site; require the panel's exact Referer origin. */
 function pmssPikkumiesOpenSameOriginReferer($referer, $scheme, $authority)
 {
@@ -295,6 +321,19 @@ $sameOrigin = ($_SERVER['HTTP_SEC_FETCH_SITE'] ?? '') === 'same-origin'
     || (!isset($_SERVER['HTTP_SEC_FETCH_SITE']) && pmssPikkumiesOpenSameOriginReferer(
         $_SERVER['HTTP_REFERER'] ?? '', $panelScheme, $_SERVER['HTTP_HOST'] ?? ''));
 $statusView = ($_GET['view'] ?? '') === 'status';
+if (($_GET['view'] ?? '') === 'ask') {
+    // A same-origin JSON POST from the panel page; a navigation (Fetch Site none) or a form post never reaches ask.
+    $allowed = ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && $sameOrigin && $home !== ''
+        && ($_SERVER['HTTP_SEC_FETCH_SITE'] ?? '') !== 'none'
+        && stripos((string) ($_SERVER['CONTENT_TYPE'] ?? ''), 'application/json') === 0;
+    $code = $allowed ? pmssPikkumiesOpenAsk($home.'/.mcxPikkumies/pikkumies/bin/pikkumies',
+        $home.'/.mcxPikkumies/pikkumies/local', file_get_contents('php://input', false, null, 0, 32768)) : 1;
+    if (!$allowed) http_response_code(403);
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    echo json_encode(array('accepted' => $code === 0, 'code' => $code));
+    return;
+}
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET' || !$sameOrigin) {
     pmssPikkumiesOpenPage(!isset($_SERVER['HTTP_SEC_FETCH_SITE'])
         && ($_SERVER['HTTP_SEC_FETCH_DEST'] ?? '') === 'iframe' ? 'old-browser' : 'cross-site', 0);
@@ -354,19 +393,14 @@ if ($ui === 'vanilla-hermes-web' || $ui === 'vanilla-agentboard') {
     header('Location: '.$panelOrigin.'/user-'.$name.'/hermesLogin.php'.($token !== '' ? '#token='.$token : ''), true, 302);
     return;
 }
-if (($ui !== 'simplified' && $ui !== 'hermes') || $home === '' || $name === ''
-    || !is_file('/etc/seedbox/config/pikkumiesEternals.enabled')) {
+if (($ui !== 'simplified' && $ui !== 'hermes') || $home === '' || $name === '') {
     if ($statusView) { pmssPikkumiesOpenStatusEmit(false, false); return; }
     pmssPikkumiesOpenPage('error', 0);
     return;
 }
 $binary = $home.'/.mcxPikkumies/pikkumies/bin/pikkumies';
 $local = $home.'/.mcxPikkumies/pikkumies/local';
-$billing = '/var/lib/pmss/public/billing/'.$name;
-$stat = @lstat($billing);
-$billingId = is_array($stat) && ($stat['mode'] & 0170000) === 0100000 && $stat['uid'] === 0 && $stat['nlink'] === 1
-    ? trim((string) @file_get_contents($billing)) : '';
-if (!is_file($binary) || !is_executable($binary) || !preg_match('/^[1-9][0-9]*$/D', $billingId)
+if (!is_file($binary) || !is_executable($binary)
     || is_file($local.'/eternals.off') || !is_dir($local)) {
     if ($statusView) { pmssPikkumiesOpenStatusEmit(false, false); return; }
     pmssPikkumiesOpenPage('error', 0);
@@ -378,10 +412,8 @@ if (preg_match('/^[a-z0-9.-]+\.[a-z]{2,}$/D', $host) !== 1) {
     pmssPikkumiesOpenPage('error', 0);
     return;
 }
-$permalink = substr(hash('sha256', 'mcx.fi:service:'.ltrim($billingId, '0')), 0, 16).'.mcx.fi';
-$port = $ui === 'hermes' ? 845 : 844;
-$origin = 'https://'.$permalink.':'.$port;
 $panelOrigin = 'https://'.$host;
+$origin = $panelOrigin.'/user-'.$name.($ui === 'hermes' ? '/pikkumies-hermes/' : '/pikkumies/');
 $launcherUrl = $panelOrigin.'/user-'.$name.'/pikkumiesOpen.php'.($ui === 'hermes' ? '?ui=hermes' : '');
 $socket = $local.'/ui/ui.sock';
 $started = isset($_GET['started']) && ctype_digit((string) $_GET['started']) ? (int) $_GET['started'] : time();
@@ -406,12 +438,6 @@ if (!$runtimeReady) {
     pmssPikkumiesOpenPage('setup', $started);
     return;
 }
-$certificateState = pmssPikkumiesOpenCertificateState($home, $local, $name, $host, $permalink, $port);
-if ($certificateState === 'error') {
-    if ($statusView) { pmssPikkumiesOpenStatusEmit(true, false, $origin); return; }
-    pmssPikkumiesOpenPage('error', $started);
-    return;
-}
 // Power user: Hermes' dashboard page is built once, in the background, before its first start. The build takes
 // minutes and the dashboard start below waits seconds (Pikkumies ADR-0033 addendum 2026-10-21, `ui web-build`).
 if ($ui === 'hermes' && !is_file($home.'/.mcxPikkumies/pikkumies/hermes/hermes_cli/web_dist/index.html')) {
@@ -424,7 +450,7 @@ if ($statusView) {
     if ($ui === 'hermes') {
         $runner = $home.'/bin/pikkumiesHermesUi.php';
         $ready = false;
-        if ($certificateState === 'valid' && is_file($runner) && !is_link($runner)) {
+        if (is_file($runner) && !is_link($runner)) {
             exec('HOME='.escapeshellarg($home).' /usr/bin/php '.escapeshellarg($runner).' ready >/dev/null 2>&1', $unused, $readyRc);
             $ready = $readyRc === 0;
         }
@@ -439,11 +465,7 @@ if ($statusView) {
         if (is_array($eternal) && ($eternal['id'] ?? '') === 'pm1'
             && ($eternal['state'] ?? '') === 'waiting-for-setup') $setup = true;
     }
-    pmssPikkumiesOpenStatusEmit(true, $certificateState === 'valid' && pmssPikkumiesOpenSocketLive($socket), $origin, $setup);
-    return;
-}
-if ($certificateState !== 'valid') {
-    pmssPikkumiesOpenPage('ready', $started);
+    pmssPikkumiesOpenStatusEmit(true, pmssPikkumiesOpenSocketLive($socket), $origin, $setup);
     return;
 }
 if ($ui === 'hermes') {
@@ -454,7 +476,7 @@ if ($ui === 'hermes') {
     // Single-use sign-in; the fragment reaches no server log. Without a token Hermes asks for its password.
     $token = pmssPikkumiesOpenTokenMint($home.'/.mcxPikkumies/pikkumies/local/ui/hermes/login-tokens');
     header('Cache-Control: no-store');
-    header('Location: '.$origin.($token !== '' ? '/__pmss-login#token='.$token : '/'), true, 302);
+    header('Location: '.$panelOrigin.'/user-'.$name.'/hermesLogin.php?ui=pikkumies'.($token !== '' ? '#token='.$token : ''), true, 302);
     return;
 }
 $list = [];
@@ -463,12 +485,11 @@ if ($listRc !== 0 || !is_array(json_decode(implode("\n", $list), true))) {
     pmssPikkumiesOpenPage('error', $started);
     return;
 }
-if (!pmssPikkumiesOpenSocketLive($socket)
-    && !pmssPikkumiesOpenStart($binary, $local, $socket, $origin, $panelOrigin, $launcherUrl)) {
+if (!pmssPikkumiesOpenStart($binary, $local, $socket, $panelOrigin, $panelOrigin, $launcherUrl)) {
     pmssPikkumiesOpenPage('ready', $started);
     return;
 }
 $token = pmssPikkumiesOpenTokenMint($local.'/ui/tokens');
 if ($token === '') { pmssPikkumiesOpenPage('error', $started); return; }
 header('Cache-Control: no-store');
-header('Location: '.$origin.'/?session=pm1#token='.$token, true, 302);
+header('Location: '.$origin.'?session=pm1#token='.$token, true, 302);

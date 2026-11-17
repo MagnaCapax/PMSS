@@ -17,28 +17,36 @@ button:disabled{opacity:.45;cursor:default}button:focus-visible{outline:2px soli
 <script>
 (function(){'use strict';
 var input=document.getElementById('ask'),send=document.getElementById('send'),count=document.getElementById('count'),error=document.getElementById('error');
-var key='pending-ask',draft='pikkumies:draft',target='';
+var draft='pikkumies:draft',target='',busy=false;
 try{target=new URL(document.referrer).origin;}catch(e){}
 if(window.top===window||!/^https:\/\//.test(target))return;
-try{input.value=localStorage.getItem(draft)||'';}catch(e){}
+try{input.value=sessionStorage.getItem(draft)||'';}catch(e){}
 function post(name){window.top.postMessage(name,target);
  if(window.parent!==window.top)window.parent.postMessage(name,target);}
 // Rows from the content height: 28px vertical padding + 22px per line, so an empty box is 1 row.
 function update(){var text=input.value;input.style.height='auto';
  var lines=Math.min(6,Math.max(1,Math.round((input.scrollHeight-28)/22)));
- input.style.height=(28+lines*22)+'px';send.disabled=!text.trim();
+ input.style.height=(28+lines*22)+'px';send.disabled=busy||!text.trim();
  count.hidden=text.length<3800;count.textContent=text.length+'/4000';post('pikkumies:rows:'+lines);
- try{localStorage.setItem(draft,text);}catch(e){}
+ try{sessionStorage.setItem(draft,text);}catch(e){}
 }
-function submit(){var text=input.value.replace(/\r\n?/g,'\n');if(!text.trim())return;
- try{var now=Date.now(),queue=JSON.parse(localStorage.getItem(key)||'[]');
-  if(!Array.isArray(queue))queue=[];queue=queue.filter(function(item){return item&&typeof item.text==='string'&&now-item.ts<3600000&&now-item.ts>=0;});
-  if(queue.length>=5){error.textContent='That did not go through. Try again.';return;}
-  var bytes=new Uint8Array(16);crypto.getRandomValues(bytes);
-  queue.push({text:text,nonce:Array.from(bytes,function(n){return n.toString(16).padStart(2,'0');}).join(''),ts:now});
-  localStorage.setItem(key,JSON.stringify(queue));localStorage.removeItem(draft);
-  input.value='';error.textContent='';update();post('pikkumies:switch');
- }catch(e){error.textContent='That did not go through. Try again.';}
+// The panel runs `pikkumies ask` as this account; codes 5 and 6 (starting, busy) are retried three times, 5 s apart.
+var notes={2:'Finish the Pikkumies setup first.',3:'Pikkumies has unsent text in its window. Send or clear it there first.',
+ 4:'You are sending quickly. Try again in a minute.'};
+function done(note,show){busy=false;error.textContent=note;update();if(show)post('pikkumies:switch');}
+function deliver(text,nonce,tries){
+ fetch('pikkumiesOpen.php?view=ask',{method:'POST',credentials:'same-origin',cache:'no-store',
+  headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text,nonce:nonce})})
+ .then(function(r){return r.json();}).then(function(result){
+  if(result.accepted){input.value='';try{sessionStorage.removeItem(draft);}catch(e){}done('',true);return;}
+  if((result.code===5||result.code===6)&&tries<3){setTimeout(function(){deliver(text,nonce,tries+1);},5000);return;}
+  done(notes[result.code]||'That did not go through. Try again.',result.code===2||result.code===3);
+ }).catch(function(){done('That did not go through. Try again.',false);});
+}
+function submit(){var text=input.value.replace(/\r\n?/g,'\n');if(busy||!text.trim())return;
+ var bytes=new Uint8Array(16);crypto.getRandomValues(bytes);
+ busy=true;error.textContent='Sending…';update();
+ deliver(text,Array.from(bytes,function(n){return n.toString(16).padStart(2,'0');}).join(''),0);
 }
 input.addEventListener('input',update);
 input.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing&&!matchMedia('(pointer:coarse)').matches){e.preventDefault();submit();}});

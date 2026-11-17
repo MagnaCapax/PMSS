@@ -100,7 +100,7 @@ final class AppProfilesTest extends TestCase
             $bad = array_replace($ops, $this->pmssMakeCallbacks(['port' => $port]));
             $this->assertSame('reserved Hermes port unavailable', \pmssAddUserHermesGate(['memory' => 1000], $home, $files, $bad));
         }
-        foreach (['', 'localhost', 'user@node.example.com', 'node.example.com:846', "node.example.com\n"] as $host) {
+        foreach (['', 'localhost', 'user@node.example.com', 'node.example.com:9443', "node.example.com\n"] as $host) {
             $bad = array_replace($ops, ['host' => $host]);
             $this->assertSame('panel hostname or account unavailable', \pmssAddUserHermesGate(['memory' => 1000], $home, $files, $bad));
         }

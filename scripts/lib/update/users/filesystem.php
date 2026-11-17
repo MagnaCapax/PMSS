@@ -80,6 +80,7 @@ PHP;
         'www/console.php',
         'www/pikkumiesOpen.php',
         'www/pikkumiesPanel.php',
+        'www/pikkumiesBar.html',
         'www/apps.php',
         'www/configure.php',
         'www/configureFileWrite.php',

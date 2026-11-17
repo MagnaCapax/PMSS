@@ -15,8 +15,7 @@
  *       NoForcedCertificateRequestStaticTest pins the same set for the dev suite; this lint
  *       also runs before a push.
  *   R2  certbot / ACME / DNS-update primitives appear only in the pinned files below.
- *   R3  an nginx `listen` uses only the ports PMSS already opens (80, 443, and 844-846 for
- *       the Pikkumies UIs on the host FQDN, ADR 0150 Decision 3) or a loopback address.
+ *   R3  an nginx `listen` uses only the ports PMSS already opens (80 and 443).
  *   R4  a per-account mcx.fi name (`hash('sha256', 'mcx.fi:...')` or a string ending in
  *       `.mcx.fi`) is built only in the pinned files below.
  *   R5  the name derivation functions in nginxUserHosts.php are called only by the pinned
@@ -74,8 +73,6 @@ $r4Pinned = [
     // Transitional: the current per-account Pikkumies UI origins, which ADR 0150 supersedes.
     // Delete a pin when its file stops building the name; the lint then fails on any copy left behind.
     'etc/skel/bin/pmssHermesRuntime.php',
-    'etc/skel/www/pikkumiesPanel.php',
-    'etc/skel/www/pikkumiesOpen.php',
     // Display only: Welcome shows the account its own service permalink and publishes nothing (ADR 0150 amendment 2026-10-24).
     'etc/skel/www/welcome.php',
 ];
@@ -119,7 +116,7 @@ foreach ($files as $file) {
         // Only an address or port token counts (digit, [ipv6], variable or string concatenation); prose like "listen for" does not.
         if (!preg_match_all('/\blisten\s+((?:\[[^\]]*\]:)?[0-9][^\s;"\']*|[\$\{][^\s;]*|["\']\s*\.[^;]*)/', $line, $m)) { continue; }
         foreach ($m[1] as $addr) {
-            if (preg_match('/^(\[::\]:)?(80|443|844|845|846)$/', $addr) || preg_match('/^(127\.0\.0\.1|\[::1\]|localhost|unix):/', $addr)) { continue; }
+            if (preg_match('/^(\[::\]:)?(80|443)$/', $addr) || preg_match('/^(127\.0\.0\.1|\[::1\]|localhost|unix):/', $addr)) { continue; }
             $violations[] = sprintf('R3 %s:%d nginx listens on "%s"; a new public port needs an operator-accepted ADR', $rel, $n + 1, $addr);
         }
     }

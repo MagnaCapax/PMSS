@@ -2149,8 +2149,12 @@ to the account home. `L` means `Config::localDir()`.
   Successful transfer writes source `L/eternals.off`, keeps its hold, then
   releases and ensures the target. Failed transfer releases the source and
   extends the target hold so a partial copy stays cold.
-- Host marker: `/etc/seedbox/config/pikkumiesEternals.enabled` is root-owned
-  and staged on hosts. No `etc/seedbox/config/*.enabled` file is shipped.
+- Release state: `/etc/seedbox/config/pikkumiesEternals.enabled` is rewritten
+  by every PMSS update as root-owned mode 0644. Eternals and both Pikkumies
+  screens are on by default for every account. This file is consumed by the
+  account runtime and checked during user transfer; PMSS does not use it as
+  an activation switch. Removing it by hand is unsupported. No
+  `etc/seedbox/config/*.enabled` file is shipped in the overlay.
 - Lifecycle: Pikkumies' own per-minute user cron tick keeps the Eternals running
   and resumes them after reboot unless the user quit them. The tmux session is
   `pikkumies`; its windows are `pm1` through `pm9`, named by `id`, with `pm1`
@@ -2168,7 +2172,7 @@ to the account home. `L` means `Config::localDir()`.
   Terms pending is NOT an exit-75 refusal: Primary starts and shows the terms prompt.
   Do not emit the string
   `Primary not running`; show state via the list, badges, and launcher pages.
-- Simplified UI (port A): only `pikkumies ui start` starts the process. PMSS
+- Simplified UI (UI A): only `pikkumies ui start` starts the process. PMSS
   installs the root-owned binary `/opt/pikkumies-agentboard/agentboard`.
   It uses the Unix socket `L/ui/ui.sock` in `L/ui/` (0700), single-use tokens
   in `L/ui/tokens/` (0700, files 0600, lifetime 60 s), and TMPDIR
@@ -2180,39 +2184,56 @@ to the account home. `L` means `Config::localDir()`.
   `AGENTBOARD_SOCKET`, `AGENTBOARD_TOKEN_DIR`, `AGENTBOARD_LAUNCHER_URL`,
   `AGENTBOARD_ALLOWED_ORIGIN`, `AGENTBOARD_FRAME_ANCESTORS`,
   `TMUX_SESSION=pikkumies`, and `TERMINAL_MODE=pty`.
-- Welcome-page prompt bar: hands a question to Primary. Pending-ask JSON in
-  the port-A origin's localStorage key `pending-ask` is a queue of up to 5
-  `{"text": string <= 4000 chars, "nonce": string, "ts": unix milliseconds}` items,
-  delivered in order. Its TTL is 60 minutes. The UI frames and panel use
+- Welcome-page prompt bar: hands a question to Primary. It POSTs
+  `{"text": string <= 4000 chars, "nonce": 16-64 of [A-Za-z0-9_-]}` as JSON to
+  `pikkumiesOpen.php?view=ask` (same-origin only), which runs
+  `pikkumies ask --nonce=<nonce>` as the account with the text on stdin and
+  answers `{"accepted": bool, "code": 0-6}` with the `ask` exit code. Exit codes
+  5 and 6 are retried three times, 5 s apart, with the same nonce. Nothing is
+  queued in browser storage. The UI frames and panel use
   `pikkumies:switch`, `pikkumies:ready`, `pikkumies:reconnect`,
   `pikkumies:rows:1`, `pikkumies:rows:2`, `pikkumies:rows:3`,
   `pikkumies:rows:4`, `pikkumies:rows:5`, and `pikkumies:rows:6`
   postMessage names, always with
   an exact target origin. UI pages accept no inbound postMessage.
-  The panel accepts messages only from the matching port-A origin and the
-  active tab or bar iframe window. The bar is a root-owned inline page at
-  `/var/www/pikkumies/bar.html`; its draft key is `pikkumies:draft`.
+  The panel accepts messages only from the panel origin and the active tab
+  or bar iframe window. The bar is the panel page `pikkumiesBar.html`; its
+  unsent draft is kept in sessionStorage key `pikkumies:draft`.
 - `?session=` accepts only `^pm[1-9]$`. Per-UI `ui=` selector values are
-  `simplified` (port A, agentboard fork in pikkumies mode), `hermes` (port B,
+  `simplified` (UI A, agentboard fork in pikkumies mode), `hermes` (UI B,
   Pikkumies' Hermes dashboard, "Power user"), `vanilla-hermes-web`, and
-  `vanilla-agentboard` (port C, one at a time), and
-  `agentboard-pikkumies` (an alias that opens port A only while Pikkumies is
+  `vanilla-agentboard` (retained selector for vanilla Hermes), and
+  `agentboard-pikkumies` (a retained selector that opens UI A only while Pikkumies is
   installed and On).
-- Ports A, B, and C are respectively 844, 845, and 846. ADR 0128 records
-  their account UI routing. Each port serves its UI at `/` on the service
-  permalink. A also serves `/bar` from a root-owned host path outside `/home`.
-  The host marker gates A and B; C does not depend on it.
-- Port B runs `pikkumies run dashboard` as the account on a reserved loopback
-  listener. Its private 0600 credentials hold an independent login password
-  and session secret. B and C start with `env -i`, a pinned public URL, and no
-  secret on argv. Logout and account password changes rotate both dashboard
-  session secrets and stop A as the account. B's account cron checks its login
-  gate each minute and stops an ungated listener. The launcher offers a locked
-  account-side setup action and shows the 1000 MiB memory floor.
-- Port C tokens live in `~/.config/pmss/ui/tokens/` (0700, files 0600,
-  single-use, 60 s, at most eight live tokens). The launcher accepts `?view=status` for a same-origin
-  GET that only reads state and never requests a certificate (ADR 0150); it does
-  not start a UI or mint a token. An absent `Sec-Fetch-Site` is denied.
+- UI A is served at `/user-<u>/pikkumies/`, UI B at
+  `/user-<u>/pikkumies-hermes/`, and vanilla Hermes at `/user-<u>/hermes/`,
+  on the panel address. ADR 0128 records their account routing. The former
+  844/845/846 servers are removed, including their default-server files and
+  the PMSS-created `/var/www/pikkumies` pages. These screens need no per-account
+  public name or certificate. Public-folder names keep their existing purpose.
+- UI A receives a bare `https://<host>` allowed origin and frame ancestor.
+  Its launcher URL is `https://<host>/user-<u>/pikkumiesOpen.php`; the redirect
+  is `https://<host>/user-<u>/pikkumies/?session=pm1#token=<token>`.
+  `L/ui/launch-config.json` (0600) records the origin, frame ancestor, launcher
+  URL and readlink of the published Agentboard binary. A live socket with a
+  missing or different record causes the account UI to stop before restarting;
+  the launcher waits up to three seconds for the old socket to stop accepting.
+- UI B runs `pikkumies run dashboard` as the account on its reserved loopback
+  listener, with `HERMES_DASHBOARD_PUBLIC_URL` set to exactly
+  `https://<host>/user-<u>/pikkumies-hermes/`. Its private 0600 credentials hold
+  an independent service password and session secret. Both Hermes dashboards
+  start with `env -i`, a fixed panel URL, and no credential in the command line.
+  UI B signs in through `/user-<u>/hermesLogin.php?ui=pikkumies#token=<token>`.
+  Its tokens stay in `L/ui/hermes/login-tokens`; the exchange reaches
+  `/user-<u>/pikkumies-hermes/__pmss-session` and cookies use that dashboard's
+  path. The default handoff still uses `/user-<u>/hermes/` and its own tokens.
+  Logout and account password changes rotate the dashboard sessions and stop
+  UI A as the account. The existing per-minute account check remains in place.
+- Vanilla Agentboard's retained token path is `~/.config/pmss/ui/tokens/` (0700,
+  files 0600, single-use, 60 s, at most eight live tokens). Vanilla Hermes
+  uses `~/.hermes/login-tokens`. The launcher accepts `?view=status` for a
+  same-origin GET, or an exact same-origin Referer when Fetch Site is absent.
+  Status only reads state; it does not start a UI or mint a token.
 - Account UI preferences live in `~/.config/pmss/ui/`; absent means Simplified
   for Pikkumies and Hermes web UI for vanilla Hermes. The Pikkumies interface
   choice is `~/.config/pmss/ui/pikkumies-interface`, with `simplified` and
@@ -2224,15 +2245,13 @@ to the account home. `L` means `Config::localDir()`.
   `bun-linux-x64-baseline` target. The installer is inactive with an empty
   version or sha256 pin.
 
-The PMSS port-A launcher and route are inert until the host marker, pinned
-binary, root-owned billing identity, and per-service certificate exist. The
-launcher refuses `hermes` while its authenticated backend is absent. The
-`vanilla-hermes-web` and `vanilla-agentboard` selectors require the account's
-own completed vanilla install and root-owned billing identity, independently
-of the Eternals host marker. Port C uses a generated TLS route at `/` and an
-account-side on-demand launcher; 401 probes guard both backend choices.
-The service permalink comes from the root-owned provisioning record once it
-exists; see ADR 0128 for the legacy read.
+The launcher and panel state require the account install and its On state;
+no billing identity or certificate lookup participates. Existing account Off,
+transfer-hold, memory and one-time setup behavior remains. Readiness is a live
+account socket (and, for Hermes, the existing loopback sign-in check). The
+status JSON `origin` field is the full panel route including its trailing slash;
+message handlers derive the bare browser origin from that URL. The vanilla
+selectors require the account's completed vanilla install.
 
 ---
 

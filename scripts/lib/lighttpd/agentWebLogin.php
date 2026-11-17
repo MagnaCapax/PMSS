@@ -19,8 +19,7 @@ const PMSS_AGENT_WEB_LOGIN_PREFIX = 'pm-väinämöinen-';
 /**
  * The account's agent login name, or '' for an invalid account name.
  *
- * Same input as the per-account ids in nginxConfig/pikkumiesUi.php
- * (hash('sha256', $user)): the first 20 hex digits, each mapped 0-f to A-P.
+ * Hash the account name: the first 20 hex digits, each mapped 0-f to A-P.
  */
 function pmssAgentWebLoginName(string $user): string
 {

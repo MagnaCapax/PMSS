@@ -87,28 +87,18 @@ final class PikkumiesAgentboardInstallerTest extends TestCase
         }
     }
 
-    /** A release cannot activate with a version and no verified checksum. */
     public function testReleasePinsAreCompleteTogether(): void
     {
-        if (\PMSS_PIKKUMIES_AGENTBOARD_VERSION === '') {
-            $this->assertSame('', \PMSS_PIKKUMIES_AGENTBOARD_SHA256);
-        } else {
-            $this->assertMatches('/^[a-f0-9]{64}$/iD', \PMSS_PIKKUMIES_AGENTBOARD_SHA256);
-        }
+        $this->assertSame('v0.36.0-pikkumies.6', \PMSS_PIKKUMIES_AGENTBOARD_VERSION);
+        $this->assertMatches('/^[a-f0-9]{64}$/D', \PMSS_PIKKUMIES_AGENTBOARD_SHA256);
     }
 
-    public function testHostMarkerGateRejectsAbsentAndLinkedFiles(): void
+    public function testInstallerRunsForEveryHost(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-agentboard-gate-');
-        $marker = $root.'/enabled';
-        $this->assertFalse(\pmssPikkumiesAgentboardHostEnabled($marker));
-        $this->pmssWriteFile($marker, '');
-        $this->assertTrue(\pmssPikkumiesAgentboardHostEnabled($marker));
-        unlink($marker);
-        symlink($root.'/missing', $marker);
-        $this->assertFalse(\pmssPikkumiesAgentboardHostEnabled($marker));
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/apps/pikkumiesAgentboard.php', [
+            'function pmssPikkumiesAgentboardInstall(): void', 'pmssPikkumiesAgentboardInstall();',
+        ], ['pmssPikkumiesAgentboardHostEnabled', 'host marker is absent']);
     }
-
     public function testInvalidExistingVersionIsQuarantinedAndReplaced(): void
     {
         $temp = $this->pmssMakeTempDir('pmss-agentboard-refresh-');

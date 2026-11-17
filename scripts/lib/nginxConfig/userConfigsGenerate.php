@@ -6,8 +6,20 @@
  */
 
 require_once __DIR__.'/userConfigsReconcile.php';
-require_once __DIR__.'/pikkumiesUi.php';
 require_once __DIR__.'/moved.php';
+
+/** The trusted nginx-to-lighttpd hop must be emitted together in every relay location. */
+function pmssPikkumiesUiRelayHeaders(): string
+{
+    return <<<NGINX
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-PMSS-Proxy-Hop 127.0.0.1;
+        proxy_bind 127.0.0.2;
+        proxy_set_header Forwarded "for=\\"\$remote_addr\\";proto=https";
+        proxy_set_header Host \$host;
+
+NGINX;
+}
 
 const PMSS_NGINX_USER_CONFIG_GENERATED = 'generated';
 const PMSS_NGINX_USER_CONFIG_SKIPPED = 'skipped';
@@ -75,28 +87,6 @@ function pmssCreateNginxConfigWriteSubdomainConfigs(array $ctx, string $user, st
     // warning), unchanged.
     $publicSslBlock = pmssNginxUserSslBlock($ownFqdn, $hostSslBlock);
     $config = strtr((string) ($ctx['public'.$prefix.'Template'] ?? ''), $replacements + ['##host##' => $publicHost, '##ssl_block##' => $publicSslBlock]);
-    if (!$suspended && !$moved && $mcxHosts !== null && $mcxHosts !== ''
-        && is_file('/etc/seedbox/config/pikkumiesEternals.enabled')
-        && is_file('/opt/pikkumies-agentboard/agentboard')) {
-        if (pmssPikkumiesUiPortAvailable(844)) {
-            $serviceHost = explode(' ', $mcxHosts, 2)[0];
-            if (pmssPikkumiesUiCertificateReady($user, $subdomainBase)) {
-                $config .= "\n".pmssPikkumiesUiNginxBlock($user, $subdomainBase, $serviceHost, (int) $serverPort);
-            }
-        } else {
-            pmssCreateNginxConfigUserLog($user, '[WARN] Account UI port 844 is owned by another service');
-        }
-    }
-    if (!$suspended && !$moved && $mcxHosts !== null && $mcxHosts !== ''
-        && is_file('/etc/seedbox/config/pikkumiesEternals.enabled')
-        && pmssPikkumiesUiCertificateReady($user, $subdomainBase)) {
-        if (pmssPikkumiesUiPortAvailable(845)) {
-            $serviceHost = explode(' ', $mcxHosts, 2)[0];
-            $config .= "\n".pmssPikkumiesHermesNginxBlock($user, $subdomainBase, $serviceHost, (int) $serverPort);
-        } else {
-            pmssCreateNginxConfigUserLog($user, '[WARN] Account UI port 845 is owned by another service');
-        }
-    }
     return pmssCreateNginxConfigWriteFile((string) ($ctx['subdomainConfigDir'] ?? '/etc/nginx/conf.d').'/pmss-user-'.$user.'.conf', $config, $user, 'public'.$label.' subdomain config');
 }
 
@@ -139,9 +129,6 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
 
     if ($subdomainEnabled) {
         $billingServiceId = pmssUserBillingIdentityRead($thisUser, 'billingServiceId');
-        if (!pmssPikkumiesUiIdentityPublish($thisUser, $billingServiceId)) {
-            pmssCreateNginxConfigUserLog($thisUser, '[WARN] Root-owned UI billing identity was not published');
-        }
         if ($billingServiceId !== null) {
             $mcxHost = pmssNginxUserMcxHostname($billingServiceId);
             // Customers with 2+ services also get a cluster name, round-robined

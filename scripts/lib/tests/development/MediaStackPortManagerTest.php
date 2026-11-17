@@ -100,10 +100,9 @@ final class MediaStackPortManagerTest extends TestCase
         $definitions = \pmssMediaStackPortDefinitions();
         $this->pmssWriteFile($this->home.'/.hermes/pmss-dashboard.port', "23004\n");
         $this->assertSame(null, \pmssMediaStackConfiguredPortRead($this->home, $definitions['hermes']));
-        if (isset($definitions['pikkumies-hermes'])) {
-            $this->pmssWriteFile($this->home.'/.mcxPikkumies/pikkumies/local/ui/hermes/dashboard.port', "23005\n");
-            $this->assertSame(null, \pmssMediaStackConfiguredPortRead($this->home, $definitions['pikkumies-hermes']));
-        }
+        $this->assertSame(['path' => '', 'patterns' => []], $definitions['pikkumies-hermes']);
+        $this->pmssWriteFile($this->home.'/.mcxPikkumies/pikkumies/local/ui/hermes/dashboard.port', "23005\n");
+        $this->assertSame(null, \pmssMediaStackConfiguredPortRead($this->home, $definitions['pikkumies-hermes']));
     }
 
     public function testTorrentClientDefinitionsAreIndependentPureReservations(): void

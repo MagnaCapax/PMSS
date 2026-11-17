@@ -102,15 +102,8 @@ function pmssLighttpdRenderUserConfig(
 
     $config = pmssClampLighttpdBandwidthLimits(is_string($config) ? $config : (string) $template);
     $config = pmssLighttpdPanelSessionConfigApply($config, $user, $panelSessionLogin);
-    if (is_file('/etc/seedbox/config/pikkumiesEternals.enabled')
-        && is_file('/opt/pikkumies-agentboard/agentboard')) {
-        $config .= pmssLighttpdPikkumiesUiBlock($user);
-    }
-    if (is_file('/etc/seedbox/config/pikkumiesEternals.enabled')) {
-        $bPort = function_exists('pmssReadRegularFileNetworkPort')
-            ? pmssReadRegularFileNetworkPort('/etc/seedbox/runtime/ports/media-stack-pikkumies-hermes-'.$user) : null;
-        if ($bPort !== null) $config .= pmssLighttpdPikkumiesHermesBlock($user, $bPort);
-    }
+    $config .= pmssLighttpdPikkumiesUiBlock($user);
+    $config .= pmssLighttpdPikkumiesHermesBlock($user);
     // Route before installation, so account creation and Configure can verify host readiness.
     $reservation = '/etc/seedbox/runtime/ports/media-stack-hermes-'.$user;
     $port = function_exists('pmssReadRegularFileNetworkPort') ? pmssReadRegularFileNetworkPort($reservation) : null;

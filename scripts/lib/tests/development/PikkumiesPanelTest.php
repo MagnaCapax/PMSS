@@ -19,7 +19,7 @@ final class PikkumiesPanelTest extends TestCase
 
     private function state($home, $name = 'fixtur01')
     {
-        return \pmssPikkumiesPanelStateRead($home, $name, $home.'/marker', $home.'/billing', posix_geteuid());
+        return \pmssPikkumiesPanelStateRead($home, $name, 'node.example.com');
     }
 
     public function testEligibleAccountHasServiceOriginAndSimplifiedDefault(): void
@@ -28,27 +28,26 @@ final class PikkumiesPanelTest extends TestCase
         $state = $this->state($home);
         $this->assertTrue($state['visible']);
         $this->pmssAssertArraySubsetSame(['mode' => 'simplified',
-            'origin' => 'https://'.substr(hash('sha256', 'mcx.fi:service:123'), 0, 16).'.mcx.fi:844'], $state);
+            'origin' => 'https://node.example.com/user-fixtur01/pikkumies/'], $state);
     }
 
-    public function testMissingMarkerOrBillingHidesTheTab(): void
+    public function testHostMarkerAndBillingAreNotNeeded(): void
     {
         $home = $this->fixture();
         unlink($home.'/marker');
-        $this->assertFalse($this->state($home)['visible']);
-        $this->pmssWriteFile($home.'/marker', '');
+        $this->assertTrue($this->state($home)['visible']);
         unlink($home.'/billing/fixtur01');
-        $this->assertSame('', $this->state($home)['origin']);
+        $this->assertSame('https://node.example.com/user-fixtur01/pikkumies/', $this->state($home)['origin']);
     }
 
-    public function testInvalidBillingAndIdentityAreRejected(): void
+    public function testBillingIsIrrelevantButPanelIdentityMustBeValid(): void
     {
         $home = $this->fixture();
         $this->pmssWriteFile($home.'/billing/fixtur01', "0\n");
-        $this->assertFalse($this->state($home)['visible']);
+        $this->assertTrue($this->state($home)['visible']);
         $this->pmssWriteFile($home.'/billing/fixtur01', "123\n");
         $this->assertFalse($this->state($home, '../fixtur01')['visible']);
-        $this->assertSame('', \pmssPikkumiesPanelStateRead($home, 'fixtur01', $home.'/marker', $home.'/billing', -1)['origin']);
+        $this->assertSame('', \pmssPikkumiesPanelStateRead($home, 'fixtur01', 'invalid')['origin']);
     }
 
     public function testHermesSectionWorksWithoutMarkerOrBillingButNeedsSafeInstaller(): void
@@ -106,12 +105,16 @@ final class PikkumiesPanelTest extends TestCase
         // The network hint waits for the Pikkumies tab to be open (a frame loaded behind another tab cannot report ready)
         // and is never armed for the panel's own launcher page, which is this origin.
         $this->assertStringContainsAllStrings([
-            "try { launcher = this.contentWindow.location.origin === location.origin; } catch (e) {}",
+            "try { launcher = this.contentWindow.location.pathname !== new URL(pmssPikkumiesUrl).pathname; } catch (e) {}",
             "if (!launcher) pmssPikkumiesHintTimer = setTimeout(function () {",
             "if (!pmssPikkumiesReady && document.getElementById('pikkumies').offsetParent !== null) document.getElementById('pmss-pikkumies-hint').hidden = false;",
             '}, 30000)', 'if (!state.visible) location.reload()',
         ], $index);
         $this->assertStringContainsAllStrings(['pikkumies:switch', 'title = \'Ask Pikkumies\''], $welcome);
+        // The bar hands its question to the panel and keeps nothing in localStorage, which every page on the origin shares.
+        $bar = $this->pmssReadRepoFile('etc/skel/www/pikkumiesBar.html');
+        $this->assertStringContainsAndOmitsStrings(["fetch('pikkumiesOpen.php?view=ask',{method:'POST',credentials:'same-origin'",
+            "headers:{'Content-Type':'application/json'}", "sessionStorage.setItem(draft,text)"], ['localStorage', 'pending-ask'], $bar);
         $this->assertStringContainsString('Your network may be blocking Pikkumies.', $index);
         $this->assertStringContainsAllStrings(['>Full Hermes, in its own tab</option>',
             'Only one Hermes window works at a time: opening one closes the other.'], $configure);
@@ -125,7 +128,7 @@ final class PikkumiesPanelTest extends TestCase
         // The Hermes status poll runs only during an install; an installed Hermes must not reload Configure.
         $this->assertStringNotContainsString('setInterval(pmssHermesStatusPoll', $configure);
         $this->assertStringContainsString("if (state.state === 'installing') pmssHermesPollLater();", $configure);
-        $this->assertStringContainsString('pmssPikkumiesOpenStatusEmit(true, $certificateState', $launcher);
+        $this->assertStringContainsString('pmssPikkumiesOpenStatusEmit(true, pmssPikkumiesOpenSocketLive($socket)', $launcher);
         $this->assertStringContainsAndOmitsStrings([], [
             'Retrying in N min', 'Turn it on to use it', 'Your browser cannot reach Pikkumies',
         ], $index.$welcome.$configure.$launcher);

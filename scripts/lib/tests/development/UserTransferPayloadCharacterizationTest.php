@@ -45,6 +45,15 @@ class UserTransferPayloadCharacterizationTest extends TestCase
         }
     }
 
+    public function testTransferSourceChecksKeepReleaseStateWhileUpdatePublishesIt(): void
+    {
+        foreach (['scripts/lib/userTransfer/sshScripts.php', 'scripts/lib/userTransfer/eternalHold.php'] as $path) {
+            $this->pmssAssertRepoFileContainsString($path, '[ -f /etc/seedbox/config/pikkumiesEternals.enabled ]');
+        }
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/apps/pikkumiesAgentboard.php',
+            "function pmssPikkumiesEternalsReleaseStatePublish(string \$path = '/etc/seedbox/config/pikkumiesEternals.enabled')");
+    }
+
     public function testSharedFramingPreservesCallerPolicyAndQuotedBytes(): void
     {
         foreach ([['', "\n", false], ['printf "a b"', '', false],

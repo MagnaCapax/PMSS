@@ -120,7 +120,8 @@ class ConfigSyntaxValidationTest extends TestCase
         }
 
         require_once dirname(__DIR__, 2).'/lighttpd/pikkumiesUi.php';
-        $config = $this->renderLighttpdTemplate().\pmssLighttpdHermesUiBlock('testuser', 24000);
+        $config = $this->renderLighttpdTemplate().\pmssLighttpdHermesUiBlock('testuser', 24000)
+            .\pmssLighttpdPikkumiesUiBlock('testuser').\pmssLighttpdPikkumiesHermesBlock('testuser');
         $configFile = $this->tempDir.'/lighttpd-test.conf';
         file_put_contents($configFile, $config);
 

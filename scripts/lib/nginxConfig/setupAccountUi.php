@@ -1,30 +1,24 @@
 <?php
-/** Ordered account-UI defaults; route policy remains gated by the host marker. */
-
-/** Converge ports A/B in order, attempt shared pages once, then retire port C. */
+/** Retire the former account UI default listeners during normal nginx setup. */
 function pmssNginxConfigSetupAccountUi(bool $subdomainEnabled, string $nginxSslBlock, string $subdomainConfigDir): void
 {
-    $pagesAttempted = false;
-    foreach ([
-        'pmss-pikkumies-default.conf' => [844, '/opt/pikkumies-agentboard/agentboard', 'pmssPikkumiesUiDefaultNginxBlock', 'write account UI default'],
-        'pmss-pikkumies-hermes-default.conf' => [845, null, 'pmssPikkumiesHermesDefaultNginxBlock', 'write Pikkumies Hermes UI default'],
-    ] as $name => [$port, $binary, $builder, $operation]) {
-        $path = $subdomainConfigDir.'/'.$name;
-        if ($subdomainEnabled && $nginxSslBlock !== ''
-            && is_file('/etc/seedbox/config/pikkumiesEternals.enabled')
-            && ($binary === null || is_file($binary)) && pmssPikkumiesUiPortAvailable($port)) {
-            // A failed first attempt also suppresses a second attempt, as before.
-            if (!$pagesAttempted && !pmssPikkumiesUiPagesInstall()) {
-                pmssCreateNginxConfigSetupWarn('install account UI pages', '/var/www/pikkumies');
-            }
-            $pagesAttempted = true;
-            if (!pmssWriteManagedFile($path, (__NAMESPACE__.'\\'.$builder)($nginxSslBlock), 'root', 'root', 0644)) {
-                pmssCreateNginxConfigSetupWarn($operation, $path);
-            }
-        } else {
-            pmssCreateNginxConfigSetupRemoveDefault($path);
-        }
+    foreach (['pmss-pikkumies-default.conf', 'pmss-pikkumies-hermes-default.conf', 'pmss-hermes-default.conf'] as $name) {
+        pmssCreateNginxConfigSetupRemoveDefault($subdomainConfigDir.'/'.$name);
     }
-    // ADR 0150: Hermes uses the existing panel listener, including on marker hosts.
-    pmssCreateNginxConfigSetupRemoveDefault($subdomainConfigDir.'/pmss-hermes-default.conf');
+    // Retire only the root-owned directory with the former PMSS page inventory.
+    $directory = '/var/www/pikkumies';
+    if (!pmssPathTargetIsSafe($directory, true, false, false) || is_link($directory)
+        || !is_dir($directory) || fileowner($directory) !== 0 || (fileperms($directory) & 0022) !== 0) return;
+    $entries = @scandir($directory);
+    if (!is_array($entries)) return;
+    $pages = array_values(array_diff($entries, ['.', '..']));
+    if (array_diff($pages, ['bar.html', 'not-running.html', 'hermes-login.html']) !== []) return;
+    foreach ($pages as $page) {
+        $path = $directory.'/'.$page;
+        $stat = @lstat($path);
+        if (!is_array($stat) || ($stat['mode'] & 0170000) !== 0100000
+            || $stat['nlink'] !== 1 || $stat['uid'] !== 0) return;
+    }
+    foreach ($pages as $page) pmssCreateNginxConfigSetupRemoveDefault($directory.'/'.$page);
+    if (!@rmdir($directory)) pmssCreateNginxConfigSetupWarn('remove obsolete account UI pages', $directory);
 }

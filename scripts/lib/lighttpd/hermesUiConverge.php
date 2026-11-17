@@ -20,7 +20,7 @@ function pmssHermesUiConverge(string $user, string $home): void
             pmssBuildCommand('/scripts/util/userConfigLighttpd.php', [$user])) !== 0) return;
     }
     $panel = (string) pmssReadRegularFileContentsVerified('/etc/nginx/users/'.$user, 0, 1048576);
-    if (strpos($panel, '/user-'.$user.'/hermes/') !== false && strpos($nginx, 'listen 846 ssl;') === false) return;
+    if (strpos($panel, '/user-'.$user.'/hermes/') !== false && preg_match('/\blisten\s+84[4-6]\s/', $nginx) !== 1) return;
     if (runStep('Reconcile Hermes UI nginx route for '.$user,
         pmssBuildCommand('/scripts/util/createNginxConfig.php', ['--user', $user])) === 0) {
         runStep('Reload nginx for Hermes UI', 'systemctl reload nginx');

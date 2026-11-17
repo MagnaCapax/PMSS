@@ -2,7 +2,6 @@
 /** Nginx global setup and per-user render context. @license GPL-3.0-only */
 
 require_once __DIR__.'/templates.php';
-require_once __DIR__.'/pikkumiesUi.php';
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/../configBackups.php';
 require_once __DIR__.'/../runtime.php';

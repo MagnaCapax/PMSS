@@ -40,11 +40,15 @@ function file_exists($path) {
     if ($path === '/etc/nginx/sites-enabled/default') return ($GLOBALS['options']['enabled'] ?? 'file') !== 'missing';
     throw new \RuntimeException('Unexpected existence probe: '.$path);
 }
+function is_dir($path) { return $path === '/var/www/pikkumies' && isset($GLOBALS['options']['legacyPages']); }
+function fileowner($path) { return $GLOBALS['options']['legacyOwner'] ?? 0; }
+function fileperms($path) { return $GLOBALS['options']['legacyMode'] ?? 0755; }
+function scandir($path) { return array_merge(['.', '..'], $GLOBALS['options']['legacyPages']); }
+function lstat($path) { return ['uid' => 0, 'mode' => $GLOBALS['options']['pageMode'] ?? 0100644, 'nlink' => $GLOBALS['options']['pageLinks'] ?? 1]; }
+function rmdir($path) { record(['rmdir', $path]); return true; }
 function is_readable($path) { return $GLOBALS['options']['certificateReadable'] ?? true; }
 function is_file($path) {
-    if ($path === '/etc/seedbox/config/pikkumiesEternals.enabled') return $GLOBALS['options']['marker'] ?? true;
-    if ($path === '/opt/pikkumies-agentboard/agentboard') return $GLOBALS['options']['binary'] ?? true;
-    if (strpos($path, '/etc/nginx/conf.d/') === 0) return true;
+    if (strpos($path, '/etc/nginx/conf.d/') === 0 || strpos($path, '/var/www/pikkumies/') === 0) return true;
     throw new \RuntimeException('Unexpected file probe: '.$path);
 }
 function is_link($path) {
@@ -62,10 +66,6 @@ function unlink($path) { record(['remove', $path]); return $GLOBALS['options']['
 function passthru($command) { record(['command', $command]); }
 function pmssPathTargetIsSafe($path, $a, $b) { record(['safe', $path, $a, $b]); return $GLOBALS['options']['safe'] ?? true; }
 function pmssHostnameRead() { record(['hostname']); return $GLOBALS['options']['hostname'] ?? 'NODE.example.test extra'; }
-function pmssPikkumiesUiPortAvailable($port) { record(['port', $port]); return $GLOBALS['options']['ports'][$port] ?? true; }
-function pmssPikkumiesUiPagesInstall() { record(['pages']); return $GLOBALS['options']['pages'] ?? true; }
-function pmssPikkumiesUiDefaultNginxBlock($ssl) { record(['build', 844, $ssl]); return 'A '.$ssl; }
-function pmssPikkumiesHermesDefaultNginxBlock($ssl) { record(['build', 845, $ssl]); return 'B '.$ssl; }
 function pmssWriteManagedFile($path, $content, $owner, $group, $mode) {
     record(['managed', $path, $content, $owner, $group, $mode]);
     return $GLOBALS['options']['managed'] ?? true;
@@ -116,15 +116,11 @@ PHP;
         $expected[] = ['directory', '/etc/nginx/ssl', 0755];
         $expected[] = ['mode', '/etc/nginx/users', 0751];
         $expected[] = ['directory', '/etc/nginx/conf.d', 0755];
-        $expected[] = ['port', 844];
-        $expected[] = ['pages'];
-        foreach ([844 => ['pmss-pikkumies-default.conf', 'A'], 845 => ['pmss-pikkumies-hermes-default.conf', 'B']] as $port => [$name, $prefix]) {
-            if ($port === 845) $expected[] = ['port', $port];
-            $expected[] = ['build', $port, "ssl fallback;\n"];
-            $expected[] = ['managed', '/etc/nginx/conf.d/'.$name, $prefix." ssl fallback;\n", 'root', 'root', 0644];
+        foreach (['pmss-pikkumies-default.conf', 'pmss-pikkumies-hermes-default.conf', 'pmss-hermes-default.conf'] as $name) {
+            $expected[] = ['safe', '/etc/nginx/conf.d/'.$name, false, true];
+            $expected[] = ['remove', '/etc/nginx/conf.d/'.$name];
         }
-        $expected[] = ['safe', '/etc/nginx/conf.d/pmss-hermes-default.conf', false, true];
-        $expected[] = ['remove', '/etc/nginx/conf.d/pmss-hermes-default.conf'];
+        $expected[] = ['safe', '/var/www/pikkumies', true, false];
         $expected[] = ['subdomains'];
         $this->assertSame($expected, $events);
         $this->assertSame([], $warnings);
@@ -166,42 +162,56 @@ PHP;
         $this->assertSame([], array_values(array_filter($events, static function ($e) { return $e[0] === 'write'; })));
     }
 
-    public function testUiGuardsAndOnePageAttemptRetainBothClientPolicies(): void
+    public function testOnlyRetiredDefaultsAreRemovedRegardlessOfHostConfiguration(): void
     {
-        foreach ([
-            [['marker' => false], []], [['binary' => false], [845]],
-            [['ports' => [844 => false]], [845]], [['ports' => [845 => false]], [844]],
-            [['ports' => [844 => false, 845 => false]], []],
-        ] as [$options, $expected]) {
-            [, $events, , $fault] = $this->runSetup($options);
-            $builds = array_values(array_filter($events, static function ($e) { return $e[0] === 'build'; }));
-            $ports = array_column($builds, 1);
-            $this->assertSame($expected, $ports);
-            $this->assertSame($expected === [] ? 0 : 1, count(array_filter($events, static function ($e) { return $e[0] === 'pages'; })));
+        foreach (['node.example.test', 'localhost', ''] as $host) {
+            [, $events, , $fault] = $this->runSetup(['hostname' => $host]);
+            $removed = array_values(array_filter($events, static function ($e) { return $e[0] === 'remove'; }));
+            $this->assertSame([
+                ['remove', '/etc/nginx/conf.d/pmss-pikkumies-default.conf'],
+                ['remove', '/etc/nginx/conf.d/pmss-pikkumies-hermes-default.conf'],
+                ['remove', '/etc/nginx/conf.d/pmss-hermes-default.conf'],
+            ], $removed);
+            $this->assertSame([], array_values(array_filter($events, static function ($e) { return $e[0] === 'managed'; })));
             $this->assertSame(null, $fault);
         }
-        [, $events, $warnings] = $this->runSetup(['pages' => false, 'managed' => false]);
-        $this->assertSame(1, count(array_filter($events, static function ($e) { return $e[0] === 'pages'; })));
-        $this->assertSame([
-            "[WARN] Failed to install account UI pages nginx config: /var/www/pikkumies\n",
-            "[WARN] Failed to write account UI default nginx config: /etc/nginx/conf.d/pmss-pikkumies-default.conf\n",
-            "[WARN] Failed to write Pikkumies Hermes UI default nginx config: /etc/nginx/conf.d/pmss-pikkumies-hermes-default.conf\n",
-        ], $warnings);
     }
-
     public function testObsoleteDefaultsKeepLinkAndSafetyRefusals(): void
     {
         foreach ([['obsoleteLink' => true], ['safe' => false]] as $options) {
-            [, $events] = $this->runSetup($options + ['marker' => false]);
+            [, $events] = $this->runSetup($options);
             $this->assertSame([], array_values(array_filter($events, static function ($e) { return $e[0] === 'remove'; })));
         }
-        [, , $warnings] = $this->runSetup(['marker' => false, 'remove' => false]);
+        [, , $warnings] = $this->runSetup(['remove' => false]);
         $this->assertSame(3, count($warnings));
         foreach (['pmss-pikkumies-default.conf', 'pmss-pikkumies-hermes-default.conf', 'pmss-hermes-default.conf'] as $i => $name) {
             $this->assertSame('[WARN] Failed to remove obsolete account UI default nginx config: /etc/nginx/conf.d/'.$name."\n", $warnings[$i]);
         }
     }
 
+    public function testRetiredPagesAreRemovedOnlyForTheRootOwnedManagedInventory(): void
+    {
+        $pages = ['bar.html', 'hermes-login.html', 'not-running.html'];
+        [, $events, $warnings, $fault] = $this->runSetup(['legacyPages' => $pages]);
+        $pageEvents = array_values(array_filter($events, static function ($e) {
+            return $e[0] === 'remove' && strpos($e[1], '/var/www/pikkumies/') === 0;
+        }));
+        $this->assertSame([
+            ['remove', '/var/www/pikkumies/bar.html'], ['remove', '/var/www/pikkumies/hermes-login.html'],
+            ['remove', '/var/www/pikkumies/not-running.html'],
+        ], $pageEvents);
+        $this->assertTrue(in_array(['rmdir', '/var/www/pikkumies'], $events, true));
+        $this->assertSame([], $warnings);
+        $this->assertSame(null, $fault);
+        foreach ([['legacyOwner' => 1000], ['legacyMode' => 0777], ['pageLinks' => 2],
+            ['pageMode' => 0120777], ['legacyPages' => ['customer.html']]] as $options) {
+            [, $events, , $fault] = $this->runSetup($options + ['legacyPages' => $pages]);
+            $this->assertSame([], array_values(array_filter($events, static function ($e) {
+                return in_array($e[0], ['remove', 'rmdir'], true) && strpos($e[1], '/var/www/pikkumies') === 0;
+            })));
+            $this->assertSame(null, $fault);
+        }
+    }
     public function testHostnameAndCertificateCreationRetainCommandAndSkipBoundaries(): void
     {
         foreach (['node.example.test', 'host', '', 'bad;host', '192.0.2.1'] as $hostname) {
@@ -224,7 +234,7 @@ PHP;
         $this->assertSame(['subdomains'], end($events));
         $this->assertSame(11, count($warnings));
         $this->assertSame(null, $fault);
-        foreach (['read', 'backup', 'write', 'port', 'pages', 'managed', 'remove'] as $stage) {
+        foreach (['read', 'backup', 'write', 'remove'] as $stage) {
             foreach (['RuntimeException', 'Error'] as $class) {
                 [$context, $events, , $fault] = $this->runSetup(['throw' => $stage, 'throwClass' => '\\'.$class]);
                 $this->assertSame(null, $context);

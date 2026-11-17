@@ -74,7 +74,7 @@ function pmssCreateNginxConfigReconcileStaleUserFiles(string $user, array $ctx, 
 /** Remove managed paths not owned by the already-selected current user set. */
 function pmssCreateNginxConfigPruneOrphans(array $users, array $ctx): bool
 {
-    // A removed account's published billing identity (pmssPikkumiesUiIdentityPublish) goes with its routes.
+    // Retired billing identity artifacts are pruned with a removed account's routes.
     $billingDir = rtrim((string) ($ctx['billingPublicDir'] ?? ''), '/');
     $expected = [];
     foreach (pmssConfigLines($users, []) as $user) {

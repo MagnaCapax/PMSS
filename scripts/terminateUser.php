@@ -268,6 +268,7 @@ pmssUserLifecycleRunSteps('terminate', $username, array(
     array('release_media_jellyfin_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' media-stack-jellyfin'),
     array('release_media_openclaw_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' media-stack-openclaw'),
     array('release_media_hermes_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' media-stack-hermes'),
+    array('release_media_pikkumies_hermes_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' media-stack-pikkumies-hermes'),
     array('release_media_qbittorrent_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' media-stack-qbittorrent'),
     array('release_media_qbittorrent_peer_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' media-stack-qbittorrent-peer'),
     array('release_media_transmission_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' media-stack-transmission'),

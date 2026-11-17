@@ -5,8 +5,8 @@ Category: architecture
 
 ## Status
 
-Accepted. Ports A and B are gated by the host marker. Port C has a separate
-account install gate.
+Accepted, amended 2026-11-17 below. The panel routes and release-state
+semantics in that amendment supersede the original port and host-marker policy.
 
 Partly superseded by ADR 0150 (2026-10-22): the implicit per-account
 certificate is withdrawn. The UIs must not request a public certificate or wait
@@ -165,3 +165,48 @@ about 140 GiB. Background runs started from the launcher now set
 (Pikkumies ADR-0013 addendum 2026-11-14). The other background verb,
 `ui web-build`, does not read the variable. Older Pikkumies versions ignore
 it.
+
+## Amendment 2026-11-17: default account panel screens
+
+Pikkumies Eternals and both account screens are on by default for every account.
+UI A (Agentboard) uses `/user-<u>/pikkumies/`; UI B (Pikkumies Hermes) uses
+`/user-<u>/pikkumies-hermes/` on the server's existing panel address. Like vanilla
+Hermes, these screens follow ADR 0150 Decision 3. They use the existing panel
+sign-in and need no per-account public name or certificate. Pages share the
+panel origin as already accepted in ADR 0150.
+
+This replaces the original 844/845/846 servers, defaults, internal A/B mounts,
+certificate readiness checks and root-owned static pages. Normal update and
+nginx convergence remove the former defaults and the known PMSS page inventory.
+Public-folder hostnames retain their existing purpose. Vanilla Hermes keeps
+`/user-<u>/hermes/` and its existing lifecycle.
+
+The lighttpd mounts keep panel sign-in, clear Authorization before the account
+socket and map each panel prefix to `/`. UI B appends its X-Forwarded-Prefix
+without replacing the Authorization setting (ADR 0111). nginx follows the
+existing Hermes panel location, including its request rules, WebSocket handling,
+redirect and cookie-path normalization. UI B retains the dashboard cron-action
+restriction. UI A receives the bare panel origin as allowed origin and frame
+ancestor; status returns the full account route with a trailing slash.
+
+The UI A launcher records allowed origin, frame ancestor, launcher URL and the
+Agentboard symlink target in `L/ui/launch-config.json` (0600). A missing or changed
+record replaces the account's existing UI processes through their PID files and
+command-line checks, waiting up to three seconds for the old socket to stop
+accepting connections. UI B receives its exact panel URL and signs in through
+`hermesLogin.php?ui=pikkumies`; its single-use exchange and cookies use its own
+panel prefix. The ordinary Hermes handoff remains the default.
+
+The Welcome prompt bar no longer queues questions in browser storage, which
+every page on the shared panel origin can read and write. It POSTs the question
+to `pikkumiesOpen.php?view=ask`, which runs `pikkumies ask` as the account behind
+the panel sign-in, and keeps only the unsent draft, in sessionStorage. UI A no
+longer reads or sends queued questions.
+
+Every PMSS update rewrites `/etc/seedbox/config/pikkumiesEternals.enabled` using
+the managed writer as root:root 0644 and reports the result through the update
+logger. The file is release state consumed by the account runtime, not a PMSS
+switch; hand removal is unsupported. Only the existing user-transfer source
+checks still read it in PMSS. Account Off, transfer hold, memory and setup states
+remain effective. The Agentboard installer runs on every host with the release
+pin and verifies the archive against its pinned sha256.

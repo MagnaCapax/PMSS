@@ -978,7 +978,8 @@ function loadFrame(frameId, frameSrc) {
 }
 
 <?php if ($pmssPikkumiesState['visible']): ?>
-var pmssPikkumiesOrigin = <?= json_encode($pmssPikkumiesState['origin']) ?>;
+var pmssPikkumiesUrl = <?= json_encode($pmssPikkumiesState['origin']) ?>;
+var pmssPikkumiesOrigin = new URL(pmssPikkumiesUrl).origin;
 var pmssPikkumiesReady = false, pmssPikkumiesPendingSwitch = false, pmssPikkumiesHintTimer;
 var pmssPikkumiesWelcomeReloaded = false;
 var pmssPikkumiesLastReconnect = 0;
@@ -1002,7 +1003,7 @@ document.getElementById('pikkumiesFrame').addEventListener('load', function () {
  // report ready either (the browser runs no animation frames in it), so the hint shows only while the tab is open;
  // opening the tab while not ready reloads the frame, which starts this timer again.
  var launcher = false;
- try { launcher = this.contentWindow.location.origin === location.origin; } catch (e) {}
+ try { launcher = this.contentWindow.location.pathname !== new URL(pmssPikkumiesUrl).pathname; } catch (e) {}
  if (!launcher) pmssPikkumiesHintTimer = setTimeout(function () {
   if (!pmssPikkumiesReady && document.getElementById('pikkumies').offsetParent !== null) document.getElementById('pmss-pikkumies-hint').hidden = false;
  }, 12000);
@@ -1059,7 +1060,7 @@ window.addEventListener('message', function (event) {
   bar.style.height = (52 + 22 * (Number(event.data.slice(-1)) - 1)) + 'px';
  }
 });
-// A host rollback removes the marker while an old top frame may stay open.
+// Account state can change while the top frame stays open.
 setInterval(function () {
  fetch('pikkumiesOpen.php?view=status', {credentials:'same-origin',cache:'no-store'})
   .then(function (response) { return response.json(); })

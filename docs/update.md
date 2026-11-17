@@ -344,7 +344,7 @@ table only tracks external/non-Debian sources.
 | `firehol.php` | Compiles FireHOL firewall suite when missing. | Fetches the pinned `firehol-3.1.8.tar.gz` release from GitHub over HTTPS, verifies SHA256, and builds under `/root/compile`. |
 | `iprange.php` | After the package stage, keeps an existing `/usr/bin/iprange` or `/usr/local/bin/iprange`; builds from source only when both are absent. | Requires `PMSS_PACKAGES_READY` flag and toolchain packages; fetches the pinned `iprange-1.0.4.tar.xz` release from GitHub over HTTPS with SHA256 verification. |
 | `mono.php` | Installs Mono runtime and clears legacy Sonarr apt entries on old hosts. | Relies on Debian APT; no external mirrors. |
-| `pikkumiesAgentboard.php` | On hosts with the Pikkumies Eternals marker, installs the pinned Agentboard binary and `dist/client` frontend under a root-owned version directory and switches `/opt/pikkumies-agentboard/agentboard` after validation. The account launcher sets `AGENTBOARD_STATIC_DIR` to that version's frontend. | Fetches `v0.36.0-pikkumies.5` from the MagnaCapax fork release over HTTPS and verifies the pinned archive SHA256. |
+| `pikkumiesAgentboard.php` | On every host, installs the pinned Agentboard binary and `dist/client` frontend under a root-owned version directory and switches `/opt/pikkumies-agentboard/agentboard` after validation. The account launcher sets `AGENTBOARD_STATIC_DIR` to that version's frontend. | Fetches `v0.36.0-pikkumies.6` from the MagnaCapax fork release over HTTPS and verifies the pinned archive SHA256. |
 | `configureOpenvpn.php` | Seeds EasyRSA, server/client configs, and writes client bundles to `/etc/skel/www`. | Uses the `easy-rsa` package from the dpkg baseline; skips provisioning if EasyRSA is unavailable. Expects templates `template.openvpn.*`. |
 | `pyload.php` | Creates `/opt/pyload` venv and installs `pyload-ng`. | Installs deps via apt then uses pip (PyPI) inside the venv; honours `PMSS_DISTRO_VERSION`. |
 | `python.php` | Provisions FlexGet + gdrivefs virtualenv and CLI symlink. | Executes pip installs (PyPI) for FlexGet stack; assumes Python 3/venv available. |
@@ -366,6 +366,22 @@ PATH lookup to reach the distro command. Existing backups are never overwritten;
 working local interpreters and unrecognized launchers stay untouched. Both the
 version probe and backup use `runStep()` and honor `PMSS_DRY_RUN`. Reopen an
 existing shell or clear its command hash after an update repairs its launcher.
+
+Every update publishes `/etc/seedbox/config/pikkumiesEternals.enabled` next to
+Agentboard installation using the managed-file writer (root:root, 0644), with
+one update-log result. It is release state for the account runtime, not a host
+switch; removing it by hand is unsupported (ADRs 0128, 0272). Dry runs report
+the planned write. The Agentboard archive is checked against its pinned sha256.
+
+Pikkumies and its Hermes dashboard use `/user-<u>/pikkumies/` and
+`/user-<u>/pikkumies-hermes/` on the existing panel address for every account.
+They require no per-account public name or certificate. Normal nginx setup
+removes the former 844/845/846 default-server files and the root-owned PMSS page
+directory when it contains only the known page inventory; other contents are
+left for operator review. Account vhosts are regenerated without these servers.
+Existing account Off and setup states remain. Opening a UI replaces an older
+launch configuration before reusing its socket. Vanilla Hermes retains its
+existing `/user-<u>/hermes/` route.
 
 Torrent-client venv, Transmission web, and Agentboard archive inspection rejects
 empty or NUL-containing filenames before shell quoting or tar execution, using

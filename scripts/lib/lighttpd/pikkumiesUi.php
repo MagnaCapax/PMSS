@@ -1,5 +1,5 @@
 <?php
-/** Internal unprefixed upstream mount for the account's simplified UI. */
+/** Panel-authenticated mount for the account's simplified UI. */
 
 function pmssLighttpdPikkumiesUiBlock(string $user): string
 {
@@ -7,27 +7,29 @@ function pmssLighttpdPikkumiesUiBlock(string $user): string
     $socket = '/home/'.$user.'/.mcxPikkumies/pikkumies/local/ui/ui.sock';
     return <<<LIGHTTPD
 
-# This internal prefix is removed before the account UI sees the request.
-\$HTTP["url"] =~ "^/__pmss-ui-a/" {
+# The existing panel zone authenticates before Authorization is cleared.
+\$HTTP["url"] =~ "^/user-{$user}/pikkumies/" {
+    setenv.set-request-header = ( "Authorization" => "" )
     proxy.server = ( "" => (( "socket" => "{$socket}" )) )
-    proxy.header = ( "upgrade" => "enable", "map-urlpath" => ( "/__pmss-ui-a/" => "/" ) )
+    proxy.header = ( "upgrade" => "enable", "map-urlpath" => ( "/user-{$user}/pikkumies/" => "/" ) )
     server.max-read-idle = 3600
     server.max-write-idle = 3600
 }
 LIGHTTPD;
 }
 
-/** Port B reaches only the account's separate Pikkumies Hermes listener. */
-function pmssLighttpdPikkumiesHermesBlock(string $user, int $port): string
+/** The panel reaches only the account's separate Pikkumies Hermes relay. */
+function pmssLighttpdPikkumiesHermesBlock(string $user): string
 {
-    if (preg_match('/^[a-z][a-z0-9]{0,7}$/D', $user) !== 1 || $port < 1024 || $port > 65535) return '';
+    if (preg_match('/^[a-z][a-z0-9]{0,7}$/D', $user) !== 1) return '';
     $socket = '/home/'.$user.'/.mcxPikkumies/pikkumies/local/ui/hermes/ui.sock';
     return <<<LIGHTTPD
 
-\$HTTP["url"] =~ "^/__pmss-ui-b/" {
+\$HTTP["url"] =~ "^/user-{$user}/pikkumies-hermes/" {
     setenv.set-request-header = ( "Authorization" => "" )
+    setenv.set-request-header += ( "X-Forwarded-Prefix" => "/user-{$user}/pikkumies-hermes" )
     proxy.server = ( "" => (( "socket" => "{$socket}" )) )
-    proxy.header = ( "upgrade" => "enable", "map-urlpath" => ( "/__pmss-ui-b/" => "/" ) )
+    proxy.header = ( "upgrade" => "enable", "map-urlpath" => ( "/user-{$user}/pikkumies-hermes/" => "/" ) )
     server.max-read-idle = 3600
     server.max-write-idle = 3600
 }

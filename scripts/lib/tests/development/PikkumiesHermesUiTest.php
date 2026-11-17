@@ -4,7 +4,7 @@ namespace PMSS\Tests;
 require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 4).'/etc/skel/bin/pikkumiesHermesUi.php';
 require_once dirname(__DIR__, 2).'/nginxUserHosts.php';
-require_once dirname(__DIR__, 2).'/nginxConfig/pikkumiesUi.php';
+require_once dirname(__DIR__, 2).'/nginxConfig/userConfigsGenerate.php';
 require_once dirname(__DIR__, 2).'/lighttpd/pikkumiesUi.php';
 
 final class PikkumiesHermesUiTest extends TestCase
@@ -29,40 +29,60 @@ final class PikkumiesHermesUiTest extends TestCase
         $home = $this->pmssMakeTempDir('pmss-pikkumies-hermes-', 0700);
         $paths = \pmssPikkumiesHermesPaths($home);
         $this->assertTrue(\pmssPikkumiesHermesWrite($paths, str_repeat('a', 64), str_repeat('b', 64)));
-        $command = \pmssPikkumiesHermesCommand($paths, 'https://0123456789abcdef.mcx.fi:845', 24000);
+        $command = \pmssPikkumiesHermesCommand($paths, 'https://node.example.com/user-fixtur01/pikkumies-hermes/', 24000);
         $this->assertStringContainsAllStrings(['/usr/bin/env -i', 'HERMES_DASHBOARD_PUBLIC_URL=',
             'run dashboard --host 127.0.0.1', $paths['credentials']], $command);
         // Its own session: php-cgi signals its whole process group when it recycles (live QA 2026-10-21).
         $this->assertSame(0, strpos($command, '/usr/bin/setsid nohup '), $command);
         $this->assertFalse(strpos($command, str_repeat('a', 64)) !== false);
         $this->assertFalse(strpos($command, str_repeat('b', 64)) !== false);
-        $this->assertFalse(\pmssPikkumiesHermesStart($paths, 'http://0123456789abcdef.mcx.fi:845'));
+        $this->assertFalse(\pmssPikkumiesHermesStart($paths, 'http://node.example.com/user-fixtur01/pikkumies-hermes/'));
     }
 
-    public function testPortBUsesPrivateOriginAndAuthGate(): void
+    public function testPikkumiesHermesUsesThePanelAndAccountRelay(): void
     {
-        $live = $this->pmssMakeTempDir('pmss-pikkumies-b-cert-', 0700);
-        $this->pmssWriteFiles($live.'/uitester.node.example.com', [
-            'fullchain.pem' => 'fixture', 'privkey.pem' => 'fixture',
-        ], 0777);
-        $block = \pmssPikkumiesHermesNginxBlock('uitester', 'node.example.com',
-            '0123456789abcdef.mcx.fi', 12345, $live);
-        $this->assertStringContainsAllStrings(['listen 845 ssl;', 'server_name 0123456789abcdef.mcx.fi;',
-            'auth_request /__pmss-b-auth;', 'location = /api/cron/fire { return 404; }',
-            '(cross-site|same-site)', "frame-ancestors 'none'",
-            'pmss_ui_b_noargs', 'proxy_set_header X-Forwarded-Proto https;'], $block);
-        $this->assertFalse(strpos($block, '$args') !== false);
-        $this->assertFalse(strpos($block, 'server_name uitester') !== false);
-        $this->assertStringContainsString('listen 845 ssl default_server;',
-            \pmssPikkumiesHermesDefaultNginxBlock("    ssl_certificate /safe/fullchain.pem;\n"));
-        $this->pmssAssertRepoFileContainsString('etc/seedbox/config/template.nginx-conf',
-            'log_format pmss_ui_b_noargs');
-        $lighttpd = \pmssLighttpdPikkumiesHermesBlock('uitester', 24000);
-        $this->assertStringContainsAllStrings(['^/__pmss-ui-b/', '"socket" => "/home/uitester/.mcxPikkumies/pikkumies/local/ui/hermes/ui.sock"',
-            '"Authorization" => ""'], $lighttpd);
-        $this->assertSame('', \pmssLighttpdPikkumiesHermesBlock('../uitester', 24000));
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-user');
+        $this->assertStringContainsAllStrings(['location ^~ /user-##username/pikkumies-hermes/',
+            'if ($uri = /user-##username/pikkumies-hermes/api/cron/fire) { return 404; }'], $template);
+        $lighttpd = \pmssLighttpdPikkumiesHermesBlock('uitester');
+        $this->assertStringContainsAllStrings(['^/user-uitester/pikkumies-hermes/',
+            '"socket" => "/home/uitester/.mcxPikkumies/pikkumies/local/ui/hermes/ui.sock"',
+            '"Authorization" => ""', 'setenv.set-request-header += ( "X-Forwarded-Prefix" => "/user-uitester/pikkumies-hermes" )'], $lighttpd);
+        $this->assertStringNotContainsString('auth.require', $lighttpd);
+        $this->assertSame('', \pmssLighttpdPikkumiesHermesBlock('../uitester'));
     }
 
+    public function testDashboardStartAcceptsOnlyThisAccountsExactPanelUrl(): void
+    {
+        $script = <<<'FIXTURE'
+namespace PikkumiesPanelUrlFixture;
+function shell_exec($command) { return "node.example.com\n"; }
+function is_file($path) { return true; }
+function is_link($path) { return false; }
+function is_executable($path) { return true; }
+function pmssAgentReservedPort($path) { $GLOBALS['portReads']++; return null; }
+FIXTURE;
+        $script .= \pmssTestingFunctionExport('pmssPikkumiesHermesStart', 'PikkumiesPanelUrlFixture');
+        $script .= <<<'FIXTURE'
+$answers = [];
+foreach (json_decode(getenv('PMSS_TEST_PIKKUMIES_URLS'), true) as $url) {
+    $GLOBALS['portReads'] = 0;
+    $answers[] = [pmssPikkumiesHermesStart(['home' => '/home/fixtur01', 'binary' => '/fixture/pikkumies', 'port' => '/fixture/port'], $url), $GLOBALS['portReads']];
+}
+echo json_encode($answers);
+FIXTURE;
+        $urls = ['https://node.example.com/user-fixtur01/pikkumies-hermes/',
+            'http://node.example.com/user-fixtur01/pikkumies-hermes/',
+            'https://other.example.com/user-fixtur01/pikkumies-hermes/',
+            'https://node.example.com/user-fixtur02/pikkumies-hermes/',
+            'https://node.example.com/user-fixtur01/hermes/',
+            'https://node.example.com/user-fixtur01/pikkumies-hermes',
+            'https://node.example.com:845/user-fixtur01/pikkumies-hermes/',
+            'https://node.example.com/user-fixtur01/pikkumies-hermes/?next=/'];
+        $results = $this->pmssRunInlinePhpJson($script, ['PMSS_TEST_PIKKUMIES_URLS' => json_encode($urls)]);
+        $this->assertSame([false, 1], $results[0], 'only the exact panel URL proceeds to the reservation lookup');
+        foreach (array_slice($results, 1) as $result) $this->assertSame([false, 0], $result);
+    }
     public function testRotationStopsRecordedChildBeforeReadingInvalidCredentials(): void
     {
         $home = $this->pmssMakeTempDir('pmss-b-rotation-', 0700);
@@ -212,7 +232,7 @@ final class PikkumiesHermesUiTest extends TestCase
 
     private static function signInRequest(string $body): string
     {
-        return "POST /__pmss-session HTTP/1.0\r\nHost: 0123456789abcdef.mcx.fi\r\nContent-Type: text/plain\r\n"
+        return "POST /__pmss-session HTTP/1.0\r\nHost: node.example.com\r\nContent-Type: text/plain\r\n"
             ."Content-Length: ".strlen($body)."\r\n\r\n".$body;
     }
 
@@ -232,21 +252,21 @@ final class PikkumiesHermesUiTest extends TestCase
         $paths = ['base' => $home.'/h', 'credentials' => $home.'/h/credentials', 'socket' => $home.'/h/ui.sock'];
         $this->assertTrue(\pmssPikkumiesHermesWrite($paths, str_repeat('a', 64), str_repeat('b', 64)));
         $log = $home.'/hermes.log';
-        [$backend, $backendPipes, $port] = $this->fakeHermes($log, 200);
+        [$backend, $backendPipes, $port] = $this->fakeHermes($log, 200, '/user-exampleuser/pikkumies-hermes');
         [$relay, $relayPipes] = $this->startRelay($paths['socket'], $port, $paths['credentials']);
         try {
             $token = $this->loginToken($paths['base'].'/login-tokens');
             $answer = $this->relayRequest($paths['socket'], self::signInRequest($token));
             $this->assertSame(0, strpos($answer, "HTTP/1.1 204 No Content\r\n"), $answer);
             $this->assertStringContainsAllStrings([
-                "\r\nSet-Cookie: __Host-hermes_session_at=\"at=\"; HttpOnly; Max-Age=43200; Path=/; SameSite=lax; Secure\r\n",
-                "\r\nSet-Cookie: __Host-hermes_session_rt=rt; HttpOnly; Max-Age=2592000; Path=/; SameSite=lax; Secure\r\n",
+                "\r\nSet-Cookie: __Secure-hermes_session_at=\"at=\"; HttpOnly; Max-Age=43200; Path=/; SameSite=lax; Secure\r\n",
+                "\r\nSet-Cookie: __Secure-hermes_session_rt=rt; HttpOnly; Max-Age=2592000; Path=/; SameSite=lax; Secure\r\n",
                 "\r\nCache-Control: no-store\r\n"], $answer);
             $this->assertFalse(strpos($answer, str_repeat('a', 64)) !== false, 'the password never reaches the browser');
             $this->assertFalse(file_exists($paths['base'].'/login-tokens/'.$token), 'the token is spent');
             $this->assertStringContainsAllStrings(["POST /auth/password-login HTTP/1.1\r\n", "\r\nHost: 127.0.0.1\r\n",
                 "\r\nX-Forwarded-Proto: https\r\n", "\r\nContent-Type: application/json\r\n",
-                '{"provider":"basic","username":"exampleuser","password":"'.str_repeat('a', 64).'","next":"\/"}'],
+                '{"provider":"basic","username":"exampleuser","password":"'.str_repeat('a', 64).'","next":"\/user-exampleuser\/pikkumies-hermes\/"}'],
                 (string) file_get_contents($log));
             // The same token again, malformed bodies, and a body that is not a token: nothing reaches Hermes.
             foreach ([$token, strtoupper($token), substr($token, 1), '', str_repeat('g', 64)] as $body) {
@@ -429,48 +449,23 @@ final class PikkumiesHermesUiTest extends TestCase
         }
     }
 
-    public function testGeneratedPortBConfigParsesWhenNginxIsAvailable(): void
+    public function testGeneratedPanelLocationsParseWhenNginxIsAvailable(): void
     {
         $nginx = trim((string) @shell_exec('command -v nginx 2>/dev/null'));
-        $openssl = trim((string) @shell_exec('command -v openssl 2>/dev/null'));
-        if ($nginx === '' || $openssl === '') throw new SkipTest('nginx or openssl is unavailable');
-        $root = $this->pmssMakeTempDir('pmss-b-nginx-', 0700);
-        mkdir($root.'/uitester.node.example.com');
-        $cert = $root.'/uitester.node.example.com/fullchain.pem';
-        $key = $root.'/uitester.node.example.com/privkey.pem';
-        exec(escapeshellarg($openssl).' req -x509 -newkey rsa:2048 -nodes -subj /CN=uitester.node.example.com'
-            .' -keyout '.escapeshellarg($key).' -out '.escapeshellarg($cert).' -days 1 2>/dev/null', $rows, $rc);
-        $this->assertSame(0, $rc);
-        $block = \pmssPikkumiesHermesNginxBlock('uitester', 'node.example.com',
-            '0123456789abcdef.mcx.fi', 12345, $root);
-        $block .= "\n".\pmssHermesUiNginxBlock('uitester', 'node.example.com',
-            '0123456789abcdef.mcx.fi', 12345, $root);
-        // Validate the live panel mount as well as the retained legacy renderers.
+        if ($nginx === '') throw new SkipTest('nginx is unavailable');
+        $root = $this->pmssMakeTempDir('pmss-panel-nginx-', 0700);
         $panel = strstr($this->pmssReadRepoFile('etc/seedbox/config/template.nginx-user'), 'location /user-##username/', true);
         $panel = str_replace(['##username', '##serverPort', '##PMSS_HERMES_RELAY_HEADERS##'],
             ['uitester', '12345', \pmssPikkumiesUiRelayHeaders()], $panel);
-        $block .= "\nserver { listen 20847; server_name node.example.com;\n".$panel."\n}\n";
-        $block = preg_replace('/^    (?:include|ssl_dhparam) \/etc\/letsencrypt\/[^;]+;\n/m', '', $block);
-        $block = str_replace('/var/log/nginx/access.log', $root.'/access.log', $block);
-        // Every path nginx -t opens stays under $root, so the check also runs as an unprivileged user.
-        $config = "pid {$root}/nginx.pid; error_log {$root}/error.log; events {} http { access_log {$root}/access.log;\n"
-            ."client_body_temp_path {$root}/tmp_body; proxy_temp_path {$root}/tmp_proxy; fastcgi_temp_path {$root}/tmp_fcgi;\n"
-            ."uwsgi_temp_path {$root}/tmp_uwsgi; scgi_temp_path {$root}/tmp_scgi; log_format pmss_ui_b_noargs '\$uri';\n"
-            ."log_format pmss_ui_noargs '\$uri'; limit_conn_zone \$binary_remote_addr zone=addr:10m;\n"
-            .\pmssPikkumiesHermesDefaultNginxBlock('    ssl_certificate '.escapeshellarg($cert).";\n"
-                .'    ssl_certificate_key '.escapeshellarg($key).";\n")
-            .\pmssHermesUiDefaultNginxBlock('    ssl_certificate '.escapeshellarg($cert).";\n"
-                .'    ssl_certificate_key '.escapeshellarg($key).";\n")
-            .$block."\n}";
-        // nginx -t binds every listen port; an unprivileged user cannot bind 844-846, so test them 20000 higher.
-        $config = preg_replace_callback('/\blisten (84[4-6])\b/', static function (array $m): string {
-            return 'listen '.((int) $m[1] + 20000);
-        }, $config);
+        // Every file nginx -t opens is private to this fixture; no host configuration is read.
+        $config = "pid {$root}/nginx.pid; error_log {$root}/error.log; events {} http { access_log off;\n"
+            ."client_body_temp_path {$root}/tmp_body; proxy_temp_path {$root}/tmp_proxy;\n"
+            ."limit_conn_zone \$binary_remote_addr zone=addr:10m;\n"
+            ."server { listen 127.0.0.1:20847; server_name node.example.com;\n".$panel."\n} }";
         $this->pmssWriteFile($root.'/nginx.conf', $config);
         exec(escapeshellarg($nginx).' -t -p '.escapeshellarg($root.'/').' -c '.escapeshellarg($root.'/nginx.conf').' 2>&1', $rows, $rc);
         $this->assertSame(0, $rc, implode("\n", $rows));
     }
-
     public function testRootInstallerDoesNotExecuteAccountBinary(): void
     {
         $source = $this->pmssReadRepoFile('scripts/lib/update/apps/pikkumiesAgentboard.php');
