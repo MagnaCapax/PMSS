@@ -59,8 +59,7 @@ class OpenClawPanelCompatibilityTest extends TestCase
             $this->pmssWriteFile($home.'/www/openclaw-probe.php', '<?php require __DIR__."/userOpenClaw.php";'
                 .'var_export(pmssOpenClawRuntimeReady());');
             $probe = $render('openclaw-probe.php', array('minBytes' => 1));
-            $this->assertSame('', $probe['stderr']);
-            $this->assertSame('true', $probe['stdout']);
+            $this->pmssAssertArraySubsetSame(['stderr' => '', 'stdout' => 'true'], $probe);
             foreach (array('welcome.php' => 10000, 'welcome.php?news=1' => 1, 'configure.php' => 4000) as $page => $minimum) {
                 $parts = explode('?', $page, 2);
                 $result = $render($parts[0], array('minBytes' => $minimum, 'query' => $parts[1] ?? ''));

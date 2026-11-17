@@ -74,8 +74,7 @@ final class PanelHealCompatibilityTest extends TestCase
                 .'$ok=pmssCustomerTorrentClientToggleStart("qbittorrent",function()use(&$calls){$calls++;},'
                 .var_export($home, true).'); echo json_encode([$ok,$calls]);';
             $result = $this->pmssExecInlinePhp($script);
-            $this->assertSame(0, $result['rc'], $result['output']);
-            $this->assertSame('[true,1]', $result['output']);
+            $this->pmssAssertArraySubsetSame(['rc' => 0, 'output' => '[true,1]'], $result, $result['output'].' ');
         }
     }
 
@@ -94,8 +93,7 @@ PHP
         $script = 'require '.var_export($endpoint, true).'; echo (http_response_code() ?: 200)."\\n";'
             .'echo pmssQbittorrentFrontendPreferenceSet("[Preferences]\\r\\nWebUI\\\\Port=8080\\r\\n", "WebUI\\\\Port", "23456");';
         $result = $this->pmssExecInlinePhp($script);
-        $this->assertSame(0, $result['rc'], $result['output']);
-        $this->assertSame("200\n[Preferences]\nWebUI\\Port=23456", $result['output']);
+        $this->pmssAssertArraySubsetSame(['rc' => 0, 'output' => "200\n[Preferences]\nWebUI\\Port=23456"], $result, $result['output'].' ');
     }
 
     public function testNightlyPasswordHelperDoesNotAssumeNewHealDefinitionsAreLoaded(): void
@@ -103,7 +101,6 @@ PHP
         $script = 'require '.var_export($this->pmssRepoPath('etc/skel/www/qbittorrentPassword.php'), true).';'
             .'echo json_encode(pmssQbittorrentFrontendPasswordApplyStopped("/must-not-be-read", "separate-secret"));';
         $result = $this->pmssExecInlinePhp($script);
-        $this->assertSame(0, $result['rc'], $result['output']);
-        $this->assertSame('false', $result['output']);
+        $this->pmssAssertArraySubsetSame(['rc' => 0, 'output' => 'false'], $result, $result['output'].' ');
     }
 }

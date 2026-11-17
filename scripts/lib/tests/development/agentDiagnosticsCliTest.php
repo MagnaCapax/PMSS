@@ -64,12 +64,10 @@ final class agentDiagnosticsCliTest extends TestCase
         $this->assertSame("hello host\n", $payload['sections']['motd']['raw']);
         $this->assertSame(['fixtur01', 'fixtur02'], $payload['sections']['users']['list']);
         $this->assertSame(4, $payload['sections']['services']['rtorrent_count']);
-        $this->assertSame(['pid1 rtorrent'], $payload['sections']['user_processes']);
-        $this->assertSame(
-            ['ts' => 1756200000, 'uid' => 1001, 'mem_failcnt' => 126389728, 'mem_current' => 327155712, 'mem_peak' => 327155712, 'mem_limit' => 327155712, 'mem_oom_kill' => 0],
-            $payload['sections']['user_metrics_latest']
-        );
         $this->pmssAssertArraySubsetSame([
+            'user_processes' => ['pid1 rtorrent'],
+            'user_metrics_latest' => ['ts' => 1756200000, 'uid' => 1001, 'mem_failcnt' => 126389728,
+                'mem_current' => 327155712, 'mem_peak' => 327155712, 'mem_limit' => 327155712, 'mem_oom_kill' => 0],
             'user_metrics_24h_ago' => $payload['sections']['user_metrics_latest'],
             'user_identity' => ['raw' => 'uid=1001(fixtur01) gid=1001(fixtur01) groups=1001(fixtur01)'],
             'user_quota' => ['raw' => 'Disk quotas for user fixtur01'], 'user_disk' => ['raw' => '12G /home/fixtur01'],
@@ -93,11 +91,9 @@ final class agentDiagnosticsCliTest extends TestCase
         $user = "fixtur01'; printf injected";
         $spec = \pmssAgentDiagnosticsSectionSpecs($user)['user_metrics_24h_ago'];
 
-        $this->pmssAssertArraySubsetSame(['type' => 'command', 'format' => 'json'], $spec);
-        $this->assertSame(
-            'cat '.escapeshellarg('/var/log/pmss/metrics/archive/'.$user.'.1').' '.escapeshellarg('/var/log/pmss/metrics/'.$user).' 2>/dev/null | tail -n 289 | head -1',
-            $spec['command']
-        );
+        $this->pmssAssertArraySubsetSame(['type' => 'command', 'format' => 'json',
+            'command' => 'cat '.escapeshellarg('/var/log/pmss/metrics/archive/'.$user.'.1').' '.escapeshellarg('/var/log/pmss/metrics/'.$user).' 2>/dev/null | tail -n 289 | head -1',
+        ], $spec);
     }
 
     public function testUserMetricsHistorySelectsArchiveSampleAndHandlesMissingFiles(): void
