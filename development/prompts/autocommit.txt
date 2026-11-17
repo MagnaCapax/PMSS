@@ -47,6 +47,14 @@ COMMIT MESSAGE RULE (PUBLIC REPO — BINDING):
   Use generic descriptions: "user account", "target server", "the affected host".
   The lane scans every commit message before publishing and holds back a commit that violates this.
 
+FILE SIZE AND INTENT (BINDING):
+  Keep code files at or under 150 lines; split a file instead of growing it.
+  A code file your commit grows and leaves over 175 lines needs this trailer line in the commit message:
+    Split-Reason: <repo-relative path> -- <why this change cannot split it>
+  A new file states its one job in its first comment or heading line. If it cannot, add this trailer line:
+    Intent: <repo-relative path> -- <one-line job of the file>
+  Never commit a file that crosses 750 lines: split it.
+
 PUBLISHING (the lane is the only publisher):
   Do NOT run git push. Do NOT post, edit, label or close anything on GitHub (no gh write commands).
   Commit locally and finish; your commits stay at HEAD. After the session the lane checks each commit
