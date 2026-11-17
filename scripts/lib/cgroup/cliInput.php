@@ -85,7 +85,9 @@ function pmssCgroupCliParseFlagInputs(SystemInterface $sys, array $flags, ?strin
 function pmssCgroupCliValidateFlagOptions(array $opt, string $ioCostQos, string $ioCostModel): ?string
 {
     foreach (PMSS_CGROUP_INTEGER_OPTIONS as $key) {
-        if (isset($opt[$key]) && preg_match('/^-?[0-9]+$/D', (string)$opt[$key]) !== 1) {
+        // Containers cannot supply numeric text or invoke object conversion hooks.
+        if (isset($opt[$key]) && (!is_scalar($opt[$key])
+            || preg_match('/^-?[0-9]+$/D', (string)$opt[$key]) !== 1)) {
             return 'Invalid --'.$key.' value: expected integer';
         }
     }
@@ -104,7 +106,7 @@ function pmssCgroupCliValidateFlagOptions(array $opt, string $ioCostQos, string 
         return null;
     }
 
-    $quota = (string)$opt['cpu-quota-percent'];
+    $quota = is_scalar($opt['cpu-quota-percent']) ? (string)$opt['cpu-quota-percent'] : '';
     if (strtolower($quota) === 'infinity' || preg_match('/^-?[0-9]+$/D', $quota) === 1) {
         return null;
     }

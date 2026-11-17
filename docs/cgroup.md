@@ -91,6 +91,14 @@ There is no translated profile catalog or diagnostic-result envelope between
 these modules. The CLI output, return codes, validation, and production v1 pin
 (ADR 0019) remain unchanged; `UserCgroupUtilTest` locks profile/option output.
 
+Numeric option validation rejects arrays, objects and resources before string
+conversion, using the existing integer or integer/infinity refusal. Object
+conversion hooks cannot supply option text. Scalar conversions, null-as-absent
+options, latency positivity and validation order retain their existing results.
+`CgroupCliInputSafetyTest` covers this boundary without host probes or cgroup
+writes; execution stays on testing machines, with changed-file PHP syntax checks
+on the devbox.
+
 Shared systemd property readers treat overflowed time spans and CPU percentages
 as unavailable (`null`). Both direct percentages and time-derived percentages
 must round to a positive PHP integer before conversion. Finite time spans,
