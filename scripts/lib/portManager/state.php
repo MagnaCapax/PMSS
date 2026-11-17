@@ -9,7 +9,7 @@
 /** Keep test-mode allocator state under the shared hermetic test root. */
 function pmssPortManagerDefaultPath(string $leaf, string $productionPath): string
 {
-    if (getenv('PMSS_TEST_MODE') !== '1') {
+    if (!pmssEnvFlagEnabled('PMSS_TEST_MODE')) {
         return $productionPath;
     }
     $testRoot = getenv('PMSS_TEST_TEMP_ROOT');

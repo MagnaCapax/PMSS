@@ -30,7 +30,7 @@ function pmssRtorrentPortReservationUsernameIsValid($user): bool
 /** Keep reservation acquisition and reconciliation on one lock namespace. */
 function pmssRtorrentPortReservationLockPath(): string
 {
-    $testMode = (defined('PMSS_TEST_MODE') && constant('PMSS_TEST_MODE')) || getenv('PMSS_TEST_MODE') === '1';
+    $testMode = (defined('PMSS_TEST_MODE') && constant('PMSS_TEST_MODE')) || pmssEnvFlagEnabled('PMSS_TEST_MODE');
     if ($testMode) {
         $testRoot = getenv('PMSS_TEST_TEMP_ROOT');
         if (is_string($testRoot) && $testRoot !== '') {

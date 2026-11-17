@@ -11,7 +11,7 @@ const PMSS_USER_WATCHDOG_SERVICE_PATTERN = '/^[a-z][a-z0-9-]{0,31}$/D';
 function pmssUserWatchdogTimeoutSeconds(int $seconds): int
 {
     $override = getenv('PMSS_WATCHDOG_TIMEOUT_TEST_SECONDS');
-    return getenv('PMSS_TEST_MODE') === '1' && is_string($override)
+    return pmssEnvFlagEnabled('PMSS_TEST_MODE') && is_string($override)
         && ctype_digit($override) && (int) $override > 0 ? (int) $override : $seconds;
 }
 

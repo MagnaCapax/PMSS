@@ -26,7 +26,7 @@ if ($passwd === null || preg_match('/(?:^|\n)root:[^:\n]*:0:/', $passwd) !== 1
     $log(array('status' => 'identity_unavailable'));
     exit(1);
 }
-$dryRun = in_array('--dry-run', $argv, true) || getenv('PMSS_DRY_RUN') === '1';
+$dryRun = in_array('--dry-run', $argv, true) || pmssEnvFlagEnabled('PMSS_DRY_RUN');
 $uidLookup = static function (int $uid) use ($passwd) {
     // Preserve local accounts even when NSS cannot resolve a non-root UID.
     return preg_match('/(?:^|\n)[^:\n]+:[^:\n]*:'.$uid.':/', $passwd) === 1
