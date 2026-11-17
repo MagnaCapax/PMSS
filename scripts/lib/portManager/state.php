@@ -87,16 +87,20 @@ function pmssPortManagerReservationRootIsSafe(string $root): bool
 function pmssPortManagerReservationPorts(string $root, string $pattern, bool $allowMissing, callable $readPort, ?bool &$scanComplete): array
 {
     $scanComplete = false;
+    // Malformed roots are not evidence that an optional namespace is absent.
+    if ($root === '' || strpos($root, "\0") !== false) return [];
     if (!pmssPortManagerReservationRootIsSafe($root)) {
         $scanComplete = $allowMissing && !pmssPathExistsOrLink($root);
         return [];
     }
     $paths = @glob($root.$pattern);
-    $scanComplete = $paths !== false && pmssPortManagerReservationRootIsSafe($root);
+    if ($paths === false || !pmssPortManagerReservationRootIsSafe($root)) return [];
     $used = array();
-    foreach ($scanComplete ? $paths : [] as $path) {
+    foreach ($paths as $path) {
         if (($port = $readPort($path)) !== null) $used[$port] = true;
     }
+    // A throwing decoder must not leave a partial scan certified as complete.
+    $scanComplete = true;
     return $used;
 }
 

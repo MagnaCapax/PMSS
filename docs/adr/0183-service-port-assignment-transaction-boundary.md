@@ -66,6 +66,21 @@ Tests run only on testing machines. The sandbox runner returned exit 69 for both
 requested PHP 7.3 and PHP 8 interpreters before executing the suite; the publishing
 lane must perform the baseline comparison. Local verification is static only.
 
+## Reservation scan completion safety (2026-11-17)
+
+The shared scan rejects empty and NUL-containing roots before filesystem probes;
+these cannot certify an absent optional namespace. A valid missing legacy root
+still completes successfully, while a missing managed root remains incomplete.
+Existing unsafe roots and failed glob/recheck results retain their refusals.
+Completion becomes true only after all port decoding returns, so a decoder
+exception or error leaves it false and propagates unchanged. Successful port
+sets, insertion order, duplicate handling and CLI output retain their contracts.
+
+`PortManagerNamespaceRootGuardTest` covers malformed, missing and unsafe roots,
+successful empty and populated scans, and early/late decoder faults. Fixtures
+use temporary files without binding ports or changing host state. Local checks
+are changed-file PHP syntax only; execution remains on the testing machine.
+
 ## References
 - [Architecture overview](../architecture.md)
 - [Kernel port reservations](0026-kernel-ephemeral-port-reservation.md)
