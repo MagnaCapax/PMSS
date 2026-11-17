@@ -46,7 +46,7 @@ final class agentDiagnosticsCliTest extends TestCase
         ]))));
 
         $this->assertSame(
-            ['motd', 'storage', 'services', 'system', 'cgroup', 'io_sharing', 'system_test', 'users', 'resources', 'traffic', 'user_settings', 'user_processes', 'user_metrics_latest', 'user_metrics_24h_ago', 'user_identity', 'user_quota', 'user_disk', 'user_http_responsiveness'],
+            ['motd', 'storage', 'services', 'system', 'cgroup', 'io_sharing', 'system_test', 'users', 'resources', 'traffic', 'user_settings', 'user_processes', 'user_net_relay', 'user_metrics_latest', 'user_metrics_24h_ago', 'user_identity', 'user_quota', 'user_disk', 'user_http_responsiveness'],
             array_keys($payload['sections'])
         );
         $this->assertSame(
@@ -65,6 +65,7 @@ final class agentDiagnosticsCliTest extends TestCase
         $this->assertSame(4, $payload['sections']['services']['rtorrent_count']);
         $this->pmssAssertArraySubsetSame([
             'user_processes' => ['pid1 rtorrent'],
+            'user_net_relay' => [],
             'user_metrics_latest' => ['ts' => 1756200000, 'uid' => 1001, 'mem_failcnt' => 126389728,
                 'mem_current' => 327155712, 'mem_peak' => 327155712, 'mem_limit' => 327155712, 'mem_oom_kill' => 0],
             'user_metrics_24h_ago' => $payload['sections']['user_metrics_latest'],
@@ -321,8 +322,8 @@ final class agentDiagnosticsCliTest extends TestCase
             'df' => "#!/bin/sh\nprintf 'Filesystem Size Used Avail Use%% Mounted on\\n/dev/md0 100G 10G 90G 10%% /home\\n'\n",
             'systemctl' => "#!/bin/sh\nprintf 'active\\n'\n",
             'ps' => "#!/bin/sh\nprintf 'rtorrent main\\nrtorrent main\\nrtorrent main\\nrtorrent main\\n'\n",
-            'pgrep' => "#!/bin/sh\nif [ \"$1\" = '-cx' ]; then\n  if [ \"$2\" = 'rtorrent' ]; then printf '4\\n'; else printf '2\\n'; fi\n  exit 0\nfi\nprintf 'pid1 rtorrent\\n'\n",
-            'id' => "#!/bin/sh\nprintf 'uid=1001(fixtur01) gid=1001(fixtur01) groups=1001(fixtur01)\\n'\n",
+            'pgrep' => "#!/bin/sh\nif [ \"$4\" = 'slirp4netns' ]; then exit 1; fi\nif [ \"$1\" = '-cx' ]; then\n  if [ \"$2\" = 'rtorrent' ]; then printf '4\\n'; else printf '2\\n'; fi\n  exit 0\nfi\nprintf 'pid1 rtorrent\\n'\n",
+            'id' => "#!/bin/sh\nif [ \"$1\" = '-u' ]; then printf '1001\\n'; else printf 'uid=1001(fixtur01) gid=1001(fixtur01) groups=1001(fixtur01)\\n'; fi\n",
             'quota' => "#!/bin/sh\nprintf 'Disk quotas for user fixtur01\\n'\n",
             'du' => "#!/bin/sh\nprintf '12G /home/fixtur01\\n'\n",
             'tail' => "#!/bin/sh\nprintf '{\"ts\":1756200000,\"uid\":1001,\"mem_failcnt\":126389728,\"mem_current\":327155712,\"mem_peak\":327155712,\"mem_limit\":327155712,\"mem_oom_kill\":0}\\n'\n",

@@ -75,6 +75,43 @@ function pmssAgentDiagnosticsSectionSpecs(string $user = ''): array
         $userArg = escapeshellarg($user);
         $sections['user_settings'] = ['type' => 'php', 'path' => 'userSetting.php', 'args' => ['view', $user], 'format' => 'json'];
         $sections['user_processes'] = ['type' => 'command', 'command' => 'pgrep -u '.$userArg.' -a 2>/dev/null', 'format' => 'lines'];
+        // A one-shot relay sample: consumers derive CPU usage from successive tick counters.
+        // Inline PHP keeps proc parsing and descriptor counting independent of the script-root guard.
+        $relayProbe = <<<'PHP'
+$uid = $argv[1] ?? "";
+$hz = (int) ($argv[2] ?? 0);
+$pageSize = (int) ($argv[3] ?? 0);
+if (!ctype_digit($uid) || $hz <= 0 || $pageSize <= 0) exit(1);
+$owned = static function ($path) use ($uid) {
+    // Match the effective UID, as pgrep -u does; proc inode ownership can reflect dumpability.
+    return preg_match("/^Uid:[ \t]+[0-9]+[ \t]+".$uid."[ \t]/m", (string) @file_get_contents($path."/status")) === 1;
+};
+$rows = [];
+foreach (array_slice($argv, 4) as $pid) {
+    if (!ctype_digit($pid)) continue;
+    $path = "/proc/".$pid;
+    if (!$owned($path)) continue;
+    $stat = preg_split("/\s+/", trim((string) @file_get_contents($path."/stat")));
+    $timestamp = microtime(true);
+    if (count($stat) < 24 || $stat[1] !== "(slirp4netns)") continue;
+    // Exact comm matching above makes positional stat parsing safe (no spaces in comm).
+    foreach ([13, 14, 19, 21, 23] as $field) {
+        if (!ctype_digit($stat[$field])) continue 2;
+    }
+    $fds = @scandir($path."/fd");
+    $after = preg_split("/\s+/", trim((string) @file_get_contents($path."/stat")));
+    // An exited or reused PID must not attribute another process's descriptors to this relay.
+    if (count($after) < 24 || $after[1] !== "(slirp4netns)" || $after[21] !== $stat[21]
+        || !$owned($path)) continue;
+    $rows[] = ["pid" => (int) $pid, "threads" => (int) $stat[19],
+        "rss_bytes" => (int) $stat[23] * $pageSize, "cpu_ticks" => (int) $stat[13] + (int) $stat[14],
+        "clock_ticks_per_second" => $hz, "timestamp" => $timestamp, "start_ticks" => (int) $stat[21],
+        "open_descriptors" => $fds === false ? null : count($fds) - 2];
+}
+echo json_encode($rows), "\n";
+PHP;
+        $sections['user_net_relay'] = ['type' => 'command', 'format' => 'json', 'command' =>
+            'php -r '.escapeshellarg($relayProbe).' "$(id -u '.$userArg.' 2>/dev/null)" "$(getconf CLK_TCK)" "$(getconf PAGESIZE)" $(pgrep -u '.$userArg.' -x slirp4netns 2>/dev/null)'];
         // Latest per-user resource-metrics snapshot (cpu-throttle / blkio / pids / memory-pressure).
         // metricsLog.php (root.cron, */5) persists pmssUserMetricsCollect() output as JSONL here; the
         // last line surfaces this account's resource envelope — including memory.failcnt, max_usage vs
