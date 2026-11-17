@@ -33,6 +33,23 @@ function pmssJournaldTemplateSize(int $bytes): string
     return $bytes > 0 && ($bytes % $gib) === 0 ? (string) ($bytes / $gib).'G' : (string) max(1, (int) floor($bytes / (1024 * 1024))).'M';
 }
 
+/** Build substitutions shared by policy installation and read-only drift checks. */
+function pmssJournaldTemplateReplacements(array $policy): array
+{
+    $repl = [];
+    foreach ([
+        '%%PMSS_JOURNALD_SYSTEM_MAX_USE%%' => $policy['system_max_use_bytes'],
+        '%%PMSS_JOURNALD_SYSTEM_KEEP_FREE%%' => $policy['system_keep_free_bytes'],
+        '%%PMSS_JOURNALD_RUNTIME_MAX_USE%%' => $policy['runtime_max_use_bytes'],
+    ] as $placeholder => $bytes) {
+        $repl[$placeholder] = pmssJournaldTemplateSize((int) $bytes);
+    }
+    return $repl + [
+        '%%PMSS_JOURNALD_RATE_LIMIT_INTERVAL%%' => $policy['rate_limit_interval_sec'].'s',
+        '%%PMSS_JOURNALD_RATE_LIMIT_BURST%%'    => (string) $policy['rate_limit_burst'],
+    ];
+}
+
 /**
  * Render and install journald limits template, then restart journald.
  *
@@ -49,18 +66,7 @@ function pmssApplyJournaldLimits(?callable $logger = null): void
         return;
     }
     $policy = pmssJournaldLimitsForRootBytes($rootBytes);
-    $repl = [];
-    foreach ([
-        '%%PMSS_JOURNALD_SYSTEM_MAX_USE%%' => $policy['system_max_use_bytes'],
-        '%%PMSS_JOURNALD_SYSTEM_KEEP_FREE%%' => $policy['system_keep_free_bytes'],
-        '%%PMSS_JOURNALD_RUNTIME_MAX_USE%%' => $policy['runtime_max_use_bytes'],
-    ] as $placeholder => $bytes) {
-        $repl[$placeholder] = pmssJournaldTemplateSize((int) $bytes);
-    }
-    $repl += [
-        '%%PMSS_JOURNALD_RATE_LIMIT_INTERVAL%%' => $policy['rate_limit_interval_sec'].'s',
-        '%%PMSS_JOURNALD_RATE_LIMIT_BURST%%'    => (string) $policy['rate_limit_burst'],
-    ];
+    $repl = pmssJournaldTemplateReplacements($policy);
     $rendered = pmssRenderLoggingTemplate(
         $cfgDir.'/template.journald.conf.d-pmss-limits.conf',
         $repl,

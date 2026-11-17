@@ -135,6 +135,7 @@
     create 0600 root root
 }
 
+/var/log/pmss/log-policy-health.jsonl
 /var/log/pmss/storage-health.jsonl /var/log/pmss/storageHealthSnapshot.log {
     daily
     rotate 3650

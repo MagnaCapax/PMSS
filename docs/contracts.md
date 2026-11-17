@@ -506,6 +506,17 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   - Validates a temporary full-config candidate with `rsyslogd -N1`, keeps a timestamped backup, atomically replaces the original while preserving metadata, and restarts rsyslog only after a successful change.
   - Nonstandard/custom imklog declarations, unreadable or unsafe paths, and validation failures are preserved with a warning. `PMSS_RSYSLOG_CONFIG_PATH` and the runner callback support hermetic tests.
 
+- pmssLogPolicyHealthCollect(?callable $read=null, ?int $rootBytes=null, ?int $now=null): array
+  - Read-only managed log-policy comparison and content-age observation (ADR 0293).
+    Missing/ambiguous evidence warns; no remediation. Injected reads, capacity and
+    clock allow hermetic fixtures. Journald substitutions share the installer helper.
+  - `scripts/cron/logPolicyHealthSnapshot.php [--json <path>]` appends one JSONL
+    observation (default `/var/log/pmss/log-policy-health.jsonl`), twice daily via
+    root cron. Success is silent with exit 0, including warning findings; output
+    failures use stderr and exit 1. It preserves storage snapshot/report contracts.
+  - Content-age limit defaults to four weeks; per-host `logPolicyMaxAgeWeeks` under
+    `/etc/seedbox/config` accepts 1–520. Invalid values warn and retain the default.
+
 ---
 
 ## APT Repository Management
