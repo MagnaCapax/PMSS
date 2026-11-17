@@ -50,6 +50,19 @@ Active work items are tracked in GitHub issues to avoid duplication between this
   The skeleton manifest lists the bin files but cannot prove the external
   panel retrieval allowlist or dependency ordering. See
   [ADR 0022](adr/0022-guiv-delivered-customer-files-must-be-self-contained.md).
+- [ ] Establish helper-version delivery ordering before sharing customer
+  torrent-client lock release. The 2026-11-17 tracked-tree duplication scan also
+  found the same resource guard and unlock-in-try/close-in-finally sequence in
+  `pmssConfigureTorrentClientSwitchApply()`, `pmssConfigureTorrentClientOtherSwitch()`,
+  `pmssTorrentClientResolverLaunch()` and `pmssCustomerTorrentClientToggleStart()`.
+  Their files are respectively `configureTorrentClients.php`,
+  `configureTorrentClientsSwitch.php`, `qbittorrentResolverLaunch.php` and
+  `scriptsIncAppProcess.php` under `etc/skel/www/`. The last explicitly supports
+  mixed deliveries; `scriptsInc.php` also tolerates absent parts. An existing
+  helper filename alone does not prove that a new release symbol arrives before
+  its callers. Preserve held-lock ownership and close-after-unlock-fault behavior;
+  resolve the [ADR 0022](adr/0022-guiv-delivered-customer-files-must-be-self-contained.md)
+  delivery prerequisite before replacing these four copies.
 
 ## Recently Completed
 
