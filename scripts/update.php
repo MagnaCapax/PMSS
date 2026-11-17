@@ -593,6 +593,9 @@ function parseSpec(string $spec): array
             $source['repo'] = $maybeRepo;
         }
         $source['branch'] = $maybeBranch !== '' ? $maybeBranch : 'main';
+    } elseif (strlen($rest) > 1 && $rest[0] === '/') {
+        // git refuses a branch name that starts with '/', so this is a local repository path (a bundle or a clone).
+        $source['repo'] = $rest;
     } elseif ($rest !== '') {
         $source['branch'] = $rest;
     }

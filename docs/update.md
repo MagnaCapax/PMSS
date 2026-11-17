@@ -92,6 +92,9 @@ Common flags:
   repository files.
 - `--repo`/`--branch` – override the default repository when building a `git/*`
   spec on the fly.
+- A `git/` spec whose rest starts with `/` names a local repository path (a clone
+  or a git bundle): `git//srv/pmss.bundle` uses branch `main`, and
+  `git//srv/pmss.bundle:beta` uses `beta`.
 
 ### Phase 1 Quick Reference
 
