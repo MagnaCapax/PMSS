@@ -86,3 +86,27 @@ udev rule. That rule still covers processes started before a supplementary-group
 change, including running tmux, systemd-user, and rootless Docker sessions,
 until they restart. Membership grants no access beyond what the 0666 rule
 already permits. Hosts without Intel display hardware are unaffected.
+
+## Amendment 2026-11-17: non-free iHD media driver on Intel iGPU hosts
+
+On a Gen9 iGPU (Intel HD Graphics 630, i5-7500T class, Debian 12), Debian's free
+`intel-media-va-driver` 23.1.1+dfsg1 decodes but cannot run VAAPI video
+processing: `scale_vaapi` fails with "the requested VAProfile is not supported",
+so every Jellyfin VAAPI transcode fails. `i965-va-driver` 2.4.1 aborts in its
+H.264 encoder. The non-free build `intel-media-va-driver-non-free` (same upstream
+version, with the media kernels the free build strips) works. Measured as a
+customer account with the system ffmpeg: 1080p to 720p H.264 at 14.3x real
+time, 4K HEVC Main10 HDR10 to 1080p at 5.65x, and HDR to SDR tone mapping with
+`tonemap_vaapi` at 2.67x. `install-media-stack.sh` runs Jellyfin on the distro
+ffmpeg by default, so this driver decides whether hardware transcoding works for
+customers at all.
+
+Decision: the baseline sanitiser selects `intel-media-va-driver-non-free` in
+place of an `intel-media-va-driver install` entry when an Intel display device is
+present and the package is available (the PMSS bookworm and trixie source
+templates enable `non-free`). Otherwise the free entry stays. A `hold` entry is
+left as written. The packages conflict, so apt removes the free build when it
+installs the non-free one; `va-driver-all` accepts either. A host whose Intel
+display device goes away gets the free entry back on the next update. Testing
+the VAAPI path on a Gen9 host means a scale and an encode as a customer account
+through the system ffmpeg, not only a decode.

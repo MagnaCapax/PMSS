@@ -21,6 +21,22 @@ class IntelGpuFirmwareSelectionTest extends TestCase
         $this->pmssAssertArraySubsetSame(['sanitised' => ["alpha\tinstall", "firmware-misc-nonfree\tinstall"], 'dropped_hardware' => []], $plan);
     }
 
+    public function testIntelHostGetsNonFreeMediaDriverWhenAvailable(): void
+    {
+        $plan = \pmssDpkgSelectionsSanitise(['alpha install', 'intel-media-va-driver install'], 12, function () { return true; }, function () { return true; });
+        $this->pmssAssertArraySubsetSame(['sanitised' => ["alpha\tinstall", "intel-media-va-driver-non-free\tinstall"]], $plan);
+    }
+
+    public function testMediaDriverStaysFreeWithoutIntelDisplayOrWithoutNonFree(): void
+    {
+        $noIntel = \pmssDpkgSelectionsSanitise(['intel-media-va-driver install'], 12, function () { return true; }, function () { return false; });
+        $this->pmssAssertArraySubsetSame(['sanitised' => ["intel-media-va-driver\tinstall"]], $noIntel);
+        $noNonFree = \pmssDpkgSelectionsSanitise(['intel-media-va-driver install'], 12, function ($p) { return $p !== 'intel-media-va-driver-non-free'; }, function () { return true; });
+        $this->pmssAssertArraySubsetSame(['sanitised' => ["intel-media-va-driver\tinstall"]], $noNonFree);
+        $held = \pmssDpkgSelectionsSanitise(['intel-media-va-driver hold'], 12, function () { return true; }, function () { return true; });
+        $this->pmssAssertArraySubsetSame(['sanitised' => ["intel-media-va-driver\thold"]], $held);
+    }
+
     public function testIntelDisplayPciDetectorAcceptsOnlyMatchingClassAndVendor(): void
     {
         $root = $this->pmssMakeTempDir('pmss-pci-devices-', 0700);
