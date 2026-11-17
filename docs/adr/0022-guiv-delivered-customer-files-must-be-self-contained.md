@@ -88,6 +88,28 @@ real gate is the allowlist, not those guards. Fix or remove the dead guards.)
   `retrieve.php` path guards; ensure new provisioning (skeleton) and the `update.php` per-user
   path also carry the relocated helper.
 
+## DRY audit: account command cleanup (2026-11-17)
+
+A tracked-tree scan covered 897 first-party runtime PHP files, 43 shell files,
+two JavaScript files, one Perl file and one C file, with a separate PHP test
+function scan. Bundled third-party trees and the frozen testing harness were
+excluded from refactor candidates. Normalized function and block matches were
+reviewed as candidates, not proof of equivalent behavior.
+
+Three concrete terminate/reap copies remain in `pmssAgentRun()`
+(`etc/skel/bin/pmssAccountAgent.php`), `pmssDockerLsioSeedCapture()`
+(`etc/skel/bin/dockerLsioSeedHttp.php`) and `pmssToggleAppQuiAccountCommand()`
+(`etc/skel/www/toggleAppRuntime.php`). The first two close two pipes; the panel
+helper closes three. `pmssHermesStart()` in `etc/skel/bin/pmssHermesRuntime.php`
+also closes three pipes but only reaps its child. A shared cleanup operation must
+retain those differences, still-owned resource checks and `finally` precedence.
+
+The updater's `scripts/lib/update/users/filesystem.php` inventory lists the bin
+helpers, but cannot establish the external panel retrieval allowlist or delivery
+ordering required above. This audit therefore stopped without extracting a new
+cross-tree dependency. The prerequisite already recorded in `docs/TODO.md`
+remains unresolved; no runtime code, validation or delivery contract changed.
+
 ## References
 
 - ADR 0016 (customer PHP tree separation — no `/scripts/` requires), ADR 0017 (customer-tree
