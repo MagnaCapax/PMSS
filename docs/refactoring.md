@@ -20,6 +20,16 @@ faults retain PHP's `finally` precedence.
 for both copies; execution stays on testing machines, with changed-file PHP
 syntax checks on the devbox.
 
+Operator and customer qBittorrent version probes reject NUL-containing stdout
+chunks through the existing `null` result before further status polling. A
+previously captured version cannot certify a corrupted capture; the existing
+child, pipe and private-profile cleanup still runs. Non-NUL bytes, empty reads,
+launch commands, deadlines and output limits retain their contracts.
+`QbittorrentBuildReadSafetyTest` covers leading, embedded, trailing and later-chunk
+NULs, an exited child, early read termination and unchanged non-NUL output for
+both copies. Execution stays on testing machines; devbox checks changed PHP
+syntax only.
+
 Customer backup creation and pre-restore snapshots attempt unpublished `.part`
 removal after output closure and pipe reaping, even when those operations or
 publication throw (ADR 0200). Successful rename ends part-file ownership;

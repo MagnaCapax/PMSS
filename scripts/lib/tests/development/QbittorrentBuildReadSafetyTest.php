@@ -5,7 +5,7 @@ require_once __DIR__.'/../common/TestCase.php';
 require_once __DIR__.'/../../user/qbittorrentBuildProbe.php';
 require_once dirname(__DIR__, 4).'/etc/skel/www/qbittorrentBuildProbe.php';
 
-/** Failed reads use only memory streams and fake process/profile operations. */
+/** Failed and malformed reads use only memory streams and fake process/profile operations. */
 class QbittorrentBuildReadSafetyTest extends TestCase
 {
     public function testBothProbesRejectReadFailuresWithoutConfusingEmptyReadsWithErrors(): void
@@ -52,10 +52,19 @@ foreach (['pmssQbittorrentBuildProbe', 'pmssQbittorrentFrontendBuildProbe'] as $
         ['failed-exited', [false], true, null],
         ['failed-after-version', [$version, false], false, null],
         ['failed-after-empty', ['', false], false, null],
+        ['nul-only', ["\0"], false, null],
+        ['nul-leading', ["\0".$version], false, null],
+        ['nul-interior', ["qBittorrent\0 v5.3.0\n"], false, null],
+        ['nul-trailing', [$version."\0"], false, null],
+        ['nul-after-version', [$version, "\0"], false, null],
+        ['nul-before-unread-chunk', ["\0", $version], false, null],
+        ['nul-exited', [$version."\0"], true, null],
         ['empty-then-version', ['', $version], false, $version],
         ['empty-eof', [''], false, ''],
         ['success', [$version], false, $version],
         ['multiple-chunks', ['qBittorrent ', "v5.3.0\n"], false, $version],
+        ['crlf', ["qBittorrent v5.3.0\r\n"], false, "qBittorrent v5.3.0\r\n"],
+        ['other-control-bytes', ["\x01".$version."\x7f"], false, "\x01".$version."\x7f"],
     ] as [$name, $chunks, $exited, $expected]) {
         $GLOBALS['events'] = $GLOBALS['limits'] = [];
         $GLOBALS['chunks'] = $chunks; $GLOBALS['exited'] = $exited; $GLOBALS['readIndex'] = 0;
@@ -77,7 +86,7 @@ foreach (['pmssQbittorrentBuildProbe', 'pmssQbittorrentFrontendBuildProbe'] as $
 echo json_encode($rows);
 PHP;
         $rows = $this->pmssRunInlinePhpJson($script);
-        $this->assertSame(16, count($rows));
+        $this->assertSame(34, count($rows));
         foreach ($rows as $row) {
             [$probe, $name, $chunks, $expected] = $row;
             $expectedEvents = ['launch', 'status', 'blocking'];
@@ -85,12 +94,12 @@ PHP;
             foreach ($chunks as $index => $chunk) {
                 $expectedEvents[] = 'read';
                 $expectedLimits[] = 4097 - $bytes;
-                if ($chunk === false) break;
+                if ($chunk === false || strpos($chunk, "\0") !== false) break;
                 $bytes += strlen($chunk);
                 $expectedEvents[] = 'status';
                 if ($index < count($chunks) - 1) $expectedEvents[] = 'pause';
             }
-            // Read errors stop before polling and still release every acquired resource.
+            // Failed or malformed reads stop before polling and release every acquired resource.
             if ($expected === null) $expectedEvents = array_merge($expectedEvents, ['group-signal', 'terminate']);
             $expectedEvents = array_merge($expectedEvents, ['pipe-close', 'reap', 'profile-clean']);
             $this->assertSame([$expected, $expectedEvents, $expectedLimits, false, false],
