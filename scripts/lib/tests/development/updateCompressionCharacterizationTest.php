@@ -396,13 +396,13 @@ class UpdateCompressionCharacterizationTest extends TestCase
             ], 'forbidden' => [
                 'function pmssWrite'.'DockerDaemonConfig(', 'pmssJsonEncodePretty($payload)',
             ]],
-            'scripts/lib/update/repositories.php' => [
+            'scripts/lib/update/repositorySonarr.php' => [
                 'required' => [
                     "preg_match('/^[ \\t]*#/', \$line) === 1",
                     'signed-by=',
                 ],
                 'forbidden' => [
-                    'function pmssSonarr'.'SourceLine(' => 'repositories.php should keep Sonarr source detection inside signed-by rewriting',
+                    'function pmssSonarr'.'SourceLine(' => 'repositorySonarr.php should keep Sonarr source detection inside signed-by rewriting',
                 ],
             ],
             'scripts/lib/update/users/context.php' => [

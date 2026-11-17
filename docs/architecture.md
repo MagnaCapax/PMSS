@@ -199,7 +199,13 @@ Keep the canonical installer/update details under `docs/install.md` and
 - **scripts/lib/update/filesystem.php** – warning-only filesystem preflights, including `/home` inode density detection for media-stack-heavy hosts.
 - **scripts/lib/update/arrRootExecutionBlock.php** – occupies `/root/.config/<App>` with a regular file so a root launch cannot create its data directory and aborts before binding; leftover config directories are moved aside, never deleted. Root has no legitimate Servarr instance, and `/opt` stays fully usable by customers (ADR 0034). Backstopped by **scripts/lib/arrRootGuard.php**, which the every-2-minute media-stack cron uses to kill root-owned `/opt/<App>/` processes and any known ARR process holding its default listener.
 - **scripts/lib/update/kernelHardening.php** – module blacklist hardening that writes PMSS-owned `modprobe.d` entries and attempts runtime eviction so already-loaded modules do not silently persist. Interim blacklists such as `pmss-algif-blacklist.conf` are reverted by deleting the PMSS-owned file after patched kernels are deployed fleet-wide.
-- **scripts/lib/update/repositories.php** – Applies `/etc/seedbox/config/template.sources.<suite>` when version is known; otherwise logs and leaves sources untouched. Finishes with `apt update` via `runStep()`.
+- **scripts/lib/update/repositories.php** retains repository refresh orchestration
+  and the frozen MediaArea implementation. `repositoryDocker.php` and
+  `repositorySonarr.php` own their respective prerequisites. The existing
+  `apt.php` include dispatches release policy; `aptSources.php` owns template
+  discovery, planning and backed-up publication, and `aptMaintenance.php` owns
+  archived-release housekeeping. Public helpers and prerequisite order remain
+  available through the original includes (ADR 0295).
 - **scripts/lib/update/systemPrep.php** – Cgroups, systemd slices, base permissions, locale setup.
 - **scripts/lib/update/systemPrep/systemdSlicesEnsure.php** – Shared slice setup
   controller. Sibling sizing, I/O policy, drop-in and live-refresh modules keep

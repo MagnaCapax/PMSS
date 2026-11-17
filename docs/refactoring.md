@@ -1,5 +1,16 @@
 # Refactoring Guidelines
 
+Repository maintenance retains its `repositories.php` and `apt.php` includes and
+public helpers while separating Docker/Sonarr prerequisites, source discovery
+and publication, release dispatch, and APT housekeeping (ADR 0295). Source-line
+transforms derive changes from their returned arrays instead of separate dirty
+flags; the default clean command executes inside its existing exception boundary
+without a callback adapter. The frozen MediaArea implementation stays unchanged.
+Characterization locks source bytes, CRLF/trailing-newline behavior, dry-run
+diagnostics, legacy-key retention on write failure, backups/restores, EOL cleanup,
+prerequisite order and success-stamp policy. Execution stays on testing machines;
+devbox verification checks changed PHP syntax only.
+
 GUI watchdog traversal retains its cron entrypoint, include surface and logger
 identity (ADR 0291). Account/path/ownership checks and sentinel reconciliation
 live in `gui/watchdogPaths.php`; directory/file recovery lives in
