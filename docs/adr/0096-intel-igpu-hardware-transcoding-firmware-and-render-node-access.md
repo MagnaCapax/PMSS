@@ -105,8 +105,10 @@ Decision: the baseline sanitiser selects `intel-media-va-driver-non-free` in
 place of an `intel-media-va-driver install` entry when an Intel display device is
 present and the package is available (the PMSS bookworm and trixie source
 templates enable `non-free`). Otherwise the free entry stays. A `hold` entry is
-left as written. The packages conflict, so apt removes the free build when it
-installs the non-free one; `va-driver-all` accepts either. A host whose Intel
+left as written. The packages conflict, and `dselect-upgrade` keeps an installed
+package that is still selected for install, so the swap also writes
+`intel-media-va-driver deinstall` (the first version without it left the free
+build installed on a newly installed Gen9 host); `va-driver-all` accepts either. A host whose Intel
 display device goes away gets the free entry back on the next update. Testing
 the VAAPI path on a Gen9 host means a scale and an encode as a customer account
 through the system ffmpeg, not only a decode.

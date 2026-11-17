@@ -24,7 +24,7 @@ class IntelGpuFirmwareSelectionTest extends TestCase
     public function testIntelHostGetsNonFreeMediaDriverWhenAvailable(): void
     {
         $plan = \pmssDpkgSelectionsSanitise(['alpha install', 'intel-media-va-driver install'], 12, function () { return true; }, function () { return true; });
-        $this->pmssAssertArraySubsetSame(['sanitised' => ["alpha\tinstall", "intel-media-va-driver-non-free\tinstall"]], $plan);
+        $this->pmssAssertArraySubsetSame(['sanitised' => ["alpha\tinstall", "intel-media-va-driver-non-free\tinstall", "intel-media-va-driver\tdeinstall"]], $plan);
     }
 
     public function testMediaDriverStaysFreeWithoutIntelDisplayOrWithoutNonFree(): void

@@ -50,6 +50,9 @@ function pmssDpkgSelectionsSanitise(array $lines, int $runtimeVersion, ?callable
         if ($lower === 'intel-media-va-driver' && strtolower($state) === 'install' && $intelDisplayPresent()
             && $packageAvailable('intel-media-va-driver-non-free')) {
             $result['sanitised'][] = "intel-media-va-driver-non-free\tinstall";
+            // The packages conflict and dselect-upgrade keeps an installed package that is still selected, so the free
+            // build must be deselected too (seen on a Gen9 host 2026-11-17: swap selected, free build stayed).
+            $result['sanitised'][] = "intel-media-va-driver\tdeinstall";
             continue;
         }
         if (strtolower($state) === 'install' && !$packageAvailable($package)) {
