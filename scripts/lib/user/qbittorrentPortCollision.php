@@ -9,7 +9,7 @@ function pmssQbittorrentPortHasForeignListener(string $table, int $port, int $ui
 {
     if (!pmssNetworkPortInRange($port, 1024) || $uid < 1) return false;
     foreach (explode("\n", $table) as $line) {
-        $fields = preg_split('/\s+/', trim($line));
+        $fields = pmssConfigLineColumns($line, 0, []);
         if (count($fields) < 10 || $fields[3] !== '0A'
             || !ctype_digit($fields[7]) || !ctype_digit($fields[9]) || $fields[9] === '0') continue;
         if (preg_match('/\A(?:0100007F|00000000):([0-9A-Fa-f]{4})\z/', $fields[1], $match) !== 1) continue;

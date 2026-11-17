@@ -1050,6 +1050,7 @@ ARP and module tables use `pmssConfigRows()`. WireGuard peer blocks keep `# user
 markers with `[]`; account public-key lists filter `['#', ';']` while retaining
 source indices for diagnostics. Monitoring rules and legacy port cleanup use the
 default `#` policy. Default-route and running-peer readers keep every nonempty row.
+APT source/mount-info readers share raw text splitting; rsyslog and proc rows use the filtered/column helpers.
 LF/CRLF text readers use `pmssConfigTextLines()` and `pmssConfigTextRows()`;
 array readers retain `pmssConfigLines()` and `pmssConfigRows()`. The text helpers
 share the array parsers' trimming, source indices, internal spacing, inline

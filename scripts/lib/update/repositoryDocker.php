@@ -51,7 +51,7 @@ function pmssEnsureDockerRepository(): void
     // Disable legacy docker.list entries to prevent duplicate targets.
     $legacyList = $sourcesDir.'/docker.list';
     if (($data = @file_get_contents($legacyList)) === false) { return; }
-    $lines = preg_split('/\r?\n/', $data);
+    $lines = pmssTextLines($data);
     $disabled = array_map(static function (string $line): string {
         $trim = ltrim($line);
         return $trim !== '' && $trim[0] !== '#' ? '# PMSS(disable, switched to deb822): '.$line : $line;

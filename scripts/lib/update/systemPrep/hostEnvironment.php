@@ -91,7 +91,7 @@ function pmssEnsureCgroupsConfigured(?callable $logger = null): void
 
     try {
         $procMount = $hidepid = '';
-        foreach (preg_split('/\r?\n/', pmssReadRegularFileContents('/proc/self/mountinfo') ?? '') ?: [] as $l) {
+        foreach (pmssTextLines(pmssReadRegularFileContents('/proc/self/mountinfo') ?? '') as $l) {
             if (preg_match('#\s(/proc)\s#', $l)) {
                 $procMount = $l;
             }

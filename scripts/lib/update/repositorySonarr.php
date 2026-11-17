@@ -101,7 +101,7 @@ function pmssEnsureSonarrKey(): void
             continue;
         }
 
-        $lines = preg_split('/\r?\n/', $content);
+        $lines = pmssTextLines($content);
         $updatedLines = array_map(static function (string $line) use ($keyPath): string {
             return pmssSonarrSourceLineWithSignedBy($line, $keyPath);
         }, $lines);
@@ -109,7 +109,7 @@ function pmssEnsureSonarrKey(): void
             continue;
         }
 
-        // preg_split retains the final empty element, so joining preserves a trailing newline.
+        // The shared splitter retains the final empty element, preserving a trailing newline.
         $updatedContent = implode(PHP_EOL, $updatedLines);
 
         if ($dryRun) {

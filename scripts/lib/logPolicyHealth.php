@@ -82,9 +82,8 @@ function pmssLogPolicyHealthCollect(?callable $read = null, ?int $rootBytes = nu
     $rsyslog = $read('/etc/rsyslog.conf');
     $declarations = [];
     if (is_string($rsyslog)) {
-        foreach (preg_split('/\r?\n/', $rsyslog) as $line) {
-            $line = trim($line);
-            if ($line !== '' && $line[0] !== '#' && strpos($line, 'imklog') !== false) {
+        foreach (pmssConfigTextLines($rsyslog) as $line) {
+            if (strpos($line, 'imklog') !== false) {
                 $declarations[] = $line;
             }
         }

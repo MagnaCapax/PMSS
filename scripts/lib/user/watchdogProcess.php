@@ -105,7 +105,7 @@ function pmssUserWatchdogProcStartTime(string $procRoot, string $pid): ?int
     $stat = (string) @file_get_contents($procRoot.'/'.$pid.'/stat');
     $close = strrpos($stat, ')');
     // Fields after the parenthesised command name start at field 3, so field 22 is index 19.
-    $fields = $close === false ? array() : preg_split('/\s+/', trim(substr($stat, $close + 1)));
+    $fields = $close === false ? array() : pmssConfigLineColumns(substr($stat, $close + 1), 0, []);
     $ticks = isset($fields[19]) ? pmssUnsignedDecimalIntParse($fields[19]) : null;
     $seconds = $ticks === null ? null : intdiv($ticks, 100);
     // Unrepresentable kernel fields or sums retain the existing inode-time fallback.
