@@ -6,7 +6,8 @@ require_once dirname(__DIR__).'/blockDeviceLeaves.php';
 /** Keep block device names argv-safe before passing them to iostat. */
 function pmssDiskIostatDeviceNameIsSafe(string $device): bool
 {
-    return $device !== '' && preg_match('/\A[A-Za-z0-9._+-]+\z/', $device) === 1;
+    // Shell quoting does not stop iostat from treating a leading dash as an option.
+    return $device !== '' && $device[0] !== '-' && preg_match('/\A[A-Za-z0-9._+-]+\z/', $device) === 1;
 }
 
 /**

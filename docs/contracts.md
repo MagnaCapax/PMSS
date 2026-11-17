@@ -1122,6 +1122,11 @@ iptables helpers:
 - `pmssDiskIostatWriteSnapshotFiles()` validates all three output paths before
   writing and returns `false` on a failed or short write. Successful snapshot
   and history bytes retain their existing order and format.
+- `pmssDiskIostatDeviceNameIsSafe()` rejects leading dashes so a device cannot
+  become an iostat option despite shell quoting. `pmssDiskIostatBuildCommand()`
+  retains its existing invalid-device exception before binary lookup or quoting;
+  valid device arguments and command bytes are unchanged. Isolated cases in
+  `DiskIostatDeviceArgumentSafetyTest` run on the testing machine without probes.
 - Customer cgroup readers share ordered counter paths, unsigned/limit parsing,
   and memory fields in `etc/skel/www/scriptsIncCgroup.php`, loaded by
   `scriptsInc.php` (ADRs 0059 and 0099). Page-specific
