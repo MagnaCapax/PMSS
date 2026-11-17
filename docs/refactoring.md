@@ -288,6 +288,15 @@ and serialized field order retain their contracts.
 
 ## Minimal Contract Rules (Joukahainen)
 
+The combined service-port reservation reader clears its completion output before
+either namespace scan begins. A root probe, glob or decoder throwable cannot
+leave a caller's previous successful scan certified; the original throwable
+still propagates. Ordinary port sets, legacy-first ordering, missing-namespace
+policy and completion results remain unchanged (ADR 0183).
+`PortManagerScanCompletionSafetyTest` intercepts filesystem and decoding boundaries
+to cover both namespaces, partial results and exceptions/errors. Execution stays
+on testing machines; devbox verification checks changed PHP syntax only.
+
 Read-only package-state probes reject NUL-containing package names, dpkg field
 names and PCI roots before shell quoting, cache access or filesystem probes.
 Malformed inputs use the existing empty-string/false unavailable results.

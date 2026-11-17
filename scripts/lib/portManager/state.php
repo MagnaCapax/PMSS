@@ -118,6 +118,8 @@ function pmssPortManagerLegacyUsedPorts(string $portsBase = '/var/lib/pmss/ports
  */
 function pmssPortManagerUsedPorts(string $portDir, string $legacyPortsBase = '/var/lib/pmss/ports', ?bool &$scanComplete = null): array
 {
+    // Neither namespace may leave a previous successful scan certified after a fault.
+    $scanComplete = false;
     $used = pmssPortManagerLegacyUsedPorts($legacyPortsBase, $legacyComplete);
     $managed = pmssPortManagerReservationPorts(rtrim($portDir, '/'), '/*', false,
         static function (string $path): ?int { return pmssPortManagerReadAssignedPort($path); }, $managedComplete);
