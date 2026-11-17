@@ -864,11 +864,6 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
     copying; an unreadable existing root cannot be classified as empty.
   - Emits one structured summary log line per locked run with `reason`, `mode`,
     `files_restored`, `duration_ms`, and `preserved_conflict` fields.
-- `scripts/lib/update/users/webRoot.php` retains every migration helper through
-  its account-command, misfiled-copy and move/rollback modules (ADR 0295).
-  Misfiled-copy refusals remove unpublished staging before logging; cleanup faults
-  propagate without retry or a diagnostic, and published copies survive logger
-  faults. Existing paths, command bytes, snapshots and authority checks are preserved.
 - pmssEnsureLingerAndDocker(string $user): void
   - Enables linger + rootless Docker wiring for the user.
   - `lingerEnabled` is an independent, default-off opt-in: when true, maintenance enables linger even if rootless Docker is disabled.

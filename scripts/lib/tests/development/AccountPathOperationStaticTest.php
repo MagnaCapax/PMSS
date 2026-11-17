@@ -141,6 +141,27 @@ final class AccountPathOperationStaticTest extends TestCase
             'Imported source ownership must be normalised before account rename: ');
     }
 
+    public function testWebRootDirectoryMovesRunUnderAccount(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/webRoot.php', [
+            'pmssPathTargetIsSafe($source, true, true)',
+            'pmssPathTargetIsSafe($target, true, true)',
+            'pmssAccountPathRun($user, $home, $paths, $command, $input)',
+            'if ($input !== null) return false;',
+            'pmssUserWebRootMigrationRenameAsAccount($user, $home, $temporary, $target)',
+            'pmssUserWebRootMigrationRenameAsAccount($user, $home, $source, $target)',
+            'pmssUserWebRootMigrationRenameAsAccount($user, $home, $target, $source)',
+            "pmssUserWebRootMigrationRun(\$user, \$home, [\$source],",
+            '&& @rename($source, $target)',
+        ]);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/users/webRootReconcile.php', [
+            'pmssUserWebRootMigrationRenameAsAccount($user, $home, $stage, $www)',
+            'pmssUserWebRootMigrationRun($user, $home, [$target]',
+            'pmssReadRegularFileContents($source)',
+            'strlen($content)',
+        ], ['@rename($stage, $www)']);
+    }
+
     public function testTerminationPurgeUsesPinnedSymlinkRefusingTree(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/termination/commands.php', [
