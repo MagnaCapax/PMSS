@@ -112,8 +112,7 @@ class UpdateBootstrapLockReleaseTest extends TestCase
 
         $this->assertEquals(0, $result['rc'], 'runtime lock fd scan should reject unsafe roots without warnings');
         $payload = $this->pmssDecodeJsonArray($result['output']);
-        $this->assertSame([], $payload['empty']);
-        $this->assertSame([], $payload['nul']);
+        $this->pmssAssertArraySubsetSame(['empty' => [], 'nul' => []], $payload);
     }
 
     public function testRuntimeLockReleaseIgnoresInvalidHandleFailSoft(): void

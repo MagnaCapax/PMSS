@@ -16,8 +16,7 @@ final class AddUserFatalPathCharacterizationTest extends TestCase
         $this->assertStringContainsAllStrings(['FATAL: User already exists; refusing to overwrite', '###ADDUSER:ERROR user=fixtur01'], $result['output']);
         $this->assertTrue(strpos($result['output'], 'FATAL: User already exists; refusing to overwrite') < strpos($result['output'], '###ADDUSER:ERROR user=fixtur01'));
         $this->assertTrue(is_array($result['summary_json']), 'Expected fatal exit to emit a JSON summary line');
-        $this->assertSame('ERROR', $result['summary_json']['status']);
-        $this->assertSame('user_exists', $result['summary_json']['message']);
+        $this->pmssAssertArraySubsetSame(['status' => 'ERROR', 'message' => 'user_exists'], $result['summary_json']);
     }
 
     public function testFatalExitAddsExtraSummaryFieldsToJsonPayload(): void

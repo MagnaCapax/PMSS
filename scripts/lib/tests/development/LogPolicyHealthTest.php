@@ -34,11 +34,9 @@ class LogPolicyHealthTest extends TestCase
     public function testCurrentManagedPoliciesAreHealthyAndPayloadContainsNoConfigContents(): void
     {
         $result = $this->snapshot();
-        $this->assertSame('ok', $result['status']);
-        $this->assertSame([], $result['flags']);
-        $this->assertSame(['logrotate' => 'ok', 'journald' => 'ok', 'rsyslog' => 'ok'], $result['policies']);
-        $this->assertSame(0, $result['snapshot_age_seconds']);
-        $this->assertSame('log_policy_health', $result['event']);
+        $this->pmssAssertArraySubsetSame(['status' => 'ok', 'flags' => [],
+            'policies' => ['logrotate' => 'ok', 'journald' => 'ok', 'rsyslog' => 'ok'],
+            'snapshot_age_seconds' => 0, 'event' => 'log_policy_health'], $result);
         $this->assertSame(false, strpos(json_encode($result), 'module('));
     }
 

@@ -186,8 +186,8 @@ PHP;
     {
         $combined = 'Disk quotas for user fixtur01 (uid 1000):'."\n /dev/example 310K 20K 30K 6 0 0\n";
         $observed = $this->observe(['aggregate_report' => ['rc' => 0, 'lines' => explode("\n", rtrim($combined, "\n")), 'timed_out' => false]]);
-        $this->assertSame(['root', self::USER, $combined], $observed[1][3]);
-        $this->assertSame(['display', self::PATH, $combined], $observed[1][4]);
+        $this->pmssAssertArraySubsetSame([3 => ['root', self::USER, $combined],
+            4 => ['display', self::PATH, $combined]], $observed[1]);
         $observed = $this->observe(['aggregate_report' => ['rc' => 2, 'lines' => [], 'timed_out' => true]]);
         $this->assertSame(false, $observed[0]);
         foreach ($observed[1] as $call) $this->assertFalse(in_array($call[0], ['root', 'display'], true));

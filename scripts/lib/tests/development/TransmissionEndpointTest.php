@@ -62,8 +62,7 @@ PHP;
         $result = $this->request($home, 'start');
         $this->assertSame(200, $result['status']);
         $this->assertFalse(is_file($home.'/.transmissionDisable'));
-        $this->assertSame('launch', $result['calls'][0][0]);
-        $this->assertSame(false, $result['calls'][0][1]);
+        $this->pmssAssertArraySubsetSame([0 => 'launch', 1 => false], $result['calls'][0]);
         $this->assertStringContainsString(escapeshellarg($home.'/www/torrentClientsResolve.php')
             .' transmission --launch', $result['calls'][0][2]);
         // The panel's PHP process has no account HOME; the resolver CLI needs it.
