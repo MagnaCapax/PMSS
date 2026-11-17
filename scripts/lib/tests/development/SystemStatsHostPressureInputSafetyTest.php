@@ -22,22 +22,20 @@ class SystemStatsHostPressureInputSafetyTest extends TestCase
         };
         $incomplete = unserialize('O:8:"stdClass":0:{}', ['allowed_classes' => false]);
 
-        set_error_handler(static function (int $severity, string $message, string $file, int $line): void {
-            throw new \ErrorException($message, 0, $severity, $file, $line);
-        });
         try {
-            foreach ([[], ['1/2/3/4/5/6.5/7/8'], new \stdClass(), $stringable, $throwing,
-                $incomplete, $stream, $closedStream] as $value) {
-                // One unavailable source must not discard the valid sibling or reorder fields.
-                $this->assertSame([
-                    'timestamp' => 42, 'psi_io_full_avg300' => null, 'ioping_home_ms' => 123.4,
-                ], \pmssSystemStatsHostPressurePayloadBuild(['psiIo' => $value, 'iopingHome' => '123.4ms'], 42));
-                $this->assertSame([
-                    'timestamp' => 42, 'psi_io_full_avg300' => 6.5, 'ioping_home_ms' => null,
-                ], \pmssSystemStatsHostPressurePayloadBuild(['psiIo' => '1/2/3/4/5/6.5/7/8', 'iopingHome' => $value], 42));
-            }
+            $this->pmssAssertNoPhpWarnings(function () use ($stringable, $throwing, $incomplete, $stream, $closedStream): void {
+                foreach ([[], ['1/2/3/4/5/6.5/7/8'], new \stdClass(), $stringable, $throwing,
+                    $incomplete, $stream, $closedStream] as $value) {
+                    // One unavailable source must not discard the valid sibling or reorder fields.
+                    $this->assertSame([
+                        'timestamp' => 42, 'psi_io_full_avg300' => null, 'ioping_home_ms' => 123.4,
+                    ], \pmssSystemStatsHostPressurePayloadBuild(['psiIo' => $value, 'iopingHome' => '123.4ms'], 42));
+                    $this->assertSame([
+                        'timestamp' => 42, 'psi_io_full_avg300' => 6.5, 'ioping_home_ms' => null,
+                    ], \pmssSystemStatsHostPressurePayloadBuild(['psiIo' => '1/2/3/4/5/6.5/7/8', 'iopingHome' => $value], 42));
+                }
+            });
         } finally {
-            restore_error_handler();
             fclose($stream);
         }
     }

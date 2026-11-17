@@ -743,6 +743,12 @@ callers retain file guards, schema checks, and missing/malformed-data fallbacks.
 
 ## Helper Extraction Rules
 
+Warning-free input fixtures share `pmssAssertNoPhpWarnings()` for PHP error-handler
+installation, capture and restoration. Keep malformed inputs and expected values
+at the callers. Every captured warning fails the shared empty-capture assertion;
+callback exceptions still propagate after handler restoration. Stream cleanup
+stays outside the callback when it must run after the handler is restored.
+
 Operator path-occupancy checks share `pmssPathExistsOrLink()` so dangling links
 still count as occupied. Keep type, owner, parent and operation guards at callers.
 

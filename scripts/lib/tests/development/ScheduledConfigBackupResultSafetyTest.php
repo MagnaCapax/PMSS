@@ -9,10 +9,7 @@ class ScheduledConfigBackupResultSafetyTest extends TestCase
 {
     public function testConsumedContainersUseInvalidOutputWithoutConversionWarnings(): void
     {
-        set_error_handler(static function (int $severity, string $message, string $file, int $line): void {
-            throw new \ErrorException($message, 0, $severity, $file, $line);
-        });
-        try {
+        $this->pmssAssertNoPhpWarnings(function (): void {
             foreach (['ok', 'message', 'bytes', 'path', 'keptCount', 'deletedCount'] as $field) {
                 foreach ([[], ['private fixture value'], new \stdClass(), (object) ['nested' => true]] as $value) {
                     foreach ([0, 1, 124] as $rc) {
@@ -27,9 +24,7 @@ class ScheduledConfigBackupResultSafetyTest extends TestCase
                     }
                 }
             }
-        } finally {
-            restore_error_handler();
-        }
+        });
     }
 
     public function testScalarConversionsNullDefaultsAndExtensionFieldsStayCompatible(): void

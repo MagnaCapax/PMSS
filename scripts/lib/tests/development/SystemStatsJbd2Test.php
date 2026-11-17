@@ -178,10 +178,7 @@ class SystemStatsJbd2Test extends TestCase
     {
         [$mountinfo, $sys, $jbd2] = $this->fixtureTree(self::MOUNTINFO);
         $paths = [$mountinfo, $sys, $jbd2];
-        set_error_handler(static function (int $severity, string $message, string $file, int $line): void {
-            throw new \ErrorException($message, 0, $severity, $file, $line);
-        });
-        try {
+        $this->pmssAssertNoPhpWarnings(function () use ($paths): void {
             foreach ($paths as $index => $path) {
                 // Check leading, embedded and trailing corruption for every filesystem boundary.
                 foreach (["\0".$path, $path."\0/extra", $path."\0"] as $invalid) {
@@ -192,9 +189,7 @@ class SystemStatsJbd2Test extends TestCase
             }
             // Refusing a corrupt path must not change an ordinary successful observation.
             $this->assertSame('5/2/0/0/3472/0/0/0/2602', \pmssSystemStatsJbd2HomeRead(...$paths));
-        } finally {
-            restore_error_handler();
-        }
+        });
     }
 
     public function testReadKeepsParserDegradationForMalformedInfo(): void

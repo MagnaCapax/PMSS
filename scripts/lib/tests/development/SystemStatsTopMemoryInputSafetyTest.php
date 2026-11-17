@@ -21,25 +21,23 @@ class SystemStatsTopMemoryInputSafetyTest extends TestCase
         };
         $incomplete = unserialize('O:8:"stdClass":0:{}', ['allowed_classes' => false]);
 
-        set_error_handler(static function (int $severity, string $message, string $file, int $line): void {
-            throw new \ErrorException($message, 0, $severity, $file, $line);
-        });
         try {
-            foreach ([null, [], ['fixture03 123'], new \stdClass(), $stringable, $throwing,
-                $incomplete, $stream, $closedStream] as $value) {
-                $this->assertSame('na', \pmssSystemStatsTopMemoryFromPsRows([$value]));
-                // Invalid entries cannot discard, reorder or replace valid siblings.
-                $rows = ['fixture01 0', $value, 'fixture02 1024'];
-                $this->assertSame('fixture01:0K,fixture02:1.0M', \pmssSystemStatsTopMemoryFromPsRows($rows));
-                $this->assertSame('fixture01:0K,fixture02:1.0M', \pmssSystemStatsTopMemoryProcesses(
-                    static function (array &$output, int &$rc) use ($rows): void {
-                        $output = $rows;
-                        $rc = 0;
-                    }
-                ));
-            }
+            $this->pmssAssertNoPhpWarnings(function () use ($stringable, $throwing, $incomplete, $stream, $closedStream): void {
+                foreach ([null, [], ['fixture03 123'], new \stdClass(), $stringable, $throwing,
+                    $incomplete, $stream, $closedStream] as $value) {
+                    $this->assertSame('na', \pmssSystemStatsTopMemoryFromPsRows([$value]));
+                    // Invalid entries cannot discard, reorder or replace valid siblings.
+                    $rows = ['fixture01 0', $value, 'fixture02 1024'];
+                    $this->assertSame('fixture01:0K,fixture02:1.0M', \pmssSystemStatsTopMemoryFromPsRows($rows));
+                    $this->assertSame('fixture01:0K,fixture02:1.0M', \pmssSystemStatsTopMemoryProcesses(
+                        static function (array &$output, int &$rc) use ($rows): void {
+                            $output = $rows;
+                            $rc = 0;
+                        }
+                    ));
+                }
+            });
         } finally {
-            restore_error_handler();
             fclose($stream);
         }
     }

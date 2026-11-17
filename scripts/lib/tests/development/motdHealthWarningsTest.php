@@ -33,17 +33,12 @@ class MotdHealthWarningsTest extends TestCase
                 ['kind' => 'smart', 'device' => '/dev/sda', 'flags' => ['udma_crc_increase']],
             ]);
             // Also fail on warnings: malformed labels must never leak "Array" into the MOTD.
-            set_error_handler(static function ($severity, $message, $file, $line): void {
-                throw new \ErrorException($message, 0, $severity, $file, $line);
-            });
-            try {
+            $this->pmssAssertNoPhpWarnings(function () use ($log): void {
                 $this->pmssWithEnv(['PMSS_HEALTH_LOG_PATH' => $log], function (): void {
                     $this->assertSame('RAID md0: degraded | NVMe critical warning: /dev/nvme0n1 | SATA UDMA CRC increased: /dev/sda',
                         \pmssMotdStorageWarnings());
                 });
-            } finally {
-                restore_error_handler();
-            }
+            });
         }
     }
 
