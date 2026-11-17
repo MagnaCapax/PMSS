@@ -31,8 +31,7 @@ final class MediaStackPortManagerTest extends TestCase
 
         $ports = \pmssMediaStackPortsEnsure($this->user, $this->home);
 
-        $this->assertSame(23001, $ports['sabnzbd']);
-        $this->assertSame(23002, $ports['radarr']);
+        $this->pmssAssertArraySubsetSame(['sabnzbd' => 23001, 'radarr' => 23002], $ports);
         $this->assertSame('23001', file_get_contents($this->home.'/.media-stack-port-sabnzbd'));
         $this->assertSame('23002', file_get_contents($this->home.'/.media-stack-port-radarr'));
     }

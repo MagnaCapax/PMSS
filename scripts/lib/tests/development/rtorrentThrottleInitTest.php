@@ -33,8 +33,7 @@ class RtorrentThrottleInitTest extends TestCase
 
         $result = $this->pmssExecArgvCommand([PHP_BINARY, $script]);
 
-        $this->assertSame(1, $result['rc']);
-        $this->assertSame('', $result['output']);
+        $this->pmssAssertArraySubsetSame(['rc' => 1, 'output' => ''], $result);
     }
 
     public function testStartupHelperPreservesCustomNamedThrottleDefinitions(): void

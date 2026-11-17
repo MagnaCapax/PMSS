@@ -11,8 +11,7 @@ final class ArchiveListingPathSafetyTest extends TestCase
         $paths = ['', "\0", "\0/fixture/archive", "/fixture/archive\0",
             "/fixture/archive\0suffix", "/fixture\0/archive"];
         $result = $this->fixture($paths);
-        $this->assertSame(array_fill(0, count($paths), [false, [], false]), $result['results']);
-        $this->assertSame([], $result['calls']);
+        $this->pmssAssertArraySubsetSame(['results' => array_fill(0, count($paths), [false, [], false]), 'calls' => []], $result);
     }
 
     public function testValidFilenameBytesAndListingCommandsArePreserved(): void

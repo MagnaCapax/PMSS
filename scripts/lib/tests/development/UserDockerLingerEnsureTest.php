@@ -13,18 +13,16 @@ class UserDockerLingerEnsureTest extends TestCase
 {
     public function testLingerEnsureCommandsEnableLingerThenStartUserManager(): void
     {
-        $cmds = \pmssUserDockerLingerEnsureCommands('fixtur01', 1057);
         $this->assertSame([
             "loginctl enable-linger 'fixtur01'",
             'systemctl start user@1057.service',
-        ], $cmds);
+        ], \pmssUserDockerLingerEnsureCommands('fixtur01', 1057));
     }
 
     public function testLingerEnsureCommandsShellEscapeUsername(): void
     {
-        $cmds = \pmssUserDockerLingerEnsureCommands('fixtur01; rm -rf /', 42);
-        $this->assertSame("loginctl enable-linger 'fixtur01; rm -rf /'", $cmds[0]);
-        $this->assertSame('systemctl start user@42.service', $cmds[1]);
+        $this->pmssAssertArraySubsetSame([0 => "loginctl enable-linger 'fixtur01; rm -rf /'", 1 => 'systemctl start user@42.service'],
+            \pmssUserDockerLingerEnsureCommands('fixtur01; rm -rf /', 42));
     }
 
     public function testUserDockerStartPathWiresLingerEnsureBeforeDaemonStart(): void

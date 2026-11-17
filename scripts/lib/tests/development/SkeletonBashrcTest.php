@@ -47,8 +47,7 @@ BASH;
                 .' /bin/bash --noprofile --norc -c '.escapeshellarg($script).' bash '
                 .escapeshellarg($this->pmssRepoPath('etc/skel/.bashrc'))
             );
-            $this->assertSame(0, $result['rc']);
-            $this->assertSame($expected."\n0077", $result['output']);
+            $this->pmssAssertArraySubsetSame(['rc' => 0, 'output' => $expected."\n0077"], $result);
         }
     }
 }
