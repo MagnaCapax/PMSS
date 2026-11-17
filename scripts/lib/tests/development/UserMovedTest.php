@@ -127,7 +127,7 @@ PHP;
         $this->assertSame(0, $rc);
         $this->assertSame(['rtorrent', 'mvdtst', 9], $events[0]);
         $this->assertSame(['lighttpd', 'php-cgi', 'deluged', 'deluge-web', 'qbittorrent-nox', 'rclone', 'transmission-daemon', 'slskd'], $events[1][1]);
-        $this->assertSame(['stop_sonarr', "account:mvdtst tmux kill-session -t '=sonarr'"], $events[2]);
-        $this->assertSame(['stop_docker', "php '/scripts/util/userDocker.php' 'mvdtst' 'stop'"], $events[3]);
+        $this->pmssAssertArraySubsetSame([2 => ['stop_sonarr', "account:mvdtst tmux kill-session -t '=sonarr'"],
+            3 => ['stop_docker', "php '/scripts/util/userDocker.php' 'mvdtst' 'stop'"]], $events);
     }
 }

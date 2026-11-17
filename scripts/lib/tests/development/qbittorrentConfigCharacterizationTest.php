@@ -43,11 +43,9 @@ final class QbittorrentConfigCharacterizationTest extends TestCase
         $this->assertTrue(\pmssUpdateQbittorrentPassword('fixtur01', 'secret'));
 
         $lines = explode("\n", rtrim((string) file_get_contents($configPath), "\n"));
-        $this->assertSame('[Preferences]', $lines[0]);
-        $this->assertSame('Locale=en', $lines[1]);
+        $this->pmssAssertArraySubsetSame([0 => '[Preferences]', 1 => 'Locale=en'], $lines);
         $this->assertMatches('/^WebUI\\\\Password_PBKDF2=@ByteArray\([A-Za-z0-9+\/=]+:[A-Za-z0-9+\/=]+\)$/', $lines[2]);
-        $this->assertSame('', $lines[3]);
-        $this->assertSame('[BitTorrent]', $lines[4]);
+        $this->pmssAssertArraySubsetSame([3 => '', 4 => '[BitTorrent]'], $lines);
     }
 
     public function testPasswordSyncAsCurrentAccountUpdatesConfig(): void

@@ -27,8 +27,8 @@ final class PikkumiesPanelTest extends TestCase
         $home = $this->fixture();
         $state = $this->state($home);
         $this->assertTrue($state['visible']);
-        $this->assertSame('simplified', $state['mode']);
-        $this->assertSame('https://'.substr(hash('sha256', 'mcx.fi:service:123'), 0, 16).'.mcx.fi:844', $state['origin']);
+        $this->pmssAssertArraySubsetSame(['mode' => 'simplified',
+            'origin' => 'https://'.substr(hash('sha256', 'mcx.fi:service:123'), 0, 16).'.mcx.fi:844'], $state);
     }
 
     public function testMissingMarkerOrBillingHidesTheTab(): void

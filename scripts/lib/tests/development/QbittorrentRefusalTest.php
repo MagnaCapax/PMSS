@@ -111,8 +111,7 @@ PHP
             'qBittorrent did not start: its settings file could not be updated. Check that ~/.config/qBittorrent is writable, then start it again.'] as $message) {
             $this->pmssWriteFile($home.'/.config/pmss/torrentClients/qbittorrent.notice', $message."\n");
             $result = $this->pmssExecArgvCommand([PHP_BINARY, $home.'/www/qbittorrent.php'], [], '');
-            $this->assertSame(0, $result['rc']);
-            $this->assertSame([json_encode(['message' => $message]).'status=409'], $result['lines']);
+            $this->pmssAssertArraySubsetSame(['rc' => 0, 'lines' => [json_encode(['message' => $message]).'status=409']], $result);
         }
     }
 }

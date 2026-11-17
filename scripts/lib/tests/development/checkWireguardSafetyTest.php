@@ -17,17 +17,16 @@ class CheckWireguardSafetyTest extends TestCase
         $configPath = $this->pmssMakeNamedTempDir('pmss-check-wireguard-', 0700).'/wg0.conf';
         file_put_contents(
             $configPath,
-            "# user=alice\n"
+            "# user=fixtur01\n"
             ."# user=bad.name\n"
-            ."# user=bob\n"
-            ."# user=alice\n"
+            ."# user=fixtur02\n"
+            ."# user=fixtur01\n"
             ."# user=toolongname\n"
         );
 
         $result = \pmssWireguardPeerUsersFromConfig($configPath);
 
-        $this->assertSame('ok', $result['status']);
-        $this->assertSame(['alice', 'bob'], $result['users']);
+        $this->pmssAssertArraySubsetSame(['status' => 'ok', 'users' => ['fixtur01', 'fixtur02']], $result);
     }
 
     public function testPeerUserParserReportsUnavailableConfigStates(): void
@@ -40,8 +39,7 @@ class CheckWireguardSafetyTest extends TestCase
             [$nonRegularConfig, 'not_regular'],
         ] as [$path, $status]) {
             $result = \pmssWireguardPeerUsersFromConfig($path);
-            $this->assertSame($status, $result['status']);
-            $this->assertSame([], $result['users']);
+            $this->pmssAssertArraySubsetSame(['status' => $status, 'users' => []], $result);
         }
     }
 
@@ -59,8 +57,7 @@ class CheckWireguardSafetyTest extends TestCase
 
         $result = \pmssWireguardPeerPublicKeysFromConfig($configPath);
 
-        $this->assertSame('ok', $result['status']);
-        $this->assertSame([$this->validPeerA, $this->validPeerB], $result['keys']);
+        $this->pmssAssertArraySubsetSame(['status' => 'ok', 'keys' => [$this->validPeerA, $this->validPeerB]], $result);
     }
 
     public function testUserPublicKeyReaderRejectsUnsafeBoundaries(): void
@@ -68,16 +65,16 @@ class CheckWireguardSafetyTest extends TestCase
         $homeBase = $this->pmssMakeNamedTempDir('pmss-check-wireguard-home-', 0700);
         $outsideDir = $this->pmssMakeNamedTempDir('pmss-check-wireguard-outside-', 0700);
         $unsafeUser = '../'.basename($outsideDir);
-        $this->pmssWriteFile($homeBase.'/alice/.wireguard-public-key', " \n # ignored\n ; ignored\n ".$this->validPeerA." \n".$this->validPeerA."\n", 0700);
+        $this->pmssWriteFile($homeBase.'/fixtur01/.wireguard-public-key', " \n # ignored\n ; ignored\n ".$this->validPeerA." \n".$this->validPeerA."\n", 0700);
         $this->pmssWriteFile($outsideDir.'/.wireguard-public-key', $this->validPeerB."\n", 0700);
 
         $this->pmssWithEnv(['PMSS_WG_HOME_BASE' => $homeBase], function () use ($homeBase, $outsideDir, $unsafeUser): void {
-            $this->assertSame([$this->validPeerA], \wgReadUserPublicKeys('alice'));
+            $this->assertSame([$this->validPeerA], \wgReadUserPublicKeys('fixtur01'));
             $this->assertSame([], \wgReadUserPublicKeys($unsafeUser));
 
-            $this->assertTrue(@unlink($homeBase.'/alice/.wireguard-public-key'));
-            $this->assertTrue(@symlink($outsideDir.'/.wireguard-public-key', $homeBase.'/alice/.wireguard-public-key'));
-            $this->assertSame([], \wgReadUserPublicKeys('alice'));
+            $this->assertTrue(@unlink($homeBase.'/fixtur01/.wireguard-public-key'));
+            $this->assertTrue(@symlink($outsideDir.'/.wireguard-public-key', $homeBase.'/fixtur01/.wireguard-public-key'));
+            $this->assertSame([], \wgReadUserPublicKeys('fixtur01'));
         });
     }
 

@@ -41,33 +41,32 @@ class UsageAlertsTest extends TestCase
         $stateDir = $this->pmssMakeTempDir('pmss-usage-alert-state-');
         $active = ['traffic' => 'traffic warning', 'disk' => 'disk warning'];
 
-        $this->assertSame($active, \pmssUsageAlertsNewConditions('alice', $active, $stateDir));
-        $this->assertTrue(\pmssUsageAlertsStateRecord('alice', ['traffic' => $active['traffic']], $stateDir));
-        $this->assertSame(['disk' => 'disk warning'], \pmssUsageAlertsNewConditions('alice', $active, $stateDir));
-        \pmssUsageAlertsStateClear('alice', ['disk' => 'disk warning'], $stateDir);
-        $this->assertFalse(file_exists($stateDir.'/alice.traffic'));
-        $this->assertSame($active, \pmssUsageAlertsNewConditions('alice', $active, $stateDir));
+        $this->assertSame($active, \pmssUsageAlertsNewConditions('fixtur01', $active, $stateDir));
+        $this->assertTrue(\pmssUsageAlertsStateRecord('fixtur01', ['traffic' => $active['traffic']], $stateDir));
+        $this->assertSame(['disk' => 'disk warning'], \pmssUsageAlertsNewConditions('fixtur01', $active, $stateDir));
+        \pmssUsageAlertsStateClear('fixtur01', ['disk' => 'disk warning'], $stateDir);
+        $this->assertFalse(file_exists($stateDir.'/fixtur01.traffic'));
+        $this->assertSame($active, \pmssUsageAlertsNewConditions('fixtur01', $active, $stateDir));
     }
 
     public function testStatePathsRejectUnknownKeysAndInvalidUsers(): void
     {
-        $this->assertSame(null, \pmssUsageAlertsStatePath('../alice', 'traffic', '/tmp/state'));
-        $this->assertSame(null, \pmssUsageAlertsStatePath('alice', 'unknown', '/tmp/state'));
-        $this->assertSame('/tmp/state/alice.disk', \pmssUsageAlertsStatePath('alice', 'disk', '/tmp/state'));
+        $this->assertSame(null, \pmssUsageAlertsStatePath('../fixtur01', 'traffic', '/tmp/state'));
+        $this->assertSame(null, \pmssUsageAlertsStatePath('fixtur01', 'unknown', '/tmp/state'));
+        $this->assertSame('/tmp/state/fixtur01.disk', \pmssUsageAlertsStatePath('fixtur01', 'disk', '/tmp/state'));
     }
 
     public function testEnvelopeContainsOnlyCustomerFacingDetails(): void
     {
         $envelope = \pmssUsageAlertEnvelopeBuild(
-            'alice',
-            'alice@example.com',
+            'fixtur01',
+            'fixtur01@example.com',
             ['traffic' => 'Traffic usage is 80.0% of the monthly allowance.'],
             'host.example.com'
         );
 
-        $this->assertSame('usage-alerts@host.example.com', $envelope['from']);
-        $this->assertSame('alice@example.com', $envelope['to']);
-        $this->assertStringContainsString('Subject: [PMSS Usage Alert] account alice', $envelope['data']);
+        $this->pmssAssertArraySubsetSame(['from' => 'usage-alerts@host.example.com', 'to' => 'fixtur01@example.com'], $envelope);
+        $this->assertStringContainsString('Subject: [PMSS Usage Alert] account fixtur01', $envelope['data']);
         $this->assertStringContainsString('Traffic usage is 80.0%', $envelope['data']);
         $this->assertStringNotContainsString('/home/', $envelope['data']);
     }

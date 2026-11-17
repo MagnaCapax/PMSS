@@ -53,8 +53,7 @@ final class QbittorrentWebUiSectionTest extends TestCase
             $updated = $write($config, 'Preferences', 'WebUI\\Port', '23456');
             $values = \pmssQbittorrentConfigValues($updated);
             $this->assertSame('23456', $values['Preferences']['WebUI\\Port']);
-            $this->assertSame('23456', $values['WebUI']['Port']);
-            $this->assertSame('/custom', $values['WebUI']['RootFolder']);
+            $this->pmssAssertArraySubsetSame(['Port' => '23456', 'RootFolder' => '/custom'], $values['WebUI']);
             $this->assertSame('11', $values['Meta']['MigrationVersion']);
         }
     }
@@ -74,9 +73,8 @@ final class QbittorrentWebUiSectionTest extends TestCase
         $forced = \pmssQbittorrentWebUiAuthForce($modern.'Password_PBKDF2=owner');
         $values = \pmssQbittorrentConfigValues($forced);
         foreach (['WebUI' => '', 'Preferences' => 'WebUI\\'] as $section => $prefix) {
-            $this->assertSame('owner', $values[$section][$prefix.'Password_PBKDF2']);
-            $this->assertSame('true', $values[$section][$prefix.'LocalHostAuth']);
-            $this->assertSame('false', $values[$section][$prefix.'AuthSubnetWhitelistEnabled']);
+            $this->pmssAssertArraySubsetSame([$prefix.'Password_PBKDF2' => 'owner',
+                $prefix.'LocalHostAuth' => 'true', $prefix.'AuthSubnetWhitelistEnabled' => 'false'], $values[$section]);
         }
         $this->assertStringNotContainsString(\pmssQbittorrentWebUiAuthSentinel(), $forced);
     }
