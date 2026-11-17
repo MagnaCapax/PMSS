@@ -14,7 +14,7 @@ class UserTrafficRemoteCompatibilityTest extends TestCase
                 'serialize($userTrafficData)',
                 'Output contract (STDOUT only, no banners/warnings):',
                 'array<string,array{normal:int,local:int,ingress:int}>',
-                'Hallinta callback path expects an unserialize()-compatible payload after trim()',
+                'The caller expects an unserialize()-compatible payload after trim()',
                 'Leading newlines are allowed; any other STDOUT bytes, and anything written',
                 'Do not call /scripts/listUsers.php from this callback producer.',
             ],

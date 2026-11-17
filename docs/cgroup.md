@@ -338,7 +338,7 @@ preserving zero and valid positive counters and epochs.
 On solid-state `/home` (`ssd`, `nvme`) multiplier steps follow a band of
 `ssdLatencyLowX` (5) to `ssdLatencyHighX` (10) times a reference latency
 (ADR 0237). The reference is the higher of the service group's median weekly
-`/home` latency, which the brain sends once a day as the fifth argument of
+`/home` latency, passed at most once a day as the optional fifth argument of
 `/scripts/util/remote/fleetCompare.php` (`groupIopingMs` in
 `/var/lib/pmss/public/fleetCompare.json`, used for three days), and the disk's
 own quiet floor, `ioping_floor_ms` in `/var/run/pmss/io-ceiling.json` (the

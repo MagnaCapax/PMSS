@@ -45,8 +45,8 @@ function pmssDynamicIopsPressure(iterable $samples, int $now): array
 }
 
 /**
- * Solid-state latency reference (ADR 0237): the service group's median read latency, delivered daily by the
- * brain into fleetCompare.json and used for three days, or this disk's own quiet floor when that is higher.
+ * Solid-state latency reference (ADR 0237): the service group's median read latency, passed daily to
+ * fleetCompare.php into fleetCompare.json and used for three days, or this disk's own quiet floor when that is higher.
  * A disk that answers slowly even when idle is judged against itself, not braked for its hardware.
  */
 function pmssDynamicIopsLatencyReference(?array $fleetCompare, ?float $ownFloor, int $now): ?float

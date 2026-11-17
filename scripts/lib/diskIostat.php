@@ -4,7 +4,7 @@
  *
  * The cron entry remains intentionally small while this library owns device
  * filtering, shell-boundary construction, parser compatibility, and checked
- * writes for the files consumed by hallinta.
+ * writes for the files read by outside statistics collectors.
  *
  * @license GPL-3.0-only
  * @author PMSS Team

@@ -1512,7 +1512,7 @@ function pmssWelcomeHomeServerMetricHtmlBuild($uptimePath = '/proc/uptime')
 }
 
 /**
- * Where this server stands (ADR 0227). Own figures: the brain's daily push (tier, psi, svcMs, ts) in $ownJson. Reference average: the
+ * Where this server stands (ADR 0227). Own figures: the daily fleetCompare.php input (tier, psi, svcMs, ts) in $ownJson. Reference average: the
  * public fleet-performance feed in $feedJson, the server's tier row, or the fleet-wide row when the tier is unknown or not reporting.
  * Null (no card) unless both are well formed and at most 48 hours old.
  * @return array{psi:float,svcMs:float,psiFleet:float,svcMsFleet:float,tier:bool}|null

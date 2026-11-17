@@ -7,8 +7,8 @@ require_once __DIR__.'/sample.php';
  * Read node-level I/O pressure (PSI) full avg300 from /proc/pressure/io.
  *
  * full_avg300 = percentage of the last 300s that ALL non-idle tasks were stalled
- * on I/O — the sustained saturation signal consumed by hallinta's oversale gate.
- * Returns null when PSI is unavailable (kernel <4.20 / CONFIG_PSI=n) so the brain
+ * on I/O — the sustained saturation signal read by outside capacity checks.
+ * Returns null when PSI is unavailable (kernel <4.20 / CONFIG_PSI=n) so a reader
  * treats it as "no signal" and falls back to its other gates (fail-safe: a missing
  * value must never gate provisioning closed).
  *
@@ -22,12 +22,12 @@ function pmssDiskIostatReadPsiFullAvg300(string $psiPath = '/proc/pressure/io'):
 }
 
 /**
- * Read median ioping latency to /home in milliseconds for hallinta's I/O-health gate.
+ * Read median ioping latency to /home in milliseconds for outside I/O-health checks.
  *
  * Reuses the canonical pmssSystemStatsIopingMs() probe (DRY) rather than parsing it
  * positionally out of system-stats.log (which would reintroduce the column-shift
  * fragility class). Returns null when ioping is unavailable or the probe yields 'na'
- * so the brain treats a missing measurement as no-signal (fail-safe — never gates
+ * so a reader treats a missing measurement as no-signal (fail-safe — never gates
  * provisioning on an absent value, in EITHER direction).
  *
  * @return float|null

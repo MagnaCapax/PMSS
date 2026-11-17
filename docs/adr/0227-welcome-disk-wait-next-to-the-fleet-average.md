@@ -12,24 +12,24 @@ The Welcome tab shows the account's own usage. It does not show where the server
 stands against the other servers of its plan family (GH #1191, the first step of
 balancing load by showing it). The averages already exist: the public
 fleet-performance feed (`https://pulsedmedia.com/data/v1/fleet-performance.json`,
-built from the hallinta brain's `statsNodeIostat`, per public tier and fleet-wide).
+built outside PMSS from each node's disk statistics, per public tier and fleet-wide).
 A node knows neither its own weekly figures in the feed's definitions nor its public
 tier name, so it cannot pick the right row on its own.
 
 ## Options Considered
 
-- The brain computes per-server-group averages and pushes them to every node: a
+- An outside caller computes per-server-group averages and pushes them to every node: a
   second source of averages that can disagree with the public page.
 - The node derives its own figures from its logs: different definitions than the feed.
-- The brain pushes only the node's own figures and its public tier name; the page
+- An outside caller passes only the node's own figures and its public tier name; the page
   reads the averages from the public feed through the pinned, cached fetch (chosen).
 
 ## Decision
 
-The brain queues, at most once a day per allowlisted node, one command:
+PMSS accepts, at most once a day, one command from an outside caller:
 `php /scripts/util/remote/fleetCompare.php <tier|-> <ownPsi> <ownSvcMs> <unixTs>`
 (PSI full over the past week as percent of time and response time in milliseconds,
-both from the node's own `statsNodeIostat` row; the tier is the public tier name or
+both the node's own weekly figures in the feed's definitions; the tier is the public tier name or
 `-`). `fleetCompare.php` takes exactly those four arguments, refuses anything that
 does not match its strict patterns (and a 10-digit timestamp) with exit 2 before
 writing, refuses a symlinked target, and writes `/var/lib/pmss/public/fleetCompare.json`

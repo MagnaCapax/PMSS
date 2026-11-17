@@ -1,7 +1,7 @@
 #!/usr/bin/env php
 <?php
 /**
- * Utility script: user traffic callback payload for Hallinta automation.
+ * Utility script: user traffic payload for outside callers.
  *
  * Output contract (STDOUT only, no banners/warnings):
  * - Exactly one PHP serialized array: array<string,array{normal:int,local:int,ingress:int}>
@@ -12,7 +12,7 @@
  *   caller's read timeout. The heartbeat stops before the payload is written.
  *
  * Consumer contract:
- * - Hallinta callback path expects an unserialize()-compatible payload after trim()
+ * - The caller expects an unserialize()-compatible payload after trim()
  * - Leading newlines are allowed; any other STDOUT bytes, and anything written
  *   after the payload, can break callback parsing
  *

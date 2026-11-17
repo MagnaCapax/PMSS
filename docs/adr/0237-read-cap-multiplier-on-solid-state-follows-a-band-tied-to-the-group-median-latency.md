@@ -28,7 +28,7 @@ to place a band on.
 - A fixed millisecond band for all solid state: groups differ about three-fold in
   median latency, so one band is too loose for some and too tight for others;
   rejected.
-- The brain's placement-gate reference (group median floored at the fleet
+- An outside placement reference (group median floored at the fleet
   median): on every solid-state group the floor wins, which is the fixed band
   above; rejected.
 - A multiple of the group median alone: the slow-hardware nodes sit far above
@@ -41,7 +41,7 @@ to place a band on.
 ## Decision
 - Settings `ssdLatencyLowX` (5) and `ssdLatencyHighX` (10) in
   `cgroup.dynamicIops`; low at least 1, below high, high at most 1000.
-- Group median: the brain sends the median `iopingWeek` of the enabled nodes in
+- Group median: an outside caller may pass the median weekly `/home` latency of the nodes in
   the node's service group as an optional fifth argument of the daily
   `/scripts/util/remote/fleetCompare.php` row; it is stored as `groupIopingMs`
   in `/var/lib/pmss/public/fleetCompare.json` and used for three days. Four
@@ -65,8 +65,8 @@ to place a band on.
   with solid-state hosts under load.
 - A node that is saturated nearly all week raises its own floor and loosens
   its band; the group median does not prevent that.
-- The brain does not know a node's media: a solid-state node in a group of
+- The caller does not know a node's media: a solid-state node in a group of
   mostly hard disks gets the hard-disk median, a loose band, and caps at the
   idle multiplier, the pre-cap behaviour.
-- Until the brain sends the fifth argument, solid-state nodes steer against
+- Without the fifth argument, solid-state nodes steer against
   their own floor.

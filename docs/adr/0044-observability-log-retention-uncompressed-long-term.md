@@ -97,7 +97,7 @@ the operator wants kept. Corrected decision:
   user/*.log + users/*.log, and the cron **stdout-capture** `*.log` files (cpuStat.log,
   systemStatsLog.log, iostatLog.log, metricsLog.log, trafficStats.log, …). Note:
   `trafficStats.log` is a cron stdout capture, NOT the traffic metric — the canonical
-  per-user traffic metric lives in `~/.trafficData` and hallinta `nodeUserTraffic`, neither
+  per-user traffic metric lives in `~/.trafficData` and the output of `scripts/util/remote/userTraffic.php`, neither
   in this template — so it is deliberately left in its operational bundle.
 
 ### Disk-cost accounting (Munger check — surfaced to operator)
@@ -106,7 +106,7 @@ scales with user count), then `iostat-history-raw.log` (~0.3 GB/yr) and `process
 (~0.1–0.5 GB/yr) → **~1.5–2 GB/yr/node total**. Safe on a normal root partition for well
 over a decade; realistic node lifetimes (3–5 yr) accumulate ~6–10 GB. **If /var/log
 pressure ever materializes on a small-root, very-long-lived node, the remedy is CAPACITY —
-bigger root, archive to the multi-TB /home array, or ship to hallinta — NEVER auto-deletion
+bigger root, archive to the multi-TB /home array, or ship off the node — NEVER auto-deletion
 of performance history.** This is the operator's explicit, informed choice.
 
 ## Amendment 2026-09-05 — compression and bounded retention supersede keep-forever

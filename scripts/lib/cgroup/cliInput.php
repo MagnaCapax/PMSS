@@ -35,7 +35,7 @@ function pmssCgroupCliParseFlagInputs(SystemInterface $sys, array $flags, ?strin
         foreach ($ioSpecs[$flagName] ?? [] as $spec) {
             $specText = trim($spec);
             // /home: shorthand — generalized to accept "max" (clear) or positive integer (apply cap).
-            // Resolves /home backing device on the host at apply-time; hallinta + iopsLimitEnforcer
+            // Resolves /home backing device on the host at apply-time; callers + iopsLimitEnforcer
             // can stay device-agnostic. Matches /dev/<device>:N format for explicit-device callers.
             if (in_array($flagName, ['io-read-iops', 'io-write-iops'], true)
                 && preg_match('#^/home:(.+)$#', $specText, $homeMatches) === 1) {

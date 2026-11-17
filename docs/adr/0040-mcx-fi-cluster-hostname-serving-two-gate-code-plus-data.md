@@ -37,7 +37,7 @@ layer: the node already holds each user's ids locally; no remote lookup is neede
   present on the node.
 - **C — Thread client id through order-time provisioning** to populate
   `.billingClientId` for new customers. Necessary for NEW customers, but the order-time
-  chain (WHMCS pmseedbox module on web5 + sbautomage on hallinta) is infra-gated and
+  chain (the billing module and the provisioning system outside PMSS) is infra-gated and
   does not retroactively fill existing homes.
 - **D — Backfill `.billingClientId` for existing customers from authoritative WHMCS
   data** (management-side), since client id is recoverable per-service. Complements B+C

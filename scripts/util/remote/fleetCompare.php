@@ -3,7 +3,7 @@
 /**
  * Remote utility: record this server's own disk-wait figures and its public tier name for the welcome page.
  *
- * The brain (hallinta) queues one call per node, per day: tier ownPsi ownSvcMs unixTs [groupIopingMs]. The welcome page
+ * An outside caller runs it at most once a day: tier ownPsi ownSvcMs unixTs [groupIopingMs]. The welcome page
  * reads the result and compares it with the averages of the public fleet-performance feed (ADR 0227); the read caps take
  * the service group's median read latency from it on solid-state /home (ADR 0237). The arguments come from a queue row
  * and are run as root, so every one is checked against a strict pattern before anything is written.
