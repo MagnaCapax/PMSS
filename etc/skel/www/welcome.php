@@ -402,7 +402,10 @@ if (file_exists('openvpn-config.tgz')) {
         })();
 <?php if ($pmssPikkumiesState['visible']): ?>
 
-        /* Pikkumies ask bar. */
+        /* Pikkumies ask bar. The heal (ADR 0022) delivers this page before update.php delivers pikkumiesBar.html, so
+           until that update the bar stays on its previous address. */
+        var pmssPikkumiesBarSrc = <?= json_encode(is_file(__DIR__.'/pikkumiesBar.html') ? 'pikkumiesBar.html' : rtrim((string) $pmssPikkumiesState['origin'], '/').'/bar') ?>;
+        var pmssPikkumiesBarOrigin = new URL(pmssPikkumiesBarSrc, location.href).origin;
         var pmssPikkumiesBarReady = false, pmssPikkumiesBarInstalled = false, pmssPikkumiesBarTimer = 0;
         function pmssPikkumiesTabOpen() {
             try {
@@ -425,7 +428,7 @@ if (file_exists('openvpn-config.tgz')) {
                     frame.id = 'pmss-pikkumies-bar-frame';
                     frame.title = 'Ask Pikkumies';
                     frame.setAttribute('aria-label', 'Ask Pikkumies');
-                    frame.src = 'pikkumiesBar.html';
+                    frame.src = pmssPikkumiesBarSrc;
                     frame.addEventListener('focus', function () {
                         if (window.matchMedia('(pointer:fine)').matches)
                             window.parent.postMessage('pmss:pikkumies-preload', location.origin);
@@ -440,7 +443,7 @@ if (file_exists('openvpn-config.tgz')) {
         }
         window.addEventListener('message', function (event) {
             var frame = document.getElementById('pmss-pikkumies-bar-frame');
-            if (event.origin === location.origin && frame && event.source === frame.contentWindow) {
+            if (event.origin === pmssPikkumiesBarOrigin && frame && event.source === frame.contentWindow) {
                 if (event.data === 'pikkumies:ready') pmssPikkumiesBarReady = true;
                 if (event.data === 'pikkumies:switch'
                     && !window.parent.document.querySelector('a[href="#pikkumies"]')) window.top.location.reload(true);
@@ -448,7 +451,7 @@ if (file_exists('openvpn-config.tgz')) {
             if (event.origin === location.origin && event.source === window.parent
                 && event.data === 'pikkumies:bar-ready') pmssPikkumiesBarReady = true;
             if (event.origin === location.origin && event.source === window.parent
-                && event.data === 'pikkumies:tab-ready' && !pmssPikkumiesBarReady && frame) frame.src = 'pikkumiesBar.html';
+                && event.data === 'pikkumies:tab-ready' && !pmssPikkumiesBarReady && frame) frame.src = pmssPikkumiesBarSrc;
         });
         pmssPikkumiesBarPoll(); pmssPikkumiesBarTimer = setInterval(pmssPikkumiesBarPoll, 5000);
 <?php endif; ?>

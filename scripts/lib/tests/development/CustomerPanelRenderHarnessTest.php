@@ -196,8 +196,12 @@ class CustomerPanelRenderHarnessTest extends TestCase
             $this->assertStringContainsAllStrings(array(
                 '<div class="pmss-pikkumies-bar" id="pmss-pikkumies-bar">',
                 'Pikkumies is getting ready…</button>',
-                'var pmssPikkumiesBarOrigin = "https:\/\/example.test";',
+                'var pmssPikkumiesBarSrc = "pikkumiesBar.html";',
             ), $html);
+            // A heal-delivered welcome.php on a server without pikkumiesBar.html keeps the previous bar address.
+            $this->assertTrue(unlink($home.'/www/pikkumiesBar.html'));
+            $this->assertStringContainsString('var pmssPikkumiesBarSrc = "https:\/\/example.test\/bar";',
+                $render('welcome.php', $expectations['welcome.php'])['stdout']);
             $account = strpos($html, 'id="h-status-title"');
             $bar = strpos($html, 'id="pmss-pikkumies-bar"');
             $apps = strpos($html, 'id="h-apps-title"');
