@@ -219,7 +219,10 @@ Keep the canonical installer/update details under `docs/install.md` and
   `filesystemPatch.php` and `panelCompatibility.php`. `panelFiles.php` supplies
   the twelve panel-helper names to both updater delivery and the GUI watchdog;
   each caller retains its existing surrounding order (ADR 0244).
-  Web-root migration keeps account mutations in `webRoot.php`; `webRootInspection.php`
+  Web-root migration keeps its include and dispatch in `webRoot.php`; account
+  authority lives in `webRootAccount.php`, misfiled-tree publication and its single
+  staging cleanup in `webRootMisfile.php`, and move/link/rollback in `webRootMove.php`
+  (ADR 0295). `webRootInspection.php`
   owns one read-only traversal with snapshot, link and ownership policies,
   `webRootPaths.php` owns destination conflicts, and `webRootReconcileCopy.php`
   owns skeleton traversal. The locked reconciler retains full/partial recovery

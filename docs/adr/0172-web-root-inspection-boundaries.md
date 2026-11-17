@@ -6,6 +6,10 @@ Category: architecture
 ## Status
 Accepted
 
+ADR 0295 replaces the migration module layout with account-command, misfiled-copy
+and move/rollback modules behind the original include. The inspection, path and
+reconciliation decisions below remain in force.
+
 ## Context
 ADR 0041's migration and recovery implementation mixed account mutations,
 read-only inspection, skeleton traversal and locked orchestration in two files.
