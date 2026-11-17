@@ -43,8 +43,12 @@ Active work items are tracked in GitHub issues to avoid duplication between this
   `etc/skel/bin/pmssAccountAgent.php` and `etc/skel/www/toggleAppRuntime.php`,
   verify a common helper's delivery to both account trees. Preserve each caller's
   pipe count, still-owned-child check, termination/reaping order and throwable
-  precedence. `etc/skel/bin/pmssHermesRuntime.php` reaps without the same
-  termination step and must retain that distinction. See
+  precedence. The candidates are `pmssDockerLsioSeedCapture()` and `pmssAgentRun()`
+  (two pipes), plus `pmssToggleAppQuiAccountCommand()` (three pipes).
+  `pmssHermesStart()` in `etc/skel/bin/pmssHermesRuntime.php` also closes three
+  pipes but reaps without termination; a common helper must not add that step.
+  The skeleton manifest lists the bin files but cannot prove the external
+  panel retrieval allowlist or dependency ordering. See
   [ADR 0022](adr/0022-guiv-delivered-customer-files-must-be-self-contained.md).
 
 ## Recently Completed
