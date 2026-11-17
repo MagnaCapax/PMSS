@@ -81,8 +81,8 @@ class QuotaSnapshotUsageTest extends TestCase
                 '*** Report for user quotas on device /dev/other', '#100000 -- 7 0 0 1 0 0',
             ]);
         });
-        $this->assertSame(' /dev/example 1210K 20K 25K 23 100k 125k', $result['lines'][1]);
-        $this->assertSame(' /dev/other 7K 2K 3K 1 2k 3k', $result['lines'][2]);
+        $this->pmssAssertArraySubsetSame([1 => ' /dev/example 1210K 20K 25K 23 100k 125k',
+            2 => ' /dev/other 7K 2K 3K 1 2k 3k'], $result['lines']);
     }
 
     public function testWrappedDeviceRowsAreCombinedBeforeAggregation(): void

@@ -153,12 +153,14 @@ PHP;
             $this->assertSame($openFails ? 0 : 1, $result[2], $case.' close count');
             $this->assertTrue($result[3], $case.' handle closed');
         }
-        $this->pmssAssertArraySubsetSame(['status' => 'skip', 'reason' => 'lock_busy'], $results['lock-false-exception'][0]);
-        $this->pmssAssertArraySubsetSame(['status' => 'skip', 'reason' => 'path_changed'], $results['identity-false-exception'][0]);
-        $this->pmssAssertArraySubsetSame(['status' => 'error', 'reason' => 'truncate_failed'], $results['truncate-false-exception'][0]);
-        $this->pmssAssertArraySubsetSame(['status' => 'error', 'reason' => 'flush_failed'], $results['flush-false-exception'][0]);
-        $this->pmssAssertArraySubsetSame(['status' => 'error', 'reason' => 'close_failed'], $results['close-false-exception'][0]);
-        $this->pmssAssertArraySubsetSame(['status' => 'trimmed', 'sizeBefore' => 128, 'sizeAfter' => 0], $results['normal-exception'][0]);
+        foreach ([
+            'lock-false-exception' => ['status' => 'skip', 'reason' => 'lock_busy'],
+            'identity-false-exception' => ['status' => 'skip', 'reason' => 'path_changed'],
+            'truncate-false-exception' => ['status' => 'error', 'reason' => 'truncate_failed'],
+            'flush-false-exception' => ['status' => 'error', 'reason' => 'flush_failed'],
+            'close-false-exception' => ['status' => 'error', 'reason' => 'close_failed'],
+            'normal-exception' => ['status' => 'trimmed', 'sizeBefore' => 128, 'sizeAfter' => 0],
+        ] as $case => $expected) $this->pmssAssertArraySubsetSame($expected, $results[$case][0], $case.': ');
     }
 
     public function testTrimFileRejectsRelativePath(): void

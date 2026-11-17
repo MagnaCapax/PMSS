@@ -50,8 +50,7 @@ class UserMaintenanceFlowCharacterizationTest extends TestCase
             $label = trim($user) === '' ? '(empty)' : $user;
             $this->assertSame(['total' => 1, 'processed' => 0, 'skipped' => 1,
                 'skip_reasons' => [$label.': '.$reason]], $result['summary']);
-            $this->assertSame([], $this->events($result, 'resume'));
-            $this->assertSame([], $this->events($result, 'reset'));
+            foreach (['resume', 'reset'] as $event) $this->assertSame([], $this->events($result, $event), $event);
             $this->assertSame(['log', "[WARN] Account '{$label}' skipped during environment refresh: {$reason}"],
                 $this->events($result, 'log')[1]);
         }
@@ -129,8 +128,7 @@ class UserMaintenanceFlowCharacterizationTest extends TestCase
             $result = $this->trace(['environment_ok' => false, 'reason' => $reason]);
             $message = 'user environment convergence failed'.(is_string($reason) && trim($reason) !== '' ? ': '.$reason : '');
             $this->assertSame(['fixtur01: UserMaintenanceFlowFixture\\RuntimeException: '.$message], $result['summary']['skip_reasons']);
-            $this->assertSame([], $this->events($result, 'docker'));
-            $this->assertSame([], $this->events($result, 'marker'));
+            foreach (['docker', 'marker'] as $event) $this->assertSame([], $this->events($result, $event), $event);
         }
     }
 

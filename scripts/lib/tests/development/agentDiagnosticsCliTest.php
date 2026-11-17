@@ -15,9 +15,8 @@ final class agentDiagnosticsCliTest extends TestCase
         $this->pmssWithEnv(['PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT' => $root], function (): void {
             foreach ([[], ['', 'two words', "a'b", '$(printf injected)', "line\nbreak", '--flag=-1']] as $args) {
                 $result = \pmssAgentDiagnosticsPhpScript('echo args.php', $args);
-                $this->assertSame(7, $result['rc']);
+                $this->pmssAssertArraySubsetSame(['rc' => 7, 'stderr' => 'fixture stderr'], $result);
                 $this->assertSame($args, $this->pmssDecodeJsonArray($result['stdout']));
-                $this->assertSame('fixture stderr', $result['stderr']);
             }
         });
     }
@@ -205,9 +204,8 @@ final class agentDiagnosticsCliTest extends TestCase
         $this->pmssWriteExecutablePhpFile($root.'/probe.php', 'echo json_encode(array_slice($argv, 1));');
         $this->pmssWithEnv(['PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT' => $root], function (): void {
             $result = \pmssAgentDiagnosticsPhpScript(" \tprobe.php\r\n", [null, false, true, 0, -1, 1.5, '', "line\nbreak"]);
-            $this->assertSame(0, $result['rc']);
+            $this->pmssAssertArraySubsetSame(['rc' => 0, 'stderr' => ''], $result);
             $this->assertSame(['', '', '1', '0', '-1', '1.5', '', "line\nbreak"], $this->pmssDecodeJsonArray($result['stdout']));
-            $this->assertSame('', $result['stderr']);
         });
     }
 
