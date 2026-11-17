@@ -18,8 +18,8 @@ class IsolationStateRecheckTest extends TestCase
     {
         foreach (['rw', 'rw,hidepid=0', 'rw,hidepid=1', 'rw,hidepid=off', 'rw,hidepid=2,hidepid=1'] as $mountOptions) {
             $row = $this->observe(['mountOptions' => $mountOptions]);
-            $this->assertSame(['mount -o remount,hidepid=2 /proc'], $row['commands']);
-            $this->assertSame([true], $row['lockedDuringCommands']);
+            $this->pmssAssertArraySubsetSame(['commands' => ['mount -o remount,hidepid=2 /proc'],
+                'lockedDuringCommands' => [true]], $row);
             $this->assertSame(1, count($row['logs']));
             $this->assertStringContainsString('[REPAIR] /proc', $row['logs'][0]);
             $this->assertTrue($row['released']);
@@ -31,9 +31,8 @@ class IsolationStateRecheckTest extends TestCase
         foreach (['rw,hidepid=2,gid=500', 'rw,gid=1065,hidepid=invisible',
             'rw,gid=0,hidepid=2', 'rw,gid=500', 'rw,gid=500,gid=1065,hidepid=1'] as $mountOptions) {
             $row = $this->observe(['mountOptions' => $mountOptions]);
-            $this->assertSame(['mount -o remount,hidepid=2,gid=0 /proc',
-                'mount -o remount,hidepid=2 /proc'], $row['commands']);
-            $this->assertSame([true, true], $row['lockedDuringCommands']);
+            $this->pmssAssertArraySubsetSame(['commands' => ['mount -o remount,hidepid=2,gid=0 /proc',
+                'mount -o remount,hidepid=2 /proc'], 'lockedDuringCommands' => [true, true]], $row);
             $this->assertSame(1, count($row['logs']));
         }
     }
@@ -42,9 +41,7 @@ class IsolationStateRecheckTest extends TestCase
     {
         foreach ([0757 => 0751, 0741 => 0741, 0751 => 0751, 02757 => 02751, 0756 => 0750] as $before => $after) {
             $row = $this->observe(['homeMode' => $before]);
-            $this->assertSame($after, $row['homeMode']);
-            $this->assertSame(0777, $row['accountMode']);
-            $this->assertSame([], $row['commands']);
+            $this->pmssAssertArraySubsetSame(['homeMode' => $after, 'accountMode' => 0777, 'commands' => []], $row);
             $this->assertSame($before === $after ? 0 : 1, count($row['logs']));
         }
     }
@@ -94,8 +91,7 @@ class IsolationStateRecheckTest extends TestCase
         foreach (['rw', 'rw,hidepid=1', 'rw,hidepid=2,gid=500', null, ''] as $mountOptions) {
             $row = $this->observe(['mountOptions' => $mountOptions, 'keepMounts' => true, 'homeMode' => 0757, 'recordMode' => 0644]);
             $this->assertStringContainsString('[WARN]', $row['logs'][0]);
-            $this->assertSame(0751, $row['homeMode']);
-            $this->assertSame(0640, $row['recordMode']);
+            $this->pmssAssertArraySubsetSame(['homeMode' => 0751, 'recordMode' => 0640], $row);
             $this->assertTrue($row['released']);
         }
     }

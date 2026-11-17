@@ -11,7 +11,7 @@ final class AgentDiagnosticsNetRelayTest extends TestCase
 {
     public function testRelayCountersHaveUnitsAndDoNotExposeDescriptorNames(): void
     {
-        $root = $this->relayFixture();
+        $root = $this->pmssMakeNamedTempDir('pmss-agent-relay-');
         $this->relayProcess($root, '101', [13 => '900', 14 => '100', 19 => '3', 21 => '456', 23 => '25']);
         $this->relayProcess($root, '102', [13 => '50', 14 => '25', 19 => '1', 21 => '789', 23 => '0']);
         $before = microtime(true);
@@ -30,13 +30,13 @@ final class AgentDiagnosticsNetRelayTest extends TestCase
 
     public function testAbsentRelayIsAnEmptyListAndHostSnapshotOmitsTheProbe(): void
     {
-        $this->assertSame([], $this->relayCollect($this->relayFixture(), ''));
+        $this->assertSame([], $this->relayCollect($this->pmssMakeNamedTempDir('pmss-agent-relay-'), ''));
         $this->assertFalse(isset(\pmssAgentDiagnosticsSectionSpecs()['user_net_relay']));
     }
 
     public function testVanishedMalformedAndNonRelayProcessesAreSkipped(): void
     {
-        $root = $this->relayFixture();
+        $root = $this->pmssMakeNamedTempDir('pmss-agent-relay-');
         $this->relayProcess($root, '102', [13 => '-1']);
         $this->relayProcess($root, '103', [19 => 'bad']);
         $this->relayProcess($root, '104', [1 => '(slirp4netns helper)']);
@@ -53,14 +53,14 @@ final class AgentDiagnosticsNetRelayTest extends TestCase
 
     public function testForeignEffectiveUidCannotProduceARelayRow(): void
     {
-        $root = $this->relayFixture();
+        $root = $this->pmssMakeNamedTempDir('pmss-agent-relay-');
         $this->relayProcess($root, '101', []);
         $this->assertSame([], $this->relayCollect($root, "101\n", (string) (fileowner($root) + 1)));
     }
 
     public function testUnreadableDescriptorsAreUnknownRatherThanZero(): void
     {
-        $root = $this->relayFixture();
+        $root = $this->pmssMakeNamedTempDir('pmss-agent-relay-');
         $this->relayProcess($root, '101', []);
         rename($root.'/proc/101/fd', $root.'/proc/101/fd-missing');
         $rows = $this->relayCollect($root, "101\n");
@@ -69,7 +69,7 @@ final class AgentDiagnosticsNetRelayTest extends TestCase
 
     public function testInvalidUidAndClockCannotProduceMisleadingCounters(): void
     {
-        $root = $this->relayFixture();
+        $root = $this->pmssMakeNamedTempDir('pmss-agent-relay-');
         $this->relayProcess($root, '101', []);
         foreach ([['', '100'], ['unknown', '100'], [(string) fileowner($root), '0']] as $values) {
             $result = $this->relayCollect($root, "101\n", $values[0], $values[1]);
@@ -81,15 +81,9 @@ final class AgentDiagnosticsNetRelayTest extends TestCase
     {
         $user = "fixtur01'; printf injected";
         $spec = \pmssAgentDiagnosticsSectionSpecs($user)['user_net_relay'];
-        $this->assertSame('command', $spec['type']);
-        $this->assertSame('json', $spec['format']);
-        $this->assertStringContainsString('id -u '.escapeshellarg($user), $spec['command']);
-        $this->assertStringContainsString('pgrep -u '.escapeshellarg($user).' -x slirp4netns', $spec['command']);
-    }
-
-    private function relayFixture(): string
-    {
-        return $this->pmssMakeNamedTempDir('pmss-agent-relay-');
+        $this->pmssAssertArraySubsetSame(['type' => 'command', 'format' => 'json'], $spec);
+        $this->assertStringContainsAllStrings(['id -u '.escapeshellarg($user),
+            'pgrep -u '.escapeshellarg($user).' -x slirp4netns'], $spec['command']);
     }
 
     private function relayProcess(string $root, string $pid, array $overrides): void

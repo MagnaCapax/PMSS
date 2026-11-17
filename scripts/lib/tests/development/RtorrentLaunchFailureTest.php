@@ -83,9 +83,7 @@ PHP;
                     foreach ([0, 1] as $rc) {
                         for ($retry = 0; $retry < 6; $retry++) {
                             $result = $this->observe(['executor' => $executor, 'count' => 3, 'command' => [$channel => $error, 'rc' => $rc]]);
-                            $this->assertSame(3, $result['count']);
-                            $this->assertTrue($result['custom']);
-                            $this->assertSame(0, $result['quarantines']);
+                            $this->pmssAssertArraySubsetSame(['count' => 3, 'custom' => true, 'quarantines' => 0], $result);
                             $this->assertStringContainsString($error, implode("\n", $result['messages']));
                         }
                     }
@@ -99,8 +97,7 @@ PHP;
     {
         foreach ([['rc' => 127, 'stderr' => 'screen: command not found'], ['timed_out' => true]] as $command) {
             $result = $this->observe(['count' => 3, 'command' => $command]);
-            $this->assertSame(3, $result['count']);
-            $this->assertTrue($result['custom']);
+            $this->pmssAssertArraySubsetSame(['count' => 3, 'custom' => true], $result);
             $this->assertStringContainsString('launcher failed', implode("\n", $result['messages']));
         }
     }
@@ -109,8 +106,7 @@ PHP;
     public function testNeverObservedProcessPreservesCustomConfigAndExistingCount(): void
     {
         $result = $this->observe(['count' => 3]);
-        $this->assertSame(3, $result['count']);
-        $this->assertTrue($result['custom']);
+        $this->pmssAssertArraySubsetSame(['count' => 3, 'custom' => true], $result);
         $this->assertStringContainsString('never appeared', implode("\n", $result['messages']));
     }
 
@@ -130,9 +126,7 @@ PHP;
     public function testStableProcessClearsFailureCounterWithoutQuarantine(): void
     {
         $result = $this->observe(['count' => 3, 'polls' => [[1234], [1234]], 'stable' => true]);
-        $this->assertSame(0, $result['count']);
-        $this->assertTrue($result['custom']);
-        $this->assertSame(0, $result['quarantines']);
+        $this->pmssAssertArraySubsetSame(['count' => 0, 'custom' => true, 'quarantines' => 0], $result);
     }
 
     /** Failed prelaunch cleanup leaves both the launcher and counter untouched. */

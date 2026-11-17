@@ -40,15 +40,11 @@ class DpkgBaselineApplySafetyTest extends TestCase
         $this->pmssWriteExecutableFile($root.'/dpkg-query', "#!/bin/sh\n"
             ."[ \"\$1 \$2 \$3\" = '-W -f=\${Status} repo-mediaarea' ] && printf 'install ok installed' && exit 0\n"
             ."echo 'dpkg-query: error in show format: may not be empty string' >&2\nexit 2\n");
-        $path = (string) getenv('PATH');
-        putenv('PATH='.$root.':'.$path);
-        try {
+        $this->pmssWithPathPrefix($root, function (): void {
             $status = \pmssRepoMediaareaDpkgStatus();
-        } finally {
-            putenv('PATH='.$path);
-        }
-        $this->assertSame('install ok installed', $status);
-        $this->assertTrue(\pmssDpkgStatusIndicatesPresent($status), 'an installed repo-mediaarea must reach the purge and hold');
+            $this->assertSame('install ok installed', $status);
+            $this->assertTrue(\pmssDpkgStatusIndicatesPresent($status), 'an installed repo-mediaarea must reach the purge and hold');
+        });
     }
 
     public function testDpkgSelectionSanitizerKeepsBaselinePolicySnapshot(): void
@@ -58,7 +54,11 @@ class DpkgBaselineApplySafetyTest extends TestCase
             return \pmssDpkgSelectionsSanitise(['alpha', 'held HOLD', 'wireguard-dkms install', 'repo-mediaarea install', 'nzbdrone install', 'linux-image-6.1.0-1-amd64 install', 'php8.2-cli install', 'python3.11-venv install', 'missing-tool install', 'cgroup-bin install', 'bad$name install', 'purged purge'], 12, $available);
         });
 
-        $this->assertSame([["alpha\tinstall", "held\thold", "wireguard-dkms\tdeinstall", "repo-mediaarea\tdeinstall", "purged\tpurge"], true, true, ['nzbdrone', 'missing-tool'], ['wireguard-dkms', 'repo-mediaarea', 'php8.2-cli', 'python3.11-venv'], ['linux-image-6.1.0-1-amd64']], [$plan['sanitised'], $plan['warnings'], $plan['short_form_seen'], $plan['dropped_unavailable'], $plan['dropped_obsolete'], $plan['dropped_kernel']]);
+        $this->pmssAssertArraySubsetSame([
+            'sanitised' => ["alpha\tinstall", "held\thold", "wireguard-dkms\tdeinstall", "repo-mediaarea\tdeinstall", "purged\tpurge"],
+            'warnings' => true, 'short_form_seen' => true, 'dropped_unavailable' => ['nzbdrone', 'missing-tool'],
+            'dropped_obsolete' => ['wireguard-dkms', 'repo-mediaarea', 'php8.2-cli', 'python3.11-venv'],
+            'dropped_kernel' => ['linux-image-6.1.0-1-amd64']], $plan);
         $this->assertStringContainsString('Invalid dpkg selection entry at line 11: bad$name install', $output);
     }
 

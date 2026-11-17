@@ -116,8 +116,8 @@ class DynamicIopsLatencyTest extends TestCase
             ['ssdLatencyLowX' => 0.5], ['ssdLatencyHighX' => 2000], ['ssdLatencyLowX' => 'x']] as $bad) {
             $this->assertSame(null, \pmssDynamicIopsSettings($this->policy($bad)));
         }
-        $settings = \pmssDynamicIopsSettings($this->policy());
-        $this->assertSame([1.1, 5.0, 10.0], [$settings['latencyStep'], $settings['ssdLatencyLowX'], $settings['ssdLatencyHighX']]);
+        $this->pmssAssertArraySubsetSame(['latencyStep' => 1.1, 'ssdLatencyLowX' => 5.0, 'ssdLatencyHighX' => 10.0],
+            \pmssDynamicIopsSettings($this->policy()));
     }
 
     /** Solid state, group median 0.24 ms: the band is 1.2-2.4 ms (5x-10x the reference). */
