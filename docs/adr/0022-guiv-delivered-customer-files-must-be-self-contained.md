@@ -110,6 +110,13 @@ ordering required above. This audit therefore stopped without extracting a new
 cross-tree dependency. The prerequisite already recorded in `docs/TODO.md`
 remains unresolved; no runtime code, validation or delivery contract changed.
 
+The operator-side `pmssProcessTerminateAndClose()` in
+`scripts/lib/runtime/commandProcess.php` now shares termination and reaping for
+operator callers (ADR 0220). It cannot serve these customer entrypoints across
+the ADR 0016 boundary. Its availability does not resolve the customer helper's
+external allowlist or delivery ordering prerequisite; a repeated normalized
+source scan must not treat the remaining copies as permission to cross it.
+
 ## References
 
 - ADR 0016 (customer PHP tree separation — no `/scripts/` requires), ADR 0017 (customer-tree
