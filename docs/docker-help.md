@@ -110,6 +110,13 @@ WireGuard and similar containers size their tunnel from the container's interfac
 
 `docker-install-wireguard.sh` already does this with its own `wireguard` network, and stops with a message if a `wireguard` network exists at another MTU. Containers on the default bridge are unaffected.
 
+Tunnel-container throughput is bounded by your account's single slirp4netns relay,
+shared by all your containers. On Debian 12 this relay has been observed running
+as one thread (see the [upstream relay loop](https://github.com/rootless-containers/slirp4netns/blob/v1.2.0/slirp4netns.c#L351-L390));
+adding tunnel containers shares that same relay CPU capacity. The
+[host-managed WireGuard](./wireguard.md) service (`wg-quick@wg0`) uses a host kernel
+interface, separate from your account's rootless Docker network.
+
 If PMSS finds an empty object such as `"log-opts": {}` in your `daemon.json`, it leaves the file unchanged and logs a warning, since rewriting it would turn `{}` into `[]` and Docker would refuse to start. Remove the empty entry to let PMSS update the file.
 
 ## Additional tools
