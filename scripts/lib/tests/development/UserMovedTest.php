@@ -35,9 +35,7 @@ class UserMovedTest extends TestCase
                 \pmssUserMovedParseArguments(array_merge(['userMoved.php'], $args));
             });
             // Invoke the real CLI too: errors must have a failing exit status.
-            $command = escapeshellarg(PHP_BINARY).' '.escapeshellarg($this->pmssRepoPath('scripts/userMoved.php'));
-            foreach ($args as $arg) $command .= ' '.escapeshellarg($arg);
-            $result = $this->pmssExecShellCommand($command.' 2>&1');
+            $result = $this->pmssRunRepoPhpScriptCommand('scripts/userMoved.php', $args);
             $this->assertTrue($result['rc'] !== 0);
             $this->assertTrue(trim($result['output']) !== '');
         }
@@ -101,10 +99,10 @@ class UserMovedTest extends TestCase
         $script .= '$refresh = function() use (&$events) { $events[] = "refresh"; return 0; }; $out = [];';
         $script .= 'foreach (["2026-11-01", "2026-12-01", null, null] as $date) $out[] = pmssUserMovedApply("mvdtst", $date, $store, $stop, $refresh);';
         $script .= 'echo json_encode([$out, $events, $store->get("mvdtst")]);';
-        [$codes, $events, $payload] = $this->pmssRunInlinePhpJson($script, [], '2>&1');
-        $this->assertSame([0, 0, 0, 0], $codes);
-        $this->assertSame(['2026-11-01', 'refresh', '2026-12-01', 'refresh', 'refresh'], $events);
-        $this->assertFalse(isset($payload['movedUntil']));
+        $result = $this->pmssRunInlinePhpJson($script, [], '2>&1');
+        $this->pmssAssertArraySubsetSame([[0, 0, 0, 0],
+            ['2026-11-01', 'refresh', '2026-12-01', 'refresh', 'refresh']], $result);
+        $this->assertFalse(isset($result[2]['movedUntil']));
     }
 
     public function testStopsManagedAppsWithoutSignallingSshOrWritingHomeMarkers(): void

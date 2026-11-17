@@ -47,15 +47,14 @@ class NetconsoleConfigureTest extends TestCase
 
         $this->assertTrue(is_file($dir.'/modprobe.d/netconsole.conf'), 'expected modprobe config');
         $this->assertTrue(is_file($dir.'/modules-load.d/pmss-netconsole.conf'), 'expected modules-load config');
-        $descriptions = array_column($calls, 0);
         foreach ($calls as $call) {
             if (strpos($call[0], 'netconsole target') === false) {
                 continue;
             }
-            $this->assertStringNotContainsString(';', $call[1], 'target probe must avoid command chaining');
-            $this->assertStringNotContainsString('||', $call[1], 'target probe must avoid conditional chaining');
+            $this->assertStringContainsAndOmitsStrings([], [';' => 'target probe must avoid command chaining',
+                '||' => 'target probe must avoid conditional chaining'], $call[1]);
         }
-        $this->assertTrue(in_array('Loading netconsole kernel module', $descriptions, true), 'expected netconsole module load step');
+        $this->assertTrue(in_array('Loading netconsole kernel module', array_column($calls, 0), true), 'expected netconsole module load step');
     }
 
     public function testSkipsEnableWhenTargetIsNotReachable(): void

@@ -18,8 +18,8 @@ class AptRepositoryCharacterizationTest extends TestCase
             ['read', '/config/template.sources.buster'], ['read', '/config/template.sources.bullseye'],
             ['read', '/config/template.sources.bookworm'], ['read', '/config/template.sources.trixie']], $reads);
         $result = $this->fixture(['action' => 'plan', 'version' => 0]);
-        $this->assertSame(['mode' => 'reuse', 'current_hash' => '', 'templates' => []], $result['result']);
-        $this->assertSame([['read', '/sources.list'], ['log', 'Repository version unresolved for debian; reusing existing sources']], $result['events']);
+        $this->pmssAssertArraySubsetSame(['result' => ['mode' => 'reuse', 'current_hash' => '', 'templates' => []],
+            'events' => [['read', '/sources.list'], ['log', 'Repository version unresolved for debian; reusing existing sources']]], $result);
     }
 
     public function testSourceApplyRetainsEarlyReturnsAndDiagnostics(): void
@@ -33,8 +33,7 @@ class AptRepositoryCharacterizationTest extends TestCase
             ['debian', 12, ['bookworm' => 'current'], sha1('current'), 'Debian Bookworm repositories already correct'],
         ] as [$distro, $version, $repos, $hash, $message]) {
             $result = $this->fixture(compact('distro', 'version', 'repos', 'hash') + ['action' => 'apply']);
-            $this->assertSame([['log', $message]], $result['events']);
-            $this->assertSame(null, $result['result']);
+            $this->pmssAssertArraySubsetSame(['events' => [['log', $message]], 'result' => null], $result);
         }
     }
 
@@ -67,9 +66,9 @@ class AptRepositoryCharacterizationTest extends TestCase
             [1, [], false, '[WARN] apt-get clean failed with rc 1'], [0, ['ignored'], true, null],
             [0, [], false, '[WARN] apt-get clean runner failed: injected']] as $index => [$rc, $output, $expected, $message]) {
             $result = $this->fixture(['action' => 'clean', 'rc' => $rc, 'output' => $output, 'throw' => $index === 4]);
-            $this->assertSame($expected, $result['result']);
-            $this->assertSame($message === null ? [['exec', 'fixture-env apt-get clean 2>&1']]
-                : [['exec', 'fixture-env apt-get clean 2>&1'], ['log', $message]], $result['events']);
+            $this->pmssAssertArraySubsetSame(['result' => $expected,
+                'events' => $message === null ? [['exec', 'fixture-env apt-get clean 2>&1']]
+                    : [['exec', 'fixture-env apt-get clean 2>&1'], ['log', $message]]], $result);
         }
     }
 

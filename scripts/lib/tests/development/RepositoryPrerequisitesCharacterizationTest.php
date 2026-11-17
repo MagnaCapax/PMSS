@@ -36,8 +36,8 @@ class RepositoryPrerequisitesCharacterizationTest extends TestCase
     {
         foreach (['false', 'throw', 'error'] as $failure) {
             $result = $this->fixture(['source' => 'deb https://sonarr.invalid stable main', 'failure' => $failure]);
-            $this->assertSame('legacy-key', $result['files']['/trusted/sonarr.gpg']);
-            $this->assertSame('deb https://sonarr.invalid stable main', $result['files']['/sources.list']);
+            $this->pmssAssertArraySubsetSame(['/trusted/sonarr.gpg' => 'legacy-key',
+                '/sources.list' => 'deb https://sonarr.invalid stable main'], $result['files']);
             $this->assertSame($failure === 'false' ? null : $failure, $result['error']);
             $this->assertSame($failure === 'false'
                 ? ['log', '[WARN] Failed to scope Sonarr apt source with signed-by in /sources.list']
@@ -50,8 +50,7 @@ class RepositoryPrerequisitesCharacterizationTest extends TestCase
     {
         $source = "deb https://sonarr.invalid stable main\n";
         $result = $this->fixture(['source' => $source, 'dry' => true]);
-        $this->assertSame($source, $result['files']['/sources.list']);
-        $this->assertSame('legacy-key', $result['files']['/trusted/sonarr.gpg']);
+        $this->pmssAssertArraySubsetSame(['/sources.list' => $source, '/trusted/sonarr.gpg' => 'legacy-key'], $result['files']);
         $this->assertSame([
             ['chmod', '/keys/sonarr.gpg', 0644], ['log', 'Sonarr key installed at /keys/sonarr.gpg (fingerprint EBFF6B99D9B78493)'],
             ['log', '[SKIP] Would scope Sonarr apt source with signed-by in /sources.list'],

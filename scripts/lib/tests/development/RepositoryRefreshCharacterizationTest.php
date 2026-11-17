@@ -10,13 +10,11 @@ class RepositoryRefreshCharacterizationTest extends TestCase
     {
         foreach ([0, 1, 100] as $rc) {
             $result = $this->fixture(['version' => 0, 'rc' => $rc]);
-            $this->assertSame(true, $result['result']);
-            $this->assertSame(null, $result['error']);
-            $this->assertSame([
+            $this->pmssAssertArraySubsetSame(['result' => true, 'error' => null, 'events' => [
                 ['prerequisite', 'mediaarea'], ['prerequisite', 'docker'], ['prerequisite', 'sonarr'],
                 ['log', 'Repository version unresolved for debian; reusing existing sources'],
                 ['step', 'Refreshing apt package index (existing sources)', 'apt-get update'],
-            ], $result['events']);
+            ]], $result);
         }
     }
 
@@ -34,8 +32,7 @@ class RepositoryRefreshCharacterizationTest extends TestCase
             $events = array_merge($events, $rc === 0 ? [['directory', '/var/lib/apt/periodic', 0755],
                 ['touch', '/var/lib/apt/periodic/update-success-stamp']]
                 : [['log', '[WARN] apt-get update failed; not updating /var/lib/apt/periodic/update-success-stamp']]);
-            $this->assertSame($events, $result['events']);
-            $this->assertSame(true, $result['result']);
+            $this->pmssAssertArraySubsetSame(['events' => $events, 'result' => true], $result);
         }
     }
 
@@ -43,8 +40,7 @@ class RepositoryRefreshCharacterizationTest extends TestCase
     {
         foreach ([0, 12] as $version) {
             $result = $this->fixture(['version' => $version, 'throw' => true]);
-            $this->assertSame('index failure', $result['error']);
-            $this->assertSame(null, $result['result']);
+            $this->pmssAssertArraySubsetSame(['error' => 'index failure', 'result' => null], $result);
             $this->assertSame(['step', $version === 0 ? 'Refreshing apt package index (existing sources)' : 'Refreshing apt package index', 'apt-get update'], end($result['events']));
         }
     }
