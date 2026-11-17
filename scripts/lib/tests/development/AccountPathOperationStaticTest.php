@@ -13,7 +13,7 @@ final class AccountPathOperationStaticTest extends TestCase
         'scripts/lib/lighttpd/userConfigApply.php:63' => ['af1754514e1c4518bfe8bbc90929d930bb125806', 'fixed port utility with quoted account'],
         'scripts/lib/network/fireqos.php:25' => ['b4712db6815bc3f3adbcce7ab5678ddb8db7a60b', 'uid lookup with quoted account'],
         'scripts/lib/resources/log.php:32' => ['abcdc22775d788f8fa306195c4bbca4a3da976ab', 'uid lookup with quoted account'],
-        'scripts/lib/nginxConfig/userConfigsGenerate.php:183' => ['66d938ed265b0ac243e1b992e1820850e3e6fe1e', 'fixed config utility with quoted account'],
+        'scripts/lib/nginxConfig/userConfigsGenerate.php:170' => ['66d938ed265b0ac243e1b992e1820850e3e6fe1e', 'fixed config utility with quoted account'],
         'scripts/lib/update/systemPrep/isolationRecheck.php:90' => ['e8ba5bcb1602f5232780b34476916409e1cb0a89', 'the /home directory itself after an lstat real-directory check, no account path'],
         'scripts/lib/update/users/docker.php:83' => ['b1fd9ef63ccf528d30bc352bef2c0d326d4311b5', 'uid lookup with quoted account'],
         'scripts/lib/update/users/rutorrent.php:60' => ['10019e1ef850eb7765ac7ee4a3ee662f3b5fa53f', 'account step wrapper for deprecated plugin'],

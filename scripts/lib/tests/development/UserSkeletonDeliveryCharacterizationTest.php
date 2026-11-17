@@ -27,9 +27,9 @@ class UserSkeletonDeliveryCharacterizationTest extends TestCase
     public function testUpdaterPreservesCompleteManifestAndMaintenanceOrder(): void
     {
         $result = $this->trace('pmssUserApplySkeletonFiles', 'pmssUserApplySkeletonFiles(["user" => "fixtur01", "home" => "/fixture/home/fixtur01"]);');
-        // Digest captured from the original 143 literal entries, each followed by LF.
-        $this->assertSame(143, count($result['files']));
-        $this->assertSame('d34a225e5161e8a5f630f970d7410ab1158095dad34a400ee036757583f0d437',
+        // Digest of the 144 manifest entries (143 plus www/pikkumiesBar.html), each followed by LF.
+        $this->assertSame(144, count($result['files']));
+        $this->assertSame('7acfd3ecea12f9af2de1cf3d733f043d3228d7e0bd9870016ee5a971a7572c72',
             hash('sha256', implode("\n", $result['files'])."\n"));
         $this->assertSame(['traffic', 'panel', 'links', 'migration', 'cleanup', 'delete', 'delete', 'delete',
             'delete', 'patch', 'glob', 'counts', 'log'], array_column($result['events'], 0));
