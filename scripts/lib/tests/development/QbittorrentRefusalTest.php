@@ -73,8 +73,7 @@ final class QbittorrentRefusalTest extends TemporaryHomeRootTestCase
             'restore' => static function (): bool { throw new \RuntimeException('Running daemon config touched'); },
             'notice' => static function ($home, $text) use (&$message): void { $message = $text; },
         ] + self::pmssMakeCallbacks(['accountPids' => [101]])));
-        $this->assertStringContainsString('already running', $message);
-        $this->assertStringNotContainsString('could not be restored', $message);
+        $this->assertStringContainsAndOmitsStrings(['already running'], ['could not be restored'], $message);
     }
 
     public function testBusyPanelStartReturnsFalseAndKeepsTheRefusalMarker(): void
@@ -89,8 +88,7 @@ final class QbittorrentRefusalTest extends TemporaryHomeRootTestCase
                 static function (): void { throw new \RuntimeException('Busy panel started'); }, $home));
             $this->assertTrue(is_file($dir.'/qbittorrent.refused'));
             $message = file_get_contents($dir.'/qbittorrent.notice');
-            $this->assertStringContainsString('busy with another operation', $message);
-            $this->assertStringNotContainsString('could not be restored', $message);
+            $this->assertStringContainsAndOmitsStrings(['busy with another operation'], ['could not be restored'], $message);
         } finally { flock($lock, LOCK_UN); fclose($lock); }
     }
 

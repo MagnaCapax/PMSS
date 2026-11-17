@@ -114,9 +114,7 @@ final class QbittorrentStoppedConfigTest extends TemporaryHomeRootTestCase
             ]));
             $this->assertSame(300, $pauses);
             $notice = file_get_contents(dirname($path).'/qbittorrent.notice');
-            $this->assertStringContainsString('password synchronization failed', $notice);
-            $this->assertStringContainsString('lock timeout', $notice);
-            $this->assertStringNotContainsString('never-log-this', $notice);
+            $this->assertStringContainsAndOmitsStrings(['password synchronization failed', 'lock timeout'], ['never-log-this'], $notice);
         } finally { flock($lock, LOCK_UN); fclose($lock); }
     }
 

@@ -69,8 +69,8 @@ PHP;
                 $this->assertStringContainsString('account:fixtur01:', $command);
             }
         }
-        $this->assertStringContainsString("/usr/bin/docker --host='unix:///run/user/1057/docker.sock' version --format '{{.Server.Version}}'", $results['idle'][3][0][0]);
-        $this->assertStringContainsString('XDG_RUNTIME_DIR=\'/run/user/1057\'', $results['idle'][3][0][0]);
+        $this->assertStringContainsAllStrings(["/usr/bin/docker --host='unix:///run/user/1057/docker.sock' version --format '{{.Server.Version}}'",
+            'XDG_RUNTIME_DIR=\'/run/user/1057\''], $results['idle'][3][0][0]);
         $this->assertStringContainsString('/usr/bin/dockerd --version', $results['idle'][3][1][0]);
         $this->assertStringContainsString('ps --quiet', $results['idle'][3][2][0]);
         $this->assertStringContainsString('decision=restart reason=idle', implode('\n', $results['idle'][4]));

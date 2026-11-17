@@ -60,13 +60,14 @@ class LighttpdProxyFragmentsTest extends TestCase
     {
         $fragments = $this->managedProxyFragments();
         foreach ($fragments as $name => $fragment) {
-            $this->assertStringContainsString('$HTTP["url"] =~ ', $fragment, $name.' fragment must use lighttpd $HTTP matcher');
-            $this->assertStringNotContainsString('\\$HTTP["url"]', $fragment, $name.' fragment must not escape lighttpd $HTTP matcher');
+            $this->assertStringContainsAndOmitsStrings(
+                ['$HTTP["url"] =~ ' => $name.' fragment must use lighttpd $HTTP matcher'],
+                ['\\$HTTP["url"]' => $name.' fragment must not escape lighttpd $HTTP matcher'], $fragment);
         }
 
         $rcloneFragment = $fragments['rclone'];
-        $this->assertStringContainsString('$REQUEST_HEADER["Content-Length"]', $rcloneFragment);
-        $this->assertStringNotContainsString('\\$REQUEST_HEADER["Content-Length"]', $rcloneFragment, 'rclone fragment must not escape lighttpd $REQUEST_HEADER matcher');
+        $this->assertStringContainsAndOmitsStrings(['$REQUEST_HEADER["Content-Length"]'],
+            ['\\$REQUEST_HEADER["Content-Length"]' => 'rclone fragment must not escape lighttpd $REQUEST_HEADER matcher'], $rcloneFragment);
     }
 
     public function testManagedProxyFragmentsEnableWebSocketUpgradeForwarding(): void
@@ -159,8 +160,7 @@ class LighttpdProxyFragmentsTest extends TestCase
         $this->assertStringNotContainsString('^Bearer', $fragment);
         // The trailing-slash redirect stays behind the panel gate.
         $redirect = substr($fragment, 0, (int)strpos($fragment, '$HTTP["url"] =~'));
-        $this->assertStringContainsString('url.redirect = ( "" => "/user-fixtur01/scryer/" )', $redirect);
-        $this->assertStringNotContainsString('auth.require', $redirect);
+        $this->assertStringContainsAndOmitsStrings(['url.redirect = ( "" => "/user-fixtur01/scryer/" )'], ['auth.require'], $redirect);
     }
 
     public function testGatedCatalogRowsKeepUnconditionalAuthorizationStrip(): void
@@ -177,8 +177,7 @@ class LighttpdProxyFragmentsTest extends TestCase
     {
         // Deluge/rclone-style rules keep their output: no header handling unless the row asks for it.
         $rule = \pmssLighttpdProxyRuleFragment('^/user-demo/x/', 4100, [], true);
-        $this->assertStringContainsString('auth.require = ()', $rule);
-        $this->assertStringNotContainsString('Authorization', $rule);
+        $this->assertStringContainsAndOmitsStrings(['auth.require = ()'], ['Authorization'], $rule);
     }
 
     public function testCopypartySchemeOverridesRetainAuthorizationStripping(): void

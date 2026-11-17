@@ -57,8 +57,7 @@ final class DockerInstallLsioOperatorTest extends TestCase
             ."'argv' => array_slice(\$argv, 1), 'home' => getenv('HOME'), 'docker' => getenv('DOCKER_HOST')]);");
         $args = ['mariadb', "x'; touch pmss-injected #", '--dry-run'];
         $command = \pmssDockerInstallLsioOperatorCommand(['name' => 'pmss-test', 'uid' => 4321, 'dir' => $home], $args);
-        $this->assertStringNotContainsString('/etc/skel', $command);
-        $this->assertStringNotContainsString('/scripts/', $command);
+        $this->assertStringContainsAndOmitsStrings([], ['/etc/skel', '/scripts/'], $command);
         if (!is_executable('/usr/bin/php')) {
             throw new SkipTest('/usr/bin/php unavailable');
         }

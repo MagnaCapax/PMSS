@@ -38,16 +38,12 @@ class UserTransferIntoTest extends TestCase
             foreach (['pmssUserTransferBuildRsyncMain', 'pmssUserTransferBuildRsyncFinal'] as $builder) {
                 $normal = $builder($cfg);
                 $recovery = $builder($cfg + ['into' => 'old-copy']);
-                $this->assertStringNotContainsString('--ignore-existing', $normal);
-                $this->assertStringNotContainsString('/home/target/old-copy/', $normal);
-                $this->assertStringContainsString('/home/target/old-copy/', $recovery);
-                $this->assertStringContainsString('--ignore-existing', $recovery);
+                $this->assertStringContainsAndOmitsStrings([], ['--ignore-existing', '/home/target/old-copy/'], $normal);
+                $this->assertStringContainsAllStrings(['/home/target/old-copy/', '--ignore-existing'], $recovery);
                 $this->assertStringNotContainsString('--compare-dest', $normal);
                 // Absolute on purpose: a relative basis path breaks delta transfers (rsync rc 23, update discarded).
-                $this->assertStringContainsString('--compare-dest=/home/target/', $recovery);
-                $this->assertStringNotContainsString('--compare-dest=..', $recovery);
-                $this->assertStringContainsString('O_NOFOLLOW', $recovery);
-                $this->assertStringContainsString('setpriv --reuid=', $recovery);
+                $this->assertStringContainsAndOmitsStrings(['--compare-dest=/home/target/'], ['--compare-dest=..'], $recovery);
+                $this->assertStringContainsAllStrings(['O_NOFOLLOW', 'setpriv --reuid='], $recovery);
             }
         }
     }

@@ -15,8 +15,8 @@ final class QbittorrentStoppedNoticeTest extends TemporaryHomeRootTestCase
             'restore' => static function (): void { throw new \RuntimeException('Running config restored'); },
             'notice' => static function ($home, $text) use (&$message): void { $message = $text; },
         ] + self::pmssMakeCallbacks(['stop' => null, 'pause' => null, 'accountPids' => [101]])));
-        $this->assertStringContainsString('another qbittorrent-nox process of this account is running (not started by PMSS)', $message);
-        $this->assertStringNotContainsString('lock timeout', $message);
+        $this->assertStringContainsAndOmitsStrings(
+            ['another qbittorrent-nox process of this account is running (not started by PMSS)'], ['lock timeout'], $message);
     }
 
     public function testConfigLinkRefusalReplacesAStaleNoticeOnBothSides(): void

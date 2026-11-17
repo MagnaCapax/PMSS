@@ -112,10 +112,8 @@ class UserDataOwnershipRepairTest extends TestCase
     public function testCommandKeepsFilesystemAndEnvironmentGuards(): void
     {
         $command = \pmssUserDataOwnershipRepairCommand($this->home(), 100001, 100002);
-        $this->assertStringContainsString('/usr/bin/env PATH=/usr/sbin:/usr/bin:/sbin:/bin find ', $command);
-        $this->assertStringContainsString('-xdev -not -type l \\( ! -type f -o -links 1 \\)', $command);
-        $this->assertStringContainsString("-execdir /usr/bin/chown -h '100001:100002' {} +", $command);
-        $this->assertStringNotContainsString('chown -R', $command);
+        $this->assertStringContainsAndOmitsStrings(['/usr/bin/env PATH=/usr/sbin:/usr/bin:/sbin:/bin find ',
+            '-xdev -not -type l \\( ! -type f -o -links 1 \\)', "-execdir /usr/bin/chown -h '100001:100002' {} +"], ['chown -R'], $command);
     }
 
     public function testCliRejectsMalformedAndReservedRequestsBeforeAccountWork(): void

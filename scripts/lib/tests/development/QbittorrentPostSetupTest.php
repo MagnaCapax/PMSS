@@ -66,8 +66,7 @@ final class QbittorrentPostSetupTest extends TestCase
                 $this->assertFalse(flock($other, LOCK_EX | LOCK_NB));
                 fclose($other);
                 // The shell has no clock seam: pin its blocking policy, then simulate the holder's exit at dispatch.
-                $this->assertStringContainsString('flock -w 120 9 || exit 1;', $command);
-                $this->assertStringNotContainsString('flock -n 9', $command);
+                $this->assertStringContainsAndOmitsStrings(['flock -w 120 9 || exit 1;'], ['flock -n 9'], $command);
                 $dispatched = true;
                 flock($lock, LOCK_UN);
                 $rc = 1; $output = []; exec($command, $output, $rc); return $rc === 0;

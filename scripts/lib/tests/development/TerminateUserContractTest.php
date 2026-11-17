@@ -17,8 +17,8 @@ final class TerminateUserContractTest extends TestCase
         $source = $this->pmssReadRepoFile('scripts/terminateUser.php');
         $this->assertTrue(strpos($source, "'expire_account_before_kill'") < strpos($source, "'kill_processes_initial'"));
         $this->assertTrue(strpos($source, 'pmssTerminateUserCertLineageDeleteCommand') > strpos($source, 'kill_processes_final'));
-        $this->assertStringContainsString('pmssUserAccountLookup($username) === null', $source);
-        $this->assertStringContainsString('pmssNginxUserMcxHostname($billingServiceId)', $source);
+        $this->assertStringContainsAllStrings(['pmssUserAccountLookup($username) === null',
+            'pmssNginxUserMcxHostname($billingServiceId)'], $source);
     }
     public function testTerminateUserConfirmationLoopHandlesEof(): void
     {
@@ -64,8 +64,7 @@ final class TerminateUserContractTest extends TestCase
             'pmssTerminateUserCompletion($username, $purgePaths, $purgeResults, $dryRun)',
         ], $source);
         $lingerStep = substr($source, strpos($source, "'disable_linger'"), 280);
-        $this->assertStringContainsString('timeout --kill-after=5s 45s loginctl disable-linger', $lingerStep);
-        $this->assertStringNotContainsString('|| true', $lingerStep);
+        $this->assertStringContainsAndOmitsStrings(['timeout --kill-after=5s 45s loginctl disable-linger'], ['|| true'], $lingerStep);
         $initial = array_column(\pmssTerminateUserInitialRemovalSteps('user1234', 1234), 0);
         $final = array_column(\pmssTerminateUserFinalRemovalSteps('user1234', 1234, 'killall -9 -u user1234'), 0);
         $this->assertSame(['remove_tmux_socket', 'remove_screen_socket', 'userdel_initial'], array_slice($initial, -3));
@@ -276,15 +275,11 @@ SH
         ], $source);
         $this->assertSame(1, substr_count($source, 'if (!$resume) {'));
         $this->assertSame(1, substr_count($source, 'pkill -9 -U '));
-        $this->assertStringContainsString("\$killUserCommand = 'killall -9 -u '", $source);
-        $this->assertStringContainsString("'resume' => \$resume", $source);
-        $this->assertStringContainsString("'uid' => \$uid", $source);
-        $this->assertStringContainsString('if (!$resume && !in_array($username, $knownUsers, true))', $source);
-        $this->assertStringContainsString('if (!$resume && !is_dir(', $source);
-        $this->assertStringContainsString('if (!$resume && $accountInfo === null)', $source);
+        $this->assertStringContainsAllStrings(["\$killUserCommand = 'killall -9 -u '", "'resume' => \$resume", "'uid' => \$uid",
+            'if (!$resume && !in_array($username, $knownUsers, true))', 'if (!$resume && !is_dir(',
+            'if (!$resume && $accountInfo === null)'], $source);
         $this->assertMatches('/InitialRemovalSteps\(\$username, \$uid\), \$dryRun\);\s*\}/', $source);
-        $this->assertStringNotContainsString('.terminating-', $source);
-        $this->assertStringNotContainsString('pmssTerminateUserMoveHomeForReclaim', $source);
+        $this->assertStringContainsAndOmitsStrings([], ['.terminating-', 'pmssTerminateUserMoveHomeForReclaim'], $source);
     }
 
     /** Run the actual refusal block with NSS snapshots, then exercise its shell guards on temp trees. */
@@ -319,8 +314,8 @@ register_shutdown_function(static function () { echo json_encode($GLOBALS['event
 PHP;
         $result = $this->pmssExecShellCommandWithTempStderr(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script.$block));
         $this->assertSame(1, $result['result']['rc']);
-        $this->assertStringContainsString('UID 1000 now belongs to liveuser', file_get_contents($result['stderrPath']));
-        $this->assertStringContainsString('seal failed', file_get_contents($result['stderrPath']));
+        $this->assertStringContainsAllStrings(['UID 1000 now belongs to liveuser',
+            'seal failed'], file_get_contents($result['stderrPath']));
         $events = json_decode($result['result']['output'], true);
         $this->assertSame(4, count($events));
         $this->assertSame('resume_refused', $events[3][1]);
@@ -361,15 +356,13 @@ PHP;
             'purge must be remove -> clear-immutable -> remove-leftovers'
         );
         $this->assertStringNotContainsString('immutableClear.pl', $steps[0][1], 'first removal must not walk the tree');
-        $this->assertStringContainsString('find -P . -depth', $steps[1][1]);
-        $this->assertStringContainsString('immutableClear.pl', $steps[1][1]);
-        $this->assertStringContainsString("'/home/user1234'", $steps[1][1], 'path must be shell-escaped');
+        $this->assertStringContainsAllStrings(['find -P . -depth', 'immutableClear.pl',
+            "'/home/user1234'" => 'path must be shell-escaped'], $steps[1][1]);
         $this->assertSame($steps[0][1], $steps[2][1], 'leftover removal repeats the initial removal');
 
         foreach ($steps as $step) {
             $this->assertSame(0, strpos($step[1], 'if [ -d '), 'every step must no-op when the directory is gone');
-            $this->assertStringContainsString('cd -P --', $step[1]);
-            $this->assertStringContainsString('"$pin"', $step[1]);
+            $this->assertStringContainsAllStrings(['cd -P --', '"$pin"'], $step[1]);
         }
     }
 
