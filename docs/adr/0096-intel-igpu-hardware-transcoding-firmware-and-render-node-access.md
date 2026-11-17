@@ -108,7 +108,10 @@ templates enable `non-free`). Otherwise the free entry stays. A `hold` entry is
 left as written. The packages conflict, and `dselect-upgrade` keeps an installed
 package that is still selected for install, so the swap also writes
 `intel-media-va-driver deinstall` (the first version without it left the free
-build installed on a newly installed Gen9 host); `va-driver-all` accepts either. A host whose Intel
+build installed on a newly installed Gen9 host); `va-driver-all` accepts either. The baselines
+write the entry arch-qualified (`intel-media-va-driver:amd64`), so the match ignores
+the `:arch` suffix and both emitted lines keep it (the second version compared the
+suffixed name and never fired on a real host). A host whose Intel
 display device goes away gets the free entry back on the next update. Testing
 the VAAPI path on a Gen9 host means a scale and an encode as a customer account
 through the system ffmpeg, not only a decode.

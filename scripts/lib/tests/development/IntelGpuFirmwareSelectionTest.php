@@ -27,6 +27,22 @@ class IntelGpuFirmwareSelectionTest extends TestCase
         $this->pmssAssertArraySubsetSame(['sanitised' => ["alpha\tinstall", "intel-media-va-driver-non-free\tinstall", "intel-media-va-driver\tdeinstall"]], $plan);
     }
 
+    public function testArchQualifiedEntryKeepsItsSuffixOnBothLines(): void
+    {
+        $plan = \pmssDpkgSelectionsSanitise(["intel-media-va-driver:amd64\tinstall"], 12, function () { return true; }, function () { return true; });
+        $this->pmssAssertArraySubsetSame(['sanitised' => ["intel-media-va-driver-non-free:amd64\tinstall", "intel-media-va-driver:amd64\tdeinstall"]], $plan);
+    }
+
+    public function testShippedDebian12BaselineSwapsTheMediaDriverOnIntelHosts(): void
+    {
+        $lines = file(dirname(__DIR__, 2).'/update/dpkg/selections-debian12.txt', FILE_IGNORE_NEW_LINES);
+        $this->assertTrue(is_array($lines));
+        $plan = \pmssDpkgSelectionsSanitise($lines, 12, function () { return true; }, function () { return true; });
+        $this->assertTrue(in_array("intel-media-va-driver-non-free:amd64\tinstall", $plan['sanitised'], true));
+        $this->assertTrue(in_array("intel-media-va-driver:amd64\tdeinstall", $plan['sanitised'], true));
+        $this->assertFalse(in_array("intel-media-va-driver:amd64\tinstall", $plan['sanitised'], true));
+    }
+
     public function testMediaDriverStaysFreeWithoutIntelDisplayOrWithoutNonFree(): void
     {
         $noIntel = \pmssDpkgSelectionsSanitise(['intel-media-va-driver install'], 12, function () { return true; }, function () { return false; });
