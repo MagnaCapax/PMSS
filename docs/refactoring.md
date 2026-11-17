@@ -892,6 +892,8 @@ one callback factory without changing assertions or runtime service behavior.
 Torrent configuration, port and transfer fixtures also use it for fixed mutation,
 account, PID, restart and RPC results. Child-process stubs stay self-contained;
 identity mutators and callbacks that validate arguments or record effects stay explicit.
+Network routes, netconsole logging/steps, systemd recovery and refused rewrite
+results use the same factory; partial Deluge writes retain each injected byte count.
 
 AI launcher tests share their temporary-directory setup, valid account state,
 passthrough cases, explicit-environment matrix and result assertions through

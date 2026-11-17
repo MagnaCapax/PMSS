@@ -64,7 +64,7 @@ PHP;
         $path = $this->pmssWriteFile($root.'/state.dat', 'unchanged');
         foreach ([null, false, 0, [], new \stdClass()] as $replacement) {
             $this->assertFalse(\pmssInodeSafeRewriteRegularFile($root, $path,
-                static function () use ($replacement) { return $replacement; }));
+                self::pmssMakeCallbacks(['rewrite' => $replacement])['rewrite']));
             $this->assertSame('unchanged', file_get_contents($path));
         }
     }

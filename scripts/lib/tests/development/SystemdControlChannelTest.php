@@ -103,10 +103,9 @@ class SystemdControlChannelTest extends TestCase
             ['rc' => 1, 'stdout' => ''],
             ['rc' => 0, 'stdout' => "Version=252\n"], ['rc' => 1, 'stdout' => ''],
         ], $commands);
-        $step = static function ($description, $command): int { return 0; };
         $log = $this->pmssMakeArrayLogger($logs);
 
-        $this->assertSame(1, \pmssSystemdControlChannelCheck($capture, $step, $log));
+        $this->assertSame(1, \pmssSystemdControlChannelCheck($capture, self::pmssMakeCallbacks(['step' => 0])['step'], $log));
         $this->assertSame('control channel still failed: loginctl_sessions', $logs[1]);
     }
 }

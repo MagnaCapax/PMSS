@@ -68,7 +68,6 @@ class DelugeCacheHitRatioPatchTest extends DelugeAppTestCase
         $this->pmssWriteFile($this->tempDir.'/core.py', "original\n");
         foreach ([false, 0, $payloadLength - 1] as $writeResult) {
             $this->logs = [];
-            $writer = static function () use ($writeResult) { return $writeResult; };
             $result = \pmssDelugeWritePatchedLines(
                 $this->tempDir.'/core.py',
                 $lines,
@@ -76,7 +75,7 @@ class DelugeCacheHitRatioPatchTest extends DelugeAppTestCase
                 $this->logger,
                 'dry: ',
                 'write failed: ',
-                $writer
+                self::pmssMakeCallbacks(['write' => $writeResult])['write']
             );
 
             $this->assertFalse($result, 'Incomplete writes must use the existing failure path');

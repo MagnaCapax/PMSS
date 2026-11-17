@@ -18,9 +18,7 @@ class UpdateNetworkingTemplateTest extends TestCase
         $this->pmssWithEnv(
             array('PMSS_CONFIG_DIR' => $configDir, 'PMSS_NETWORK_CONFIG' => $target),
             function () use (&$messages): void {
-                \pmssEnsureNetworkTemplate($this->pmssMakeArrayLogger($messages), static function (): string {
-                    return "default via 192.0.2.1 dev ens3 proto dhcp\n";
-                });
+                \pmssEnsureNetworkTemplate($this->pmssMakeArrayLogger($messages), self::pmssMakeCallbacks(['route' => "default via 192.0.2.1 dev ens3 proto dhcp\n"])['route']);
             }
         );
 

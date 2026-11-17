@@ -44,8 +44,7 @@ class NetconsoleConfigureTest extends TestCase
         /** @var array<int, array{string, string}> $calls */ $calls = [];
 
         $this->pmssWithEnv($this->netconsoleEnv($dir), function () use (&$calls): void {
-            \pmssNetconsoleConfigure(function (): void {
-            }, $this->pmssMakeStepRunner($calls));
+            \pmssNetconsoleConfigure(self::pmssMakeCallbacks(['log' => null])['log'], $this->pmssMakeStepRunner($calls));
         });
 
         $this->assertTrue(is_file($dir.'/modprobe.d/netconsole.conf'), 'expected modprobe config');
@@ -67,10 +66,8 @@ class NetconsoleConfigureTest extends TestCase
         $this->pmssWriteFile($dir.'/netconsole', '6665@192.0.2.10/eth0,6666@192.0.2.20/aa:bb:cc:dd:ee:ff');
 
         $this->pmssWithEnv($this->netconsoleEnv($dir), function () use ($dir): void {
-            \pmssNetconsoleConfigure(function (): void {
-            }, function (): int {
-                return 1;
-            });
+            $ops = self::pmssMakeCallbacks(['log' => null, 'step' => 1]);
+            \pmssNetconsoleConfigure($ops['log'], $ops['step']);
             $this->assertTrue(!is_file($dir.'/modprobe.d/netconsole.conf'), 'expected config write to be skipped');
         });
     }
@@ -88,8 +85,7 @@ class NetconsoleConfigureTest extends TestCase
         $env = $this->netconsoleEnv($dir);
         $env['PMSS_NETCONSOLE_MODULE_LOADED'] = '1';
         $this->pmssWithEnv($env, function () use (&$calls): void {
-            \pmssNetconsoleConfigure(function (): void {
-            }, $this->pmssMakeStepRunner($calls));
+            \pmssNetconsoleConfigure(self::pmssMakeCallbacks(['log' => null])['log'], $this->pmssMakeStepRunner($calls));
         });
 
         $this->assertEquals(2, count($calls));
