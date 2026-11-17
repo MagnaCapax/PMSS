@@ -79,9 +79,13 @@ function pmssRunPinnedRemoteArchiveStep(string $label, string $url, string $expe
 
     return pmssPinnedRemoteArtifactTempFileUse($label, $url, $expectedSha256, static function (string $archivePath) use ($archiveName, $sourceDir, $description, $postExtractCommands, $workDir): bool {
         $tarMode = substr($archiveName, -7) === '.tar.xz' ? '-xJf' : '-xzf';
-        $commands = ['set -e', 'mkdir -p '.escapeshellarg($workDir), 'cd '.escapeshellarg($workDir),
+        // Root extracts these source trees, sometimes into a world-writable /tmp (rtorrent, deluge):
+        // --no-same-owner/--no-same-permissions keep every member root-owned regardless of the UID/mode
+        // stored in the tarball, and umask 022 bounds freshly created paths (GHSA-6p3p-m8fg-p2wr class, #1228).
+        $commands = ['set -e', 'umask 022', 'mkdir -p '.escapeshellarg($workDir), 'cd '.escapeshellarg($workDir),
             'rm -rf '.escapeshellarg($sourceDir).' '.escapeshellarg($archiveName),
-            'cp '.escapeshellarg($archivePath).' '.escapeshellarg($archiveName), 'tar '.$tarMode.' '.escapeshellarg($archiveName)];
+            'cp '.escapeshellarg($archivePath).' '.escapeshellarg($archiveName),
+            'tar --no-same-owner --no-same-permissions '.$tarMode.' '.escapeshellarg($archiveName)];
         foreach ($postExtractCommands as $command) {
             $commands[] = $command;
         }
