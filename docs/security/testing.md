@@ -39,6 +39,18 @@ Security for PMSS emphasizes defense-in-depth on a shared host.
 ## Hermeticity
 - Development tests MUST NOT mutate the real filesystem or network. Use temp dirs and environment overrides (e.g., `PMSS_OS_RELEASE_PATH`, `PMSS_APT_SOURCES_PATH`).
 
+## Customer command cleanup consolidation prerequisite
+
+The duplicate account command cleanup remains blocked by the delivery prerequisite
+in [ADR 0022](../adr/0022-guiv-delivered-customer-files-must-be-self-contained.md)
+and `docs/TODO.md`. Before extraction, retain the memory-stream fault coverage in
+`AccountAgentCommandCleanupSafetyTest`, `DockerLsioSeedCaptureSafetyTest`,
+`ToggleAppQuiCommandCleanupSafetyTest` and `HermesStartCleanupSafetyTest`.
+The first three terminate then reap a still-owned child; Hermes only reaps it.
+Verify pipe-count differences, close-before-reap ordering, already-reaped handles
+and later-cleanup throwable precedence on a testing machine. Passing those
+fixtures does not establish the external panel allowlist or helper delivery order.
+
 ## Production Probes (read-only)
 - Validate presence/versions of binaries and services.
 - Confirm repo sources and apt metadata hashes when safe.
