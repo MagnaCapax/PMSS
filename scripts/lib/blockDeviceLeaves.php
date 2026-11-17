@@ -9,6 +9,8 @@
 /** @return array{leaves:array<int, string>,complete:bool} */
 function pmssBlockDeviceLeaves(string $device, string $root, ?callable $globber = null, ?callable $visit = null): array
 {
+    // A missing root must not become /<device>; malformed paths are unknown topology.
+    if ($root === '' || strpos($root, "\0") !== false) return ['leaves' => [], 'complete' => false];
     $leaves = []; $complete = true;
     $globber = $globber ?: 'glob';
     $walk = static function (string $name, int $depth) use (&$walk, &$leaves, &$complete, $root, $globber, $visit): void {

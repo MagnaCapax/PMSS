@@ -135,6 +135,13 @@ rollback, pin the target explicitly, e.g. `release:2026-01-21` or
 
 ## Phase 2 – `scripts/util/update-step2.php`
 
+The shared `blockDeviceLeaves.php` topology walker rejects empty or NUL-containing
+sysfs roots before filesystem probes or visitor callbacks. These inputs retain
+the existing empty, incomplete-topology result, so callers keep their own fallback
+policy. Valid roots, traversal order and leaf selection remain unchanged.
+`BlockDeviceLeavesInputSafetyTest` checks these boundaries with intercepted probes
+on the testing machine; devbox verification checks changed-file PHP syntax only.
+
 Systemd preparation repairs legacy per-UID drop-in precedence, including orphaned
 UIDs, with backups and one reload after the repair batch. See
 [ADR 0160](adr/0160-per-uid-slice-dropin-precedence-and-cleanup.md) and
