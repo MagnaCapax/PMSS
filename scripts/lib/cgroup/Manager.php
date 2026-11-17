@@ -19,8 +19,6 @@ require_once __DIR__ . '/../cli/helpText.php';
 
 class Manager
 {
-    private const ACTION_FLAG_MAP = ['status' => '--status', 'config' => '--config', 'apply' => '--apply', 'dryRun' => '--dry-run', 'respectExisting' => '--respect-existing', 'defaults' => '--defaults', 'wipe' => '--wipe'];
-
     /** @var SystemInterface */
     private $sys;
 
@@ -37,8 +35,7 @@ class Manager
 
     public function run(array $argv): int
     {
-        $args = $argv;
-        array_shift($args); // remove script name
+        $args = array_slice($argv, 1);
         if (in_array('--help', $args, true) || in_array('-h', $args, true)) {
             echo pmssCgroupCliUsageText()."\n";
             return 0;
@@ -61,64 +58,32 @@ class Manager
         $mode  = $this->sys->getCgroupMode();
         echo "user=$user uid=$uid slice=$slice mode=$mode\n";
 
-        // Resolve top-level CLI booleans once, preserving exact flag matching.
-        $plan += ['slice' => $slice, 'uid' => $uid, 'actions' => []];
-        foreach (self::ACTION_FLAG_MAP as $key => $flag) $plan['actions'][$key] = in_array($flag, $flags, true);
-        $device = (string) ($plan['options']['device'] ?? '');
-        $ioProfile = strtolower((string) ($plan['options']['io-profile'] ?? ''));
-        $ioCostQos = (string) ($plan['options']['io-cost-qos'] ?? '');
-        $ioCostModel = (string) ($plan['options']['io-cost-model'] ?? '');
-        $policyIoPairs = [];
-        $plan['options'] = array_intersect_key($plan['options'], PMSS_CGROUP_POLICY_OPTIONS + PMSS_CGROUP_NUMERIC_PROFILES);
+        $plan += ['slice' => $slice, 'uid' => $uid, 'mode' => $mode];
 
         if ($parseError !== null) {
             return pmssCliReturnWithStderr($parseError."\n", 2);
         }
 
-        if (($invalidMessage = pmssCgroupCliValidateFlagOptions($plan['options'], $ioCostQos, $ioCostModel)) !== null) {
+        if (($invalidMessage = pmssCgroupCliValidateFlagOptions($plan['options'], $plan['io']['io-cost-qos'], $plan['io']['io-cost-model'])) !== null) {
             return pmssCliReturnWithStderr($invalidMessage."\n", 2);
         }
 
         if ($plan['actions']['wipe'] && (!empty($plan['options']) || !empty($plan['ioProperties']) || $plan['actions']['defaults'] || $plan['actions']['respectExisting']
-            || $device !== '' || $ioProfile !== '' || $ioCostQos !== '' || $ioCostModel !== '')) {
+            || array_filter($plan['io'], static function (string $value): bool { return $value !== ''; }) !== [])) {
             return pmssCliReturnWithStderr("Invalid --wipe combination: remove resource, IO, defaults, and respect-existing options before wiping\n", 2);
         }
 
-        if ($plan['actions']['defaults']) {
-            $policyIoPairs = pmssCgroupCliDefaultsApply($this->sys, $plan['options']);
-        }
+        $policyIoPairs = $plan['actions']['defaults'] ? pmssCgroupCliDefaultsApply($this->sys, $plan['options']) : [];
 
         if ($plan['actions']['config']) pmssCgroupCliShowConfig($this->sys, $slice);
         if ($plan['actions']['status']) pmssCgroupCliShowStatus($this->sys, $slice, $uid);
 
         pmssCgroupCliExpandProfiles($plan['options']);
 
-        if (($invalidDeviceMessage = pmssCgroupCliValidateDeviceSelector($device)) !== null) {
-            return pmssCliReturnWithStderr($invalidDeviceMessage."\n", 2);
-        }
-
-        $devResolved = pmssCgroupCliDeviceResolve($this->sys, $device, isset($plan['options']['io-latency-ms']));
-        if ($devResolved === null) return 2;
-
-        if ($ioProfile !== '' && $devResolved !== '') {
-            pmssCgroupCliApplyIoProfile($ioProfile, $devResolved, $plan);
-        }
-
-        if (isset($plan['options']['io-latency-ms']) && (int)$plan['options']['io-latency-ms'] > 0) {
-            if ($mode === 'v2' && $devResolved !== '') {
-                $plan['ioProperties'][] = 'IODeviceLatencyTargetSec='.$devResolved.' '.(int)$plan['options']['io-latency-ms'].'ms';
-            } elseif ($mode !== 'v2') {
-                echo "[SKIP] IODeviceLatencyTargetSec requires cgroup v2\n";
-            }
-        }
-        $plan['ioCostWrites'] = pmssCgroupCliIoCostWrites($this->sys, $slice, $mode, $devResolved, $ioCostQos, $ioCostModel);
-
-        if (!empty($policyIoPairs) && empty($plan['ioProperties']) && $ioProfile === '' && $device === '') {
-            $plan['ioProperties'] = $policyIoPairs;
-        }
+        if (!pmssCgroupCliPlanIo($this->sys, $plan, $policyIoPairs)) return 2;
 
         if (!$plan['actions']['status'] && !$plan['actions']['config'] && !$plan['actions']['wipe']
-            && empty($plan['options']) && empty($plan['ioProperties']) && empty($plan['ioCostWrites']) && empty($device) && empty($ioProfile)) {
+            && empty($plan['options']) && empty($plan['ioProperties']) && empty($plan['ioCostWrites']) && empty($plan['io']['device']) && empty($plan['io']['io-profile'])) {
             pmssCgroupCliShowConfig($this->sys, $slice);
             pmssCgroupCliShowStatus($this->sys, $slice, $uid);
         }

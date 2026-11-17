@@ -1649,7 +1649,9 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Behavior: Plans and optionally applies systemd/cgroup slice properties for one existing user.
   - Internal handoff: input parsing, IO profiles and display share one plan;
     `cgroup/plan.php` finalizes it without changing CLI output or sizing APIs
-    (ADR 0175). Live properties are filtered before display, and all apply
+    (ADR 0175). Actions and IO selectors are normalized by input parsing;
+    `cgroup/ioPlan.php` owns ordered device, profile, latency, cost and fallback
+    planning. Live properties are filtered before display, and all apply
     commands are constructed after root checking and before the first runs.
   - Apply errors: when `--apply` runs a planned `systemctl` or `io.cost`
     write and any step returns non-zero, the script attempts the remaining

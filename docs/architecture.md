@@ -289,7 +289,9 @@ Keep the canonical installer/update details under `docs/install.md` and
   built together, preserving payload order and enforcement policy (ADR 0280).
 - **scripts/lib/cgroup/plan.php** – Finalizes the CLI's single plan after input
   and profile expansion: retain live properties, display, guard, build and apply
-  ordered steps. Manager keeps orchestration and public sizing helpers (ADR 0175).
+  ordered steps. `cliInput.php` owns actions and IO selectors; `ioPlan.php` owns
+  ordered device/profile/latency/cost planning and policy fallback. Manager keeps
+  orchestration and public sizing helpers (ADR 0175).
 - **scripts/lib/nginxConfig/** – Generates the public user subdomain route and reconciles obsolete private hash routes. The template catalog contains only active and suspended public variants.
   Global `setup.php` retains ordered orchestration and the render context;
   `setupFilesystem.php`, `setupTls.php`, `setupDefaultSite.php` and

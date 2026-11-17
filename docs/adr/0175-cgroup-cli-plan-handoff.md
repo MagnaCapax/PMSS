@@ -50,6 +50,34 @@ so identity, validation, root-check and command ordering are behavior locks.
 No credentials, secret files, logging fields, listening ports or public names
 are introduced or changed.
 
+## Amendment: input and IO planning ownership
+
+Input parsing now builds exact-match actions, numeric/profile options and one
+`io` selector map. The manager adds identity and mode to that same plan.
+`ioPlan.php` consumes it for selector validation, resolution, profile expansion,
+latency, cost and policy fallback in the original order. Profile and cost helpers
+consume the plan rather than parallel selector and identity arguments.
+
+This completes the original handoff decision without a new plan class or an
+alternate planner. Two internal concepts disappear: the separately threaded IO
+selector tuple and the standalone resolver's string/empty/null return protocol.
+The composed IO stage returns only success/refusal and updates the existing plan.
+Strict nonempty checks still reject `0` selectors with wipe, while automatic
+status retains its historical `empty()` checks. Parsing shorthand IO still probes
+before identity lookup; explicit config/status still precede selector validation.
+
+`CgroupIoPlanCharacterizationTest` exercises the legacy Manager entrypoint with
+intercepted host operations, locking output, probe order, repeated flags, clear
+sentinels, case normalization, v1 skips, refusals and privilege-check order.
+Existing v2 characterization remains the compatibility lock, with no new v2
+behavior. Verification on the devbox is changed-file PHP syntax only; execution
+and dry-run rehearsals remain on the testing machine.
+
+The security review above still applies: changing a slice's resource controls
+could affect another account's availability, so target validation and privileged
+apply guards remain in their original order. This refactor handles no credentials
+or secret storage and adds no file writer, listener, endpoint or exposure path.
+
 ## References
 - [Cgroup v1 production pin](0019-production-cgroup-v1-pin.md)
 - [CLI contract](../contracts.md)

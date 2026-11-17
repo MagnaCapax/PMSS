@@ -32,7 +32,7 @@ function pmssCgroupCliExpandProfiles(array &$opt): void
 }
 
 /** Apply one IO profile directly; no translated defaults/limits catalog is retained. */
-function pmssCgroupCliApplyIoProfile(string $profile, string $dev, array &$plan): void
+function pmssCgroupCliApplyIoProfile(array &$plan, string $dev): void
 {
     $builtIns = [
         'hdd' => ['ioWeight' => '200', 'readBw' => '5M', 'writeBw' => '10M', 'readIops' => 100, 'writeIops' => 100],
@@ -40,11 +40,11 @@ function pmssCgroupCliApplyIoProfile(string $profile, string $dev, array &$plan)
         'bulk' => ['ioWeight' => '500', 'cpuWeight' => '300', 'tasksMax' => '8192'],
     ];
     $defaults = ['ioWeight' => 'io-weight', 'cpuWeight' => 'cpu-weight', 'tasksMax' => 'tasks-max'];
-    $entry = $builtIns[$profile] ?? [];
+    $entry = $builtIns[$plan['io']['io-profile']] ?? [];
     $policy = \pmssCgroupPolicyLoad();
     // Keep case-insensitive overrides in source order, and ignore invalid fields.
     foreach (is_array($policy['profiles']['io'] ?? null) ? $policy['profiles']['io'] : [] as $name => $config) {
-        if (!is_string($name) || $name === '' || !is_array($config) || strtolower($name) !== $profile) continue;
+        if (!is_string($name) || $name === '' || !is_array($config) || strtolower($name) !== $plan['io']['io-profile']) continue;
         foreach (array_fill_keys(array_keys($defaults), ['', true]) + \pmssCgroupPolicyIoPairSpecs(false) as $key => $spec) {
             $value = \pmssCgroupPolicyPositiveValue($config, $key, (bool) $spec[1]);
             if ($value !== null) $entry[$key] = $value;

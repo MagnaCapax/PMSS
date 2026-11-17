@@ -67,7 +67,15 @@ function pmssCgroupCliParseFlagInputs(SystemInterface $sys, array $flags, ?strin
         }
     }
 
-    return ['options' => $options, 'ioProperties' => $ioPairs];
+    // One input record owns exact-match actions and IO selectors; unknown options stay ignored.
+    $io = array_fill_keys(['device', 'io-profile', 'io-cost-qos', 'io-cost-model'], '');
+    $plan = ['options' => array_intersect_key($options, PMSS_CGROUP_POLICY_OPTIONS + PMSS_CGROUP_NUMERIC_PROFILES),
+        'ioProperties' => $ioPairs, 'io' => array_intersect_key($options, $io) + $io, 'actions' => []];
+    $plan['io']['io-profile'] = strtolower($plan['io']['io-profile']);
+    foreach (['status' => '--status', 'config' => '--config', 'apply' => '--apply', 'dryRun' => '--dry-run', 'respectExisting' => '--respect-existing', 'defaults' => '--defaults', 'wipe' => '--wipe'] as $key => $flag) {
+        $plan['actions'][$key] = in_array($flag, $flags, true);
+    }
+    return $plan;
 }
 
 /**

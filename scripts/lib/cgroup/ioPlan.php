@@ -8,18 +8,37 @@
 
 namespace PMSS\Cgroup;
 
-/** Resolve one safe device; null means a fatal selector error, empty means no target. */
-function pmssCgroupCliDeviceResolve(SystemInterface $sys, string $device, bool $needsHomeLatency): ?string
+/** Complete IO planning in order: selector, profile, latency, cost, then policy fallback. */
+function pmssCgroupCliPlanIo(SystemInterface $sys, array &$plan, array $policyIoPairs): bool
 {
-    if ($device === '' && !$needsHomeLatency) return '';
-    $resolved = strpos($device, '/dev/') === 0 ? $device : $sys->resolveDevice($device !== '' ? $device : '/home');
-    if ($resolved === '' || \pmssCgroupPolicyDeviceTargetIsSafe($resolved)) return $resolved;
-    if ($device !== '') {
-        fwrite(STDERR, "Invalid resolved --device target: expected /dev/... without whitespace or NUL bytes\n");
-        return null;
+    $device = $plan['io']['device'];
+    if (($error = pmssCgroupCliValidateDeviceSelector($device)) !== null) {
+        fwrite(STDERR, $error."\n");
+        return false;
     }
-    echo "[WARN] IODeviceLatencyTargetSec skipped: unsafe /home backing device target\n";
-    return '';
+    $resolved = '';
+    if ($device !== '' || isset($plan['options']['io-latency-ms'])) {
+        $resolved = strpos($device, '/dev/') === 0 ? $device : $sys->resolveDevice($device !== '' ? $device : '/home');
+        if ($resolved !== '' && !\pmssCgroupPolicyDeviceTargetIsSafe($resolved)) {
+            if ($device !== '') {
+                fwrite(STDERR, "Invalid resolved --device target: expected /dev/... without whitespace or NUL bytes\n");
+                return false;
+            }
+            echo "[WARN] IODeviceLatencyTargetSec skipped: unsafe /home backing device target\n";
+            $resolved = '';
+        }
+    }
+    if ($plan['io']['io-profile'] !== '' && $resolved !== '') pmssCgroupCliApplyIoProfile($plan, $resolved);
+    if (isset($plan['options']['io-latency-ms']) && (int)$plan['options']['io-latency-ms'] > 0) {
+        if ($plan['mode'] === 'v2' && $resolved !== '') {
+            $plan['ioProperties'][] = 'IODeviceLatencyTargetSec='.$resolved.' '.(int)$plan['options']['io-latency-ms'].'ms';
+        } elseif ($plan['mode'] !== 'v2') {
+            echo "[SKIP] IODeviceLatencyTargetSec requires cgroup v2\n";
+        }
+    }
+    $plan['ioCostWrites'] = pmssCgroupCliIoCostWrites($sys, $plan, $resolved);
+    if (!empty($policyIoPairs) && empty($plan['ioProperties']) && $plan['io']['io-profile'] === '' && $device === '') $plan['ioProperties'] = $policyIoPairs;
+    return true;
 }
 
 /**
@@ -28,12 +47,12 @@ function pmssCgroupCliDeviceResolve(SystemInterface $sys, string $device, bool $
  * Emit diagnostics in planning order and return only executable writes.
  * @return array<int,array{path:string,value:string}>
  */
-function pmssCgroupCliIoCostWrites(SystemInterface $sys, string $slice, string $mode, string $resolvedDevice, string $ioCostQos, string $ioCostModel): array
+function pmssCgroupCliIoCostWrites(SystemInterface $sys, array $plan, string $resolvedDevice): array
 {
-    if ($ioCostQos === '' && $ioCostModel === '') return [];
+    if ($plan['io']['io-cost-qos'] === '' && $plan['io']['io-cost-model'] === '') return [];
     $writes = [];
 
-    if ($mode !== 'v2') {
+    if ($plan['mode'] !== 'v2') {
         echo "[SKIP] io.cost requires cgroup v2\n";
         return [];
     }
@@ -68,7 +87,7 @@ function pmssCgroupCliIoCostWrites(SystemInterface $sys, string $slice, string $
         return [];
     }
 
-    foreach (['io.cost.qos' => $ioCostQos, 'io.cost.model' => $ioCostModel] as $fileName => $rawSetting) {
+    foreach (['io.cost.qos' => $plan['io']['io-cost-qos'], 'io.cost.model' => $plan['io']['io-cost-model']] as $fileName => $rawSetting) {
         $setting = trim((string) $rawSetting);
         if ($setting === '') {
             continue;
@@ -82,7 +101,7 @@ function pmssCgroupCliIoCostWrites(SystemInterface $sys, string $slice, string $
         $normalized = $hasMajorMinor ? $setting : $majorMinor.' '.$setting;
 
         $writes[] = ['path' => '/sys/fs/cgroup/'.$fileName, 'value' => $normalized];
-        $slicePath = '/sys/fs/cgroup/user.slice/'.$slice.'/'.$fileName;
+        $slicePath = '/sys/fs/cgroup/user.slice/'.$plan['slice'].'/'.$fileName;
         if ($sys->readFile($slicePath) !== null) {
             $writes[] = ['path' => $slicePath, 'value' => $normalized];
         }
