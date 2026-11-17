@@ -810,6 +810,9 @@ Positional command observations use the same subset helper without unpacking
 fields solely for assertions; command-fragment checks stay at the caller.
 Resource-list columns, maintenance event slots, frame definitions and Docker PID
 maps use the same strict batches, preserving expected order and extra fields.
+Welcome/support payloads, rootless Docker publication, storage notice CLI results,
+network rule sets and boot activation traces follow the same batching rule;
+distinct per-field diagnostics stay explicit and case labels remain batch prefixes.
 
 Process and monitoring fixtures use `TestCase::pmssWriteFiles()` for ordered
 file trees and `pmssWriteSymlinks()` for executable, namespace and descriptor links. The shared

@@ -169,8 +169,8 @@ class NetworkHelpersTest extends TestCase
             ['##IFACE##' => 'eth0']
         );
 
-        $this->assertSame(['-A INPUT -i eth0 -j ACCEPT'], $rendered['filter']);
-        $this->assertSame(['-A POSTROUTING -o eth0 -j MASQUERADE'], $rendered['nat']);
+        $this->pmssAssertArraySubsetSame(['filter' => ['-A INPUT -i eth0 -j ACCEPT'],
+            'nat' => ['-A POSTROUTING -o eth0 -j MASQUERADE']], $rendered);
     }
 
     public function testFallbackRenderRejectsUnsafeInputsBeforeFlush(): void

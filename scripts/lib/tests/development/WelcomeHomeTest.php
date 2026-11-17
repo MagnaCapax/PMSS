@@ -317,9 +317,7 @@ final class WelcomeHomeTest extends TestCase
         $result = $this->creditsCall('pmssWelcomeHomeCreditsRead', array('otherKey' => $otherKey, 'stale' => $stale, 'expired' => $expired));
 
         foreach (array('otherKey', 'expired') as $name) {
-            $this->assertSame('unknown', $result[$name]['state'], $name);
-            $this->assertSame(0, $result[$name]['balance'], $name);
-            $this->assertSame('', $result[$name]['value'], $name);
+            $this->pmssAssertArraySubsetSame(['state' => 'unknown', 'balance' => 0, 'value' => ''], $result[$name], $name.': ');
         }
         $this->assertSame('ok', $result['stale']['state'], 'A same-key copy under an hour old stands in while the service is unreachable');
         $this->pmssAssertArraySubsetSame(['balance' => 777000, 'value' => '777k'], $result['stale']);
@@ -374,9 +372,7 @@ final class WelcomeHomeTest extends TestCase
         $result = $this->creditsCall('pmssWelcomeHomeCreditsRead', array('fresh' => $fresh, 'stale' => $stale, 'unknown' => $unknown));
 
         foreach (array('fresh', 'stale') as $name) {
-            $this->assertSame('ok', $result[$name]['state'], $name);
-            $this->assertSame(900000, $result[$name]['balance'], $name);
-            $this->assertSame(null, $result[$name]['credits_30d'], $name);
+            $this->pmssAssertArraySubsetSame(['state' => 'ok', 'balance' => 900000, 'credits_30d' => null], $result[$name], $name.': ');
             $this->assertSame('≈50 questions', $result[$name]['meta'], $name.': no used figure, no separator, no tokens');
             $this->pmssAssertStringNotContainsString('token', strtolower(json_encode($result[$name])), $name);
         }
@@ -525,8 +521,7 @@ final class WelcomeHomeTest extends TestCase
 
         $failures = array('unauthorized', 'rateLimited', 'tooLong', 'badRequest');
         foreach (array_merge($failures, array('unreachable', 'serverError')) as $name) {
-            $this->assertSame(false, $result[$name]['ok'], $name);
-            $this->assertSame('', $result[$name]['ticket'], $name);
+            $this->pmssAssertArraySubsetSame(['ok' => false, 'ticket' => ''], $result[$name], $name.': ');
         }
         $this->assertStringContainsString('not accepted', $result['unauthorized']['message']);
         $this->assertStringContainsString('Too many tickets', $result['rateLimited']['message']);
@@ -611,8 +606,7 @@ final class WelcomeHomeTest extends TestCase
         $known = array();
         foreach (array(2, 3, 4, 5, 6) as $code) {
             $answer = $result['c'.$code];
-            $this->assertSame(false, $answer['ok'], 'exit '.$code);
-            $this->assertSame(true, $answer['pikkumies'], 'exit '.$code);
+            $this->pmssAssertArraySubsetSame(['ok' => false, 'pikkumies' => true], $answer, 'exit '.$code.': ');
             $this->assertStringContainsString('support now', $answer['message'], 'exit '.$code);
             $known[] = $answer['message'];
         }
@@ -624,8 +618,7 @@ final class WelcomeHomeTest extends TestCase
         $this->assertStringContainsString('support now', $fallback);
         $this->assertFalse(in_array($fallback, $known, true), 'An unknown exit code does not borrow a known message');
         foreach (array(1, 127, 124, -1) as $code) {
-            $this->assertSame(false, $result['c'.$code]['ok'], 'exit '.$code);
-            $this->assertSame($fallback, $result['c'.$code]['message'], 'exit '.$code);
+            $this->pmssAssertArraySubsetSame(['ok' => false, 'message' => $fallback], $result['c'.$code], 'exit '.$code.': ');
         }
     }
 
@@ -662,16 +655,15 @@ final class WelcomeHomeTest extends TestCase
             .' $result[$name]["stateRead"] = count($GLOBALS["stateReads"]) > $before; } echo json_encode($result);', true);
 
         foreach (array('down', 'billing', 'other') as $name) {
-            $this->assertSame(false, $result[$name]['ok'], $name);
-            $this->assertSame(true, $result[$name]['pikkumies'], $name);
-            $this->assertSame('This topic goes straight to support.', $result[$name]['message'], $name);
+            $this->pmssAssertArraySubsetSame(['ok' => false, 'pikkumies' => true,
+                'message' => 'This topic goes straight to support.'], $result[$name], $name.': ');
             $this->assertSame(false, $result[$name]['stateRead'], $name.' is refused before anything is read');
         }
         $this->assertFalse(file_exists($binary.'.ran'), 'Server down and Billing never run Pikkumies');
 
         foreach (array('noBinary', 'noBinarySlow') as $name) {
-            $this->assertSame(false, $result[$name]['ok'], $name);
-            $this->assertSame('Pikkumies is not available on this account. Send this to support now.', $result[$name]['message'], $name);
+            $this->pmssAssertArraySubsetSame(['ok' => false,
+                'message' => 'Pikkumies is not available on this account. Send this to support now.'], $result[$name], $name.': ');
         }
     }
 
@@ -691,8 +683,8 @@ final class WelcomeHomeTest extends TestCase
             .' $result[$name] = pmssWelcomeHomeSupportPikkumiesSend($home, "working", "rTorrent stopped", "abcdef0123456789"); } echo json_encode($result);', true);
 
         foreach (array('low', 'empty') as $name) {
-            $this->assertSame(false, $result[$name]['ok'], $name);
-            $this->assertSame('Your AI credits are too low for Pikkumies to look into this. Send this to support now.', $result[$name]['message'], $name);
+            $this->pmssAssertArraySubsetSame(['ok' => false,
+                'message' => 'Your AI credits are too low for Pikkumies to look into this. Send this to support now.'], $result[$name], $name.': ');
             $this->assertFalse(file_exists($homes[$name].'/.mcxPikkumies/pikkumies/bin/pikkumies.ran'), $name.' never runs Pikkumies');
         }
         $this->assertSame(true, $result['enough']['ok']);

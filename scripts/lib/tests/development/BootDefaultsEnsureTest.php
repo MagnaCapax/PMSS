@@ -192,10 +192,9 @@ echo json_encode([$failed, [$messages, $GLOBALS['steps']]]);
 PHP
         );
 
-        $this->assertSame(['Updated /proc mount options in /tmp/fstab', '[WARN] /proc hidepid remount failed (rc=23)', '[WARN] update-grub failed (rc=23); boot options may not be applied'], $result[0][0]);
-        $this->assertSame(['Remounting /proc with hidepid=2', 'Updating GRUB configuration'], $result[0][1]);
-        $this->assertSame(['Updated /proc mount options in /tmp/fstab'], $result[1][0]);
-        $this->assertSame($result[0][1], $result[1][1]);
+        $this->pmssAssertArraySubsetSame([0 => ['Updated /proc mount options in /tmp/fstab', '[WARN] /proc hidepid remount failed (rc=23)', '[WARN] update-grub failed (rc=23); boot options may not be applied'],
+            1 => ['Remounting /proc with hidepid=2', 'Updating GRUB configuration']], $result[0]);
+        $this->pmssAssertArraySubsetSame([0 => ['Updated /proc mount options in /tmp/fstab'], 1 => $result[0][1]], $result[1]);
     }
 
     public function testFstabMutationCharacterizationMatrix(): void

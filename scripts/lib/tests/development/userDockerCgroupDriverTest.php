@@ -274,8 +274,7 @@ PHP;
         $result = $this->pmssRunInlinePhpJson($script, ['PMSS_TEST_DOCKER_CONFIG_PATH' => $path]);
 
         $this->pmssAssertArraySubsetSame(['ok' => false, 'changed' => false, 'reason' => 'read_failed'], $result['result']);
-        $this->assertSame('{"keep":true}', $result['bytes']);
-        $this->assertSame([], $result['temporaryFiles']);
+        $this->pmssAssertArraySubsetSame(['bytes' => '{"keep":true}', 'temporaryFiles' => []], $result);
     }
 
     public function testSharedRootlessDockerConfigRejectsSymlinkedConfigFile(): void
@@ -377,9 +376,8 @@ PHP;
                 'PMSS_TEST_DOCKER_CONFIG_ROOT' => $root, 'PMSS_TEST_WRITE_FAILURE' => $mode,
             ]);
             $this->assertFalse($result['result'], $mode);
-            $this->assertSame('write_failed', $result['reason'], $mode);
-            $this->assertSame('{"keep":true}', $result['bytes'], $mode);
-            $this->assertSame([], $result['temporaryFiles'], $mode);
+            $this->pmssAssertArraySubsetSame(['reason' => 'write_failed',
+                'bytes' => '{"keep":true}', 'temporaryFiles' => []], $result, $mode.': ');
         }
     }
 

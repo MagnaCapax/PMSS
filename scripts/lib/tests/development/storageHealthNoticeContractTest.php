@@ -61,8 +61,7 @@ HTML;
             }
             $result = $this->pmssRunRepoPhpScriptCommand('scripts/lib/tests/fixtures/storageHealthNoticeContract.php',
                 ['partial', $directory.'/storageHealthNotice.php']);
-            $this->assertSame(0, $result['rc']);
-            $this->assertSame('[false,false,false]', $result['output'], $missing);
+            $this->pmssAssertArraySubsetSame(['rc' => 0, 'output' => '[false,false,false]'], $result, $missing.': ');
         }
     }
 
@@ -79,8 +78,7 @@ HTML;
                 $this->pmssCreateSymlinkOrSkip($this->pmssRepoPath('etc/skel/www/storageHealthRaidDisplay.php'), $helper);
             }
             $result = $this->pmssRunRepoPhpScriptCommand('scripts/lib/tests/fixtures/storageHealthNoticeContract.php', ['bridge', $script]);
-            $this->assertSame(0, $result['rc']);
-            $this->assertSame('Storage RAID display helper unavailable', $result['output']);
+            $this->pmssAssertArraySubsetSame(['rc' => 0, 'output' => 'Storage RAID display helper unavailable'], $result);
         }
     }
 }
