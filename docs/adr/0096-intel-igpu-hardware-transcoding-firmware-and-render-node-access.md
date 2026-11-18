@@ -115,3 +115,33 @@ suffixed name and never fired on a real host). A host whose Intel
 display device goes away gets the free entry back on the next update. Testing
 the VAAPI path on a Gen9 host means a scale and an encode as a customer account
 through the system ffmpeg, not only a decode.
+
+## Amendment 2026-11-18: i915 display power states off on Intel display hosts
+
+Keeping `firmware-misc-nonfree` (above) means i915 loads the display
+microcontroller firmware (`kbl_dmc_ver1_04.bin` on Kaby Lake and Coffee Lake)
+on the next boot, and the display engine starts entering its DC5/DC6 power
+states. On a headless HP ProDesk 400 G4 DM (board 83F3, BIOS 02.15.00,
+Debian 12 kernel 6.1), every boot after the firmware landed panicked about
+20 seconds in with "Timeout: Not all CPUs entered broadcast exception handler".
+`options i915 enable_dc=0` with a rebuilt initramfs stopped it: the host has
+stayed up since, the DMC firmware still loads, the DC5/DC6 counters stay at 0,
+and VAAPI is unaffected, because render and media engines are separate from the
+display power states. The same signature is reported publicly on other HP
+G4/G5 minis and an Intel NUC8 (Debian bugs 1050852 and 1036644, drm/intel
+issue 9244), and `kbl_dmc_ver1_04.bin` is the newest KBL DMC, so a firmware
+update does not fix it. BIOS updates are not a remote option on these boards.
+
+Decision: on every host with an Intel display device, update writes the managed
+`/etc/modprobe.d/pmss-i915-dc.conf` with `options i915 enable_dc=0`, then
+checks each `/boot/initrd.img-*` with `lsinitramfs`, because i915 loads from the
+initrd. If any initrd lacks the file, it runs `update-initramfs -u -k all` once
+and checks again, warning about any initrd still missing it. The option applies
+from the next boot, so a host gets it before the reboot that would first load
+the firmware. The gate is the whole Intel display class, not a board list: a
+board missing from a list boot-loops and recovers only with hands on the box,
+while the cost on a headless server is a little idle display-engine power.
+Rejected: `i915.disable_display=1` (on 6.1 it only stops hotplug polling and
+keeps DMC and the DC mask), `mce=` tolerances (they hide the report while the
+CPUs stay hung), and blacklisting i915 or `nomodeset` (they remove the render
+node this ADR provides).

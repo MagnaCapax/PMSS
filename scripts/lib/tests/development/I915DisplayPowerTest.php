@@ -1,0 +1,122 @@
+<?php
+namespace PMSS\Tests;
+
+require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 2).'/update/systemPrep.php';
+
+/** The i915 enable_dc=0 pin must land on Intel display hosts and in every initrd (ADR 0096). */
+class I915DisplayPowerTest extends TestCase
+{
+    private const CONTENT = "# PMSS-managed: keep i915 display power states (DC5/DC6) off. With the DMC firmware loaded,\n"
+        ."# some headless Intel minis hang about 20 s after every boot (MCE broadcast timeout). ADR 0096.\n"
+        ."options i915 enable_dc=0\n";
+
+    /** Fake initramfs-tools: an "initrd" is a text listing; update-initramfs appends $entry to each. */
+    private function fakeTools(string $root, string $entry, string $updateBody = ''): array
+    {
+        $bin = $root.'/bin';
+        mkdir($bin, 0700);
+        file_put_contents($bin.'/lsinitramfs', "#!/bin/sh\ncat \"\$1\"\n");
+        $update = $updateBody !== '' ? $updateBody : "for f in '".$root."/boot'/initrd.img-*; do printf '%s\\n' '".$entry."' >> \"\$f\"; done\n";
+        file_put_contents($bin.'/update-initramfs', "#!/bin/sh\n".$update);
+        chmod($bin.'/lsinitramfs', 0700);
+        chmod($bin.'/update-initramfs', 0700);
+        return [$bin.'/lsinitramfs', $bin.'/update-initramfs'];
+    }
+
+    private function shellRunner(array &$commands): callable
+    {
+        return static function (string $description, string $command, array $skip = []) use (&$commands): int {
+            $commands[] = $description;
+            exec($command.' 2>/dev/null', $output, $rc);
+            return $rc;
+        };
+    }
+
+    private function boot(string $root, array $initrds): string
+    {
+        mkdir($root.'/boot', 0700);
+        foreach ($initrds as $name => $listing) file_put_contents($root.'/boot/'.$name, $listing);
+        return $root.'/boot';
+    }
+
+    public function testNonIntelHostWritesNothingAndRunsNothing(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-i915-nonintel-', 0700);
+        $commands = [];
+        \pmssEnsureI915DisplayPowerStatesOff(static function (): void {}, $root.'/dc.conf', static function (): bool { return false; }, $this->shellRunner($commands));
+        $this->assertFalse(file_exists($root.'/dc.conf'));
+        $this->assertSame([], $commands);
+    }
+
+    public function testIntelHostWritesOptionAndRebuildsOnlyMissingInitrds(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-i915-rebuild-', 0700);
+        $target = $root.'/etc/modprobe.d/pmss-i915-dc.conf';
+        $entry = ltrim($target, '/');
+        [$ls, $update] = $this->fakeTools($root, $entry);
+        $boot = $this->boot($root, ['initrd.img-6.1.0-41-amd64' => "usr/lib/modules\n", 'initrd.img-6.1.0-40-amd64' => $entry."\n"]);
+        $messages = [];
+        $commands = [];
+        $path = static function (string $name) use ($ls, $update): string { return $name === 'lsinitramfs' ? $ls : $update; };
+
+        \pmssEnsureI915DisplayPowerStatesOff($this->pmssMakeArrayLogger($messages), $target, static function (): bool { return true; }, $this->shellRunner($commands), $path, $boot);
+
+        $this->assertSame(self::CONTENT, file_get_contents($target));
+        $this->assertSame(0644, fileperms($target) & 0777);
+        $this->assertSame([
+            'Checking initrd.img-6.1.0-40-amd64 for the i915 power-state option',
+            'Checking initrd.img-6.1.0-41-amd64 for the i915 power-state option',
+            'Rebuilding initramfs for the i915 power-state option',
+            'Checking initrd.img-6.1.0-40-amd64 for the i915 power-state option',
+            'Checking initrd.img-6.1.0-41-amd64 for the i915 power-state option',
+        ], $commands);
+        $this->assertStringContainsString($entry, file_get_contents($boot.'/initrd.img-6.1.0-41-amd64'));
+        foreach ($messages as $message) $this->assertStringNotContainsString('[WARN]', $message);
+
+        // Second run: file up to date and every initrd carries it, so no rebuild.
+        $commands = [];
+        \pmssEnsureI915DisplayPowerStatesOff($this->pmssMakeArrayLogger($messages), $target, static function (): bool { return true; }, $this->shellRunner($commands), $path, $boot);
+        $this->assertSame(2, count($commands));
+        $this->assertTrue(in_array('[SKIP] i915 display power-state option already present and up to date', $messages, true));
+    }
+
+    public function testRebuildThatLeavesAnInitrdWithoutTheOptionWarns(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-i915-stillmissing-', 0700);
+        $target = $root.'/etc/modprobe.d/pmss-i915-dc.conf';
+        [$ls, $update] = $this->fakeTools($root, ltrim($target, '/'), "exit 0\n");
+        $boot = $this->boot($root, ['initrd.img-6.1.0-41-amd64' => "usr/lib/modules\n"]);
+        $messages = [];
+        $commands = [];
+        $path = static function (string $name) use ($ls, $update): string { return $name === 'lsinitramfs' ? $ls : $update; };
+        \pmssEnsureI915DisplayPowerStatesOff($this->pmssMakeArrayLogger($messages), $target, static function (): bool { return true; }, $this->shellRunner($commands), $path, $boot);
+        $this->assertTrue(in_array('[WARN] i915 power-state option still missing from initrd.img-6.1.0-41-amd64', $messages, true));
+    }
+
+    public function testFailedRebuildAndMissingToolsWarnWithoutClaimingSuccess(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-i915-fail-', 0700);
+        $target = $root.'/etc/modprobe.d/pmss-i915-dc.conf';
+        [$ls, $update] = $this->fakeTools($root, ltrim($target, '/'), "exit 1\n");
+        $boot = $this->boot($root, ['initrd.img-6.1.0-41-amd64' => "usr/lib/modules\n"]);
+        $messages = [];
+        $commands = [];
+        $path = static function (string $name) use ($ls, $update): string { return $name === 'lsinitramfs' ? $ls : $update; };
+        \pmssEnsureI915DisplayPowerStatesOff($this->pmssMakeArrayLogger($messages), $target, static function (): bool { return true; }, $this->shellRunner($commands), $path, $boot);
+        $this->assertTrue(in_array('[WARN] update-initramfs failed; the i915 power-state option is not in every initrd yet', $messages, true));
+
+        $messages = [];
+        $commands = [];
+        \pmssEnsureI915DisplayPowerStatesOff($this->pmssMakeArrayLogger($messages), $root.'/other.conf', static function (): bool { return true; }, $this->shellRunner($commands), static function (): string { return ''; }, $boot);
+        $this->assertSame(self::CONTENT, file_get_contents($root.'/other.conf'));
+        $this->assertSame([], $commands);
+        $this->assertTrue(in_array('[WARN] initramfs-tools unavailable; the i915 power-state option is not confirmed in the initrd', $messages, true));
+    }
+
+    public function testUpdateStep2RunsTheStepAfterRenderAccess(): void
+    {
+        $source = (string) file_get_contents(dirname(__DIR__, 3).'/util/update-step2.php');
+        $this->assertOrderedStrings(["'pmssEnsureIntelRenderGroupMembers'", "'pmssEnsureI915DisplayPowerStatesOff'"], $source);
+    }
+}
