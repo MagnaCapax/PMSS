@@ -134,6 +134,11 @@ function pmssUserTransferMain(array $argv): int
             }
             $source = pmssUserTransferParseIdentity((string) ($GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? ''));
             $cfg['receiver'] = pmssUserTransferReceiverConfig($cfg['localUser'], $home, $source);
+            $cfg['senderFiltersXattrs'] = pmssUserTransferSenderFiltersXattrs($source['rsync'] ?? null);
+            if (!$cfg['senderFiltersXattrs']) {
+                logMessage('[WARN] Source rsync '.$source['rsync'].' is older than 3.1.3 and cannot parse xattr filters; '
+                    .'transferring without extended attributes');
+            }
             pmssUserTransferWriteFile($scratchPaths['namespaceProbe'], pmssUserTransferBuildNamespaceProbe($cfg), 0700);
             $localProbe = pmssBuildCommand('env', [
                 '-u', 'PMSS_USER_TRANSFER_PASSWORD', 'setpriv', '--reuid='.$cfg['receiver']['uid'],

@@ -13,6 +13,7 @@ require_once __DIR__.'/intoDestination.php';
 function pmssUserTransferBuildIdentityProbe(array $cfg): string
 {
     $remote = 'uid=$(id -u); gid=$(id -g); printf "\\nPMSS_TRANSFER_IDENTITY_BEGIN uid=%s gid=%s\\n" "$uid" "$gid"; '
+        .'printf "rsync=%s\\n" "$(rsync --version 2>/dev/null | sed -n '.escapeshellarg('1s/^rsync  *version  *\([0-9.]*\).*/\1/p').')"; '
         .'for kind in uid gid; do file=/etc/sub$kind; test -r "$file" || exit 1; '
         .'case "$kind" in uid) primary=$uid ;; gid) primary=$gid ;; esac; '
         .'awk -F: -v user='.escapeshellarg($cfg['remoteUser']).' -v primary="$primary" -v kind="$kind" '
@@ -35,13 +36,18 @@ function pmssUserTransferParseIdentity(string $output): array
     if (!is_array($lines) || !preg_match('/^uid=([0-9]+) gid=([0-9]+)$/D', $lines[0] ?? '', $match)) {
         throw new RuntimeException('Source identity probe returned invalid IDs', 1);
     }
-    $identity = ['uid' => (int) $match[1], 'gid' => (int) $match[2], 'subuid' => [], 'subgid' => []];
+    $identity = ['uid' => (int) $match[1], 'gid' => (int) $match[2], 'subuid' => [], 'subgid' => [], 'rsync' => null];
     if ($identity['uid'] < 1000 || $identity['gid'] < 1000
         || $identity['uid'] > 4294967295 || $identity['gid'] > 4294967295
         || (string) $identity['uid'] !== $match[1] || (string) $identity['gid'] !== $match[2]) {
         throw new RuntimeException('Source account has unsafe primary IDs', 1);
     }
     foreach (array_slice($lines, 1) as $line) {
+        // The sender's rsync version decides whether it can parse the xattr filter rules (pmssUserTransferSenderFiltersXattrs).
+        if (preg_match('/^rsync=([0-9]+(?:\.[0-9]+){1,2})?$/D', $line, $version)) {
+            $identity['rsync'] = isset($version[1]) && $version[1] !== '' ? $version[1] : null;
+            continue;
+        }
         if (!preg_match('/^(subuid|subgid)=([0-9]+):([0-9]+)$/D', $line, $parts)) {
             throw new RuntimeException('Source identity probe returned invalid ranges', 1);
         }

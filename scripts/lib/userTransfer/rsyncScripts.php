@@ -32,15 +32,29 @@ function pmssUserTransferBuildRsyncCommand(
 
     // One boundary flag retains empty mount directories for customer remounts.
     // --sparse: holes stay holes, so a home that fits its quota on the source also fits it on the target (ADR 0283).
-    $rsync = 'rsync -aHAX --numeric-ids --stats --one-file-system --sparse'
+    // A sender older than rsync 3.1.3 rejects the xattr filter rules and copies nothing, so it gets no xattrs at all.
+    $xattrs = ($cfg['senderFiltersXattrs'] ?? true) !== false;
+    $rsync = 'rsync -aHA'.($xattrs ? 'X' : '').' --numeric-ids --stats --one-file-system --sparse'
         .(!empty($cfg['namespaceRsync']) ? ' --rsync-path='.escapeshellarg('unshare --map-auto --map-root-user rsync')
             : ' --usermap='.escapeshellarg($cfg['receiver']['sourceUid'].':0')
                 .' --groupmap='.escapeshellarg($cfg['receiver']['sourceGid'].':0'))
-        .' --filter='.escapeshellarg('-x user.rsync.*').' --filter='.escapeshellarg('-x! user.*')
+        .($xattrs ? ' --filter='.escapeshellarg('-x user.rsync.*').' --filter='.escapeshellarg('-x! user.*') : '')
         .($options === '' ? '' : ' '.$options).' -e '
         .escapeshellarg(pmssUserTransferBuildSshCommand($cfg['remoteUser']))
         .' '.implode(' ', $arguments).' '.escapeshellarg($destination);
     return "#!/bin/bash\nset -e\n".pmssUserTransferBuildReceiver($cfg, $rsync);
+}
+
+/**
+ * Whether the sending rsync parses the xattr filter rules ('-x' modifier, rsync 3.1.3 and later).
+ * Only a parsed version below 3.1.3 answers false; an unknown version keeps the full option set.
+ */
+function pmssUserTransferSenderFiltersXattrs(?string $version): bool
+{
+    if ($version === null || !preg_match('/^([0-9]+)\.([0-9]+)(?:\.([0-9]+))?$/D', $version, $part)) {
+        return true;
+    }
+    return version_compare($part[1].'.'.$part[2].'.'.($part[3] ?? '0'), '3.1.3', '>=');
 }
 
 function pmssUserTransferBuildRsyncMain(array $cfg): string

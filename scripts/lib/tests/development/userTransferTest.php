@@ -763,6 +763,37 @@ SNAP;
         }, 'overlaps');
     }
 
+    /** A sender older than rsync 3.1.3 rejects '-x' filter rules (exclude.c, rc 1) and copies nothing. */
+    public function testOldSenderRsyncTransfersWithoutXattrFilters(): void
+    {
+        $frame = static function (string $body): string {
+            return "password: \nPMSS_TRANSFER_IDENTITY_BEGIN ".$body."PMSS_TRANSFER_IDENTITY_END\nConnection closed.\n";
+        };
+        $ranges = "subuid=110000:2\nsubgid=120000:2\n";
+        $this->assertSame('3.1.1', \pmssUserTransferParseIdentity($frame("uid=2200 gid=2300\nrsync=3.1.1\n".$ranges))['rsync']);
+        $this->assertSame(null, \pmssUserTransferParseIdentity($frame("uid=2200 gid=2300\nrsync=\n".$ranges))['rsync']);
+        $this->assertSame(null, \pmssUserTransferParseIdentity($frame("uid=2200 gid=2300\n".$ranges))['rsync']);
+        $this->assertStringContainsString('rsync --version', \pmssUserTransferBuildIdentityProbe($this->baseConfig()));
+
+        foreach (['3.1.1' => false, '3.1.2' => false, '3.1' => false, '3.1.3' => true, '3.2.7' => true, '4.0' => true,
+            'garbage' => true] as $version => $expected) {
+            $this->assertSame($expected, \pmssUserTransferSenderFiltersXattrs($version), 'sender rsync '.$version);
+        }
+        $this->assertTrue(\pmssUserTransferSenderFiltersXattrs(null));
+
+        $cfg = $this->baseConfig();
+        foreach ([\pmssUserTransferBuildRsyncMain($cfg), \pmssUserTransferBuildRsyncFinal($cfg)] as $script) {
+            $this->assertStringContainsAllStrings(['rsync -aHAX --numeric-ids', '-x user.rsync.*', '-x! user.*'], $script);
+        }
+        $cfg['senderFiltersXattrs'] = false;
+        foreach ([\pmssUserTransferBuildRsyncMain($cfg), \pmssUserTransferBuildRsyncFinal($cfg)] as $script) {
+            $this->assertStringContainsString('rsync -aHA --numeric-ids', $script);
+            $this->assertStringNotContainsString('-aHAX', $script);
+            $this->assertStringNotContainsString('user.rsync', $script);
+            $this->assertStringNotContainsString('-x! user.', $script);
+        }
+    }
+
     /** Root-only local rehearsal: no network or host account mutation. */
     public function testNamespacedReceiverPreservesPayloadAndTargetBillingMarker(): void
     {
