@@ -60,6 +60,8 @@ function pmssUserTransferBuildRemoteSizeProbe(array $cfg): string
  */
 function pmssUserTransferParseDuBytes(string $output): ?int
 {
+    // Corrupt probe bytes cannot certify a count, even outside the matched field.
+    if (strpos($output, "\0") !== false) return null;
     if (preg_match('/\bbytes=([0-9]+)\b/', $output, $matches) === 1) {
         return pmssUnsignedDecimalIntParse($matches[1]);
     }
@@ -78,6 +80,8 @@ function pmssUserTransferParseDuBytes(string $output): ?int
  */
 function pmssUserTransferParseHomeStats(string $output): ?array
 {
+    // Check raw output before trim() can erase leading or trailing corruption.
+    if (strpos($output, "\0") !== false) return null;
     if (preg_match('/\bbytes=([0-9]+)\s+files=([0-9]+)\b/', trim($output), $matches) !== 1) {
         return null;
     }

@@ -100,6 +100,32 @@ class UserTransferMetadataCharacterizationTest extends TestCase
             \pmssUserTransferEvaluateCompleteness(100, 89, 90));
     }
 
+    /** Guard scripts/lib/userTransfer/homeStats.php without executing local or remote probes. */
+    public function testHomeStatsRejectNulAtEveryRawOutputBoundary(): void
+    {
+        foreach ([
+            ["bytes=34 files=5\n", 34, ['bytes' => 34, 'files' => 5]],
+            [" \tbytes=00034\tfiles=005\r\n", 34, ['bytes' => 34, 'files' => 5]],
+            ['bytes=0 files=0', 0, ['bytes' => 0, 'files' => 0]],
+            ['bytes='.PHP_INT_MAX.' files=1', PHP_INT_MAX, ['bytes' => PHP_INT_MAX, 'files' => 1]],
+            ["12 legacy\nbytes=34 files=5", 34, ['bytes' => 34, 'files' => 5]],
+            ["bytes=34 files=5\nnested_mounts=0\n", 34, ['bytes' => 34, 'files' => 5]],
+            ["34\t/home/fixtur01/\n", 34, null],
+            [" \t00034 legacy\r\n", 34, null],
+            ['', null, null], ['unavailable', null, null],
+        ] as [$output, $bytes, $stats]) {
+            // Clean fixtures retain aggregate precedence, whitespace, zeros and legacy parsing.
+            $this->assertSame($bytes, \pmssUserTransferParseDuBytes($output));
+            $this->assertSame($stats, \pmssUserTransferParseHomeStats($output));
+            for ($offset = 0; $offset <= strlen($output); $offset++) {
+                // Include unrelated rows and path bytes, plus both ends that trim() removes.
+                $corrupt = substr($output, 0, $offset)."\0".substr($output, $offset);
+                $this->assertSame(null, \pmssUserTransferParseDuBytes($corrupt), bin2hex($corrupt));
+                $this->assertSame(null, \pmssUserTransferParseHomeStats($corrupt), bin2hex($corrupt));
+            }
+        }
+    }
+
     public function testCategoryProbeScriptBytes(): void
     {
         $prefix = "ssh -F /dev/null -o Compression=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
