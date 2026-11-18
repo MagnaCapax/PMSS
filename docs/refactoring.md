@@ -299,6 +299,14 @@ and serialized field order retain their contracts.
 
 ## Minimal Contract Rules (Joukahainen)
 
+Media-stack port discovery rejects NUL-containing home/configuration paths before
+filesystem probes and NUL-containing configuration bytes before port matching.
+These observations retain the existing null/empty-array fallbacks; valid paths,
+catalog patterns, range checks and reservation publication remain unchanged.
+`MediaStackPortInputSafetyTest` intercepts filesystem and allocation boundaries
+to cover corrupt paths/content, unavailable reads and ordinary INI/XML/marker
+ports. Execution stays on testing machines; devbox checks changed PHP syntax only.
+
 The combined service-port reservation reader clears its completion output before
 either namespace scan begins. A root probe, glob or decoder throwable cannot
 leave a caller's previous successful scan certified; the original throwable

@@ -49,6 +49,8 @@ function pmssMediaStackConfiguredPortRead(string $home, array $definition): ?int
     if (($definition['path'] ?? '') === '') return null;
     $home = rtrim($home, '/');
     $path = $home.'/'.ltrim((string) ($definition['path'] ?? ''), '/');
+    // Corrupt paths cannot identify an adoptable port; do not pass them to realpath().
+    if (pmssFilesystemPathHasNulByte($path)) return null;
     $homeReal = realpath($home);
     $pathReal = realpath($path);
     $size = @filesize($path);
@@ -60,7 +62,8 @@ function pmssMediaStackConfiguredPortRead(string $home, array $definition): ?int
     }
 
     $content = pmssReadRegularFileContents($path);
-    if ($content === null) {
+    // A valid-looking match cannot certify a NUL-corrupted configuration.
+    if ($content === null || strpos($content, "\0") !== false) {
         return null;
     }
     foreach (($definition['patterns'] ?? array()) as $pattern) {
@@ -80,7 +83,8 @@ function pmssMediaStackPortsEnsure(string $user, string $home): array
 {
     $ports = array();
     $home = rtrim($home, '/');
-    if (!pmssValidateUsername($user) || basename($home) !== $user || !is_dir($home) || is_link($home)) {
+    if (pmssFilesystemPathHasNulByte($home) || !pmssValidateUsername($user)
+        || basename($home) !== $user || !is_dir($home) || is_link($home)) {
         return $ports;
     }
 
