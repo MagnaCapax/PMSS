@@ -782,6 +782,9 @@ abstract class TestCase
             'PMSS_CONFIG_DIR' => $cfgDir,
             'PMSS_SYSTEMD_USER_SLICE_DIR' => $dropDir,
             'PMSS_TOTAL_MEM_MIB' => (string) ($options['totalMemMiB'] ?? 2048),
+            // The aggregate bound also reads the balloon and min_free; pin both so the test host's /proc never leaks in.
+            'PMSS_BALLOON_HELD_MIB' => '0',
+            'PMSS_MIN_FREE_KBYTES' => '1048576',
         ];
         if (isset($options['totalCpuThreads'])) {
             $env['PMSS_TOTAL_CPU_THREADS'] = (string) $options['totalCpuThreads'];

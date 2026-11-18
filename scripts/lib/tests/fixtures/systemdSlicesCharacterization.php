@@ -7,6 +7,8 @@ function option($key, $default = null) { return $GLOBALS['sliceCase'][$key] ?? $
 function pmssTestModeEnabled() { return option('testMode', false); }
 function pmssCgroupMode() { return option('mode', 'v1'); }
 function pmssTotalMemMiB() { record(['memory']); return option('memory', 65536); }
+function pmssBalloonHeldMiB() { record(['balloon']); return option('balloon', 0); }
+function pmssMinFreeMiB() { record(['minFree']); return option('minFree', 1024); }
 function pmssTotalCpuThreads() { record(['cpu']); return option('cpu', 16); }
 function pmssResolvePathFromEnv($key, $default) {
     return ['PMSS_CONFIG_DIR' => '/config', 'PMSS_SYSTEMD_USER_SLICE_DIR' => '/systemd/user-.slice.d',

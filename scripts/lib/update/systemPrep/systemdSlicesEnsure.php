@@ -10,7 +10,7 @@ require_once dirname(__DIR__, 2).'/cgroup/policy.php';
 require_once dirname(__DIR__).'/../runtime.php';
 require_once dirname(__DIR__, 2).'/user/userCgroupSliceDropins.php';
 
-pmssRequireRelativeFiles(__DIR__, ['systemdSliceSizing.php', 'systemdSliceIo.php', 'systemdSliceDropins.php', 'systemdSliceRuntime.php']);
+pmssRequireRelativeFiles(__DIR__, ['systemdSliceSizing.php', 'systemdSliceIo.php', 'systemdSliceDropins.php', 'systemdSliceRuntime.php', 'systemdSliceAggregate.php']);
 
 /**
  * Install tuned systemd slice overrides when missing.
@@ -82,6 +82,9 @@ function pmssEnsureSystemdSlices(?callable $logger = null): void
     }
 
     pmssSystemdSliceShadowInstall($dropDir, $tasksMax, $sawLegacyVendorDropin, $log);
+
+    // Bound the sum of all tenants by physical RAM (ADR 0296); the reload below applies it.
+    pmssSystemdUserSliceAggregateInstall($dropDir, $cfgDir, $totalMiB, $mode, $log);
 
     pmssSystemdUserManagerDropinsInstall($policy, $log);
 

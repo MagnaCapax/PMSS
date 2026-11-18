@@ -9,6 +9,7 @@ This document explains how PMSS configures Linux cgroups (via systemd) for per�
   - v2: `etc/seedbox/config/template.cgroup.user-slice.v2.conf`
   - v1: `etc/seedbox/config/template.cgroup.user-slice.v1.conf`
 - Admin drop‑ins are written to `/etc/systemd/system/user-.slice.d/15-pmss.conf`. Vendor paths are not used.
+- An aggregate physical bound is written to `/etc/systemd/system/user.slice.d/15-pmss-aggregate.conf` from `etc/seedbox/config/template.cgroup.user-slice.aggregate.conf`: `MemoryMax` on `user.slice` = full RAM (MemTotal plus what the virtio balloon holds) minus `max(1536 MiB, min(10%, 1.25 x vm.min_free_kbytes + 512 MiB))` (24576 MiB at the 1 GiB min_free floor gives 22784 MiB). It bounds the sum of all tenants only and changes no per-account limit; see [ADR 0296](adr/0296-aggregate-memory-bound-on-the-user-slice.md). Rollback: delete the file and `systemctl daemon-reload`.
 - When policy defines descriptor caps, PMSS writes `/etc/systemd/system/user@.service.d/20-pmss-limits.conf` with `LimitNOFILE=soft:hard`.
 - Root (user‑0.slice) is always unlimited. A boot + periodic check enforces this.
 

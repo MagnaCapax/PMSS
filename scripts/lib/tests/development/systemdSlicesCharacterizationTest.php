@@ -39,26 +39,29 @@ class SystemdSlicesCharacterizationTest extends TestCase
             'missing-device' => ['mode' => 'v2', 'policy' => ['ioLatencyMs' => 5]],
         ];
         // SHA-256 of JSON traces captured from the original controller on the testing VM.
+        // ADR 0296 inserts one aggregate user.slice drop-in step after the shadow install (it reads the balloon and
+        // min_free, then logs both): the 16 cases that reach it were re-captured on the testing VM; missing-template, unreadable-template and
+        // slice-write-failure stop before it and keep their original hashes.
         $expected = [
-            'defaults' => 'aacd9c9c053afe91940d0b863a6891eb865360d232a5b8fb70efe3a4b402a4b8',
-            'test-mode' => '62ce7663e8f4db0278ac5434ae146a1bc31818a415c9d935ee946b1fc6ea1df6',
-            'small-host' => '4e5875e6fee6b37b2d338cfe0c406c06b439a19127c16bceb136f3e646094390',
-            'undetected-host' => '5b8647926a91ce8ca3b3765eb08e8b29fa32facffc7d19955342578fbe332be2',
-            'numeric-policy' => '94a2ce2f64680c3430027bd02416f21da7d314456108bda7ea7fea00157d064c',
-            'invalid-policy' => '319cf5be54f2f9ca8435a0f711f6e30e485279b1e2cb8e3eb6f3df95ef960097',
-            'infinity' => 'f0c8cf91e4084a0d5b915ad6f690d9c54d2c9fe88cc1afc428e6533ac09a7064',
+            'defaults' => 'eac3d65cbe2ab194e066c9e06e44ba227a1808ec9162e941514215d84e977b0a',
+            'test-mode' => 'd40ce0025bea4e6506489bf4f19914d4a987b2cdd3cfc4ba8598461b1f0f809b',
+            'small-host' => 'b3c6b957de1d3de22ad55994c89adefc4f4eccb0adcca4f6e53c82abba05e275',
+            'undetected-host' => '73e988f75a65e8ac6491269c8695c260814ea81040df83479e46b9deb4c08368',
+            'numeric-policy' => '236b1e036fe8067c695e15f59538e5094ac09386e81be7fa28b0eba0387f49fb',
+            'invalid-policy' => '938a2ad5ffc78b6a69b14ac5ac0d1188c820e16abd627eee301d2cae3f302f0f',
+            'infinity' => 'b59eb8e738a89326b2145be2ae90fd07cbe12bad5fa15f2ff1a6761163e887da',
             'missing-template' => 'cd2b103f32887feeb9bb980975ca9a62629b39825298bf77f773c2635d4f2868',
             'unreadable-template' => 'b6b9e5f7f50ea4385f35785ece0b5184e13280a4b41bd820c2006fc101b43897',
             'slice-write-failure' => '7825cec234751d44fecde31f204ab80ac7babd693bd5522a43b574a7697816b4',
-            'root-write-failure' => '77bd1a0f9959e7ad4b62b6fb22b66236e1483072055775dfe66a118c8aa7df73',
-            'legacy-shadow' => '8ebe83ccaa0ef9ae8108cbe5b073b583383eae13fe968404e55c9c12a8965514',
-            'unchanged-shadow' => '5fd3bced2f3daf96c8f373f6081f5e4faa3418de28347754440cd456f1cfe44e',
-            'list-failure' => 'ddde5e444c481492cf6be4cb08b55d06b01d689f1d961f6c3b5adff8348bb68e',
-            'empty-list' => 'ddde5e444c481492cf6be4cb08b55d06b01d689f1d961f6c3b5adff8348bb68e',
-            'v1-io' => '8909324f3810f56ff9bf52980448b58ec56c51fb45d4e832ef1722d0589918a5',
-            'v2-io' => '811feb36fc6d35e5b0dbf4037df6634a477b480e7d411abb26b443a3ed18b871',
-            'unsafe-device' => '05075d7896b75b88ae687ec22b6c498335c8f363ddfe5c9958181872c469ec11',
-            'missing-device' => '463989cff5e94f36834de4a8351de50ae6213d73687a99a08f8f753e5bb282cd',
+            'root-write-failure' => '24270730c926fa3bab78c146386ee72109d3be7d0933d0385c8948056dfe2dff',
+            'legacy-shadow' => '813797c0df427a969aaf1176ccc32170342bfd912ddacf99c50cd80c87be1a03',
+            'unchanged-shadow' => '74c93031cf3d217204ba10b3b6b172ddab6a851f9531e8729750a3de1aa0a9fc',
+            'list-failure' => '72854123b02f03e2642923302b2513aec446257494927cb42d7517797b0c8f14',
+            'empty-list' => '72854123b02f03e2642923302b2513aec446257494927cb42d7517797b0c8f14',
+            'v1-io' => '9245d5385547b27fa7d0551558db3b1d631bc44765a4e9a282344cdc771582e5',
+            'v2-io' => '2229d45eda6fb020167898334be00e5b6caf7d3e7222d219fc37abc0786c20d0',
+            'unsafe-device' => '756d04f4b3c5fca05530ce03210d516f3a02c03e18b3737aa21ee60e28809cb3',
+            'missing-device' => 'f10be30c99dbdccda9c37daa70b75572d94c274148f1d5711d09e416db802c4b',
         ];
         foreach ($cases as $caseName => $options) {
             // Reflect the actual production helpers with in-memory dependencies.

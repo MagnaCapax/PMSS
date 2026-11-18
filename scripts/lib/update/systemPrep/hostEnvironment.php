@@ -16,6 +16,32 @@ function pmssTotalMemMiB(): int
     return pmssEnvReadDigits('PMSS_TOTAL_MEM_MIB') ?? pmssProcMeminfoTotalMiBRead();
 }
 
+/** MiB the virtio balloon holds now (inflated minus deflated 4 KiB pages since boot); 0 without one. */
+function pmssBalloonHeldMiB(string $path = '/proc/vmstat'): int
+{
+    if (($override = pmssEnvReadDigits('PMSS_BALLOON_HELD_MIB')) !== null) {
+        return $override;
+    }
+    $count = ['balloon_inflate' => 0, 'balloon_deflate' => 0];
+    foreach (pmssReadRegularFileNonEmptyLines($path) as $line) {
+        $parts = preg_split('/\s+/', trim($line));
+        if (count($parts) === 2 && isset($count[$parts[0]]) && ctype_digit($parts[1])) {
+            $count[$parts[0]] = (int) $parts[1];
+        }
+    }
+    return intdiv(max(0, $count['balloon_inflate'] - $count['balloon_deflate']) * 4, 1024);
+}
+
+/** Live vm.min_free_kbytes in MiB; 1024 (the PMSS floor) when it cannot be read. */
+function pmssMinFreeMiB(string $path = '/proc/sys/vm/min_free_kbytes'): int
+{
+    if (($override = pmssEnvReadDigits('PMSS_MIN_FREE_KBYTES')) !== null) {
+        return intdiv($override, 1024);
+    }
+    $value = trim((string) (pmssReadRegularFileContents($path) ?? ''));
+    return ctype_digit($value) && (int) $value > 0 ? intdiv((int) $value, 1024) : 1024;
+}
+
 /**
  * Count logical-CPU fields without matching 'processor' inside model names.
  */
