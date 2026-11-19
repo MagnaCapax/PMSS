@@ -313,6 +313,8 @@ pmssRunProfiledCallableBatch([
     ['Ensuring systemd slices', 'pmssEnsureSystemdSlices', ['logmsg']],
     ['Hardening systemd D-Bus cross-user disclosure', 'pmssEnsureSystemdDbusDisclosureHardening', ['logmsg']],
 ]);
+// ADR 0298: systemd writes only the memory limit on cgroup v1; put swap inside the same user.slice bound.
+runStep('Bounding user.slice memory plus swap', '/scripts/cron/cgroupUserSliceMemswApply.php');
 pmssRunProfiledCallable('Ensuring Intel render-node access', 'pmssEnsureIntelRenderNodeAccess', ['logmsg'], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);
 pmssRunProfiledCallable('Ensuring Intel render-group membership', 'pmssEnsureIntelRenderGroupMembers', ['logmsg'], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);
 pmssRunProfiledCallable('Keeping i915 display power states off', 'pmssEnsureI915DisplayPowerStatesOff', ['logmsg'], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);
