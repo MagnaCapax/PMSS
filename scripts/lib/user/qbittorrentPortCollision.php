@@ -9,12 +9,17 @@ function pmssQbittorrentPortHasForeignListener(string $table, int $port, int $ui
 {
     if (!pmssNetworkPortInRange($port, 1024) || $uid < 1) return false;
     foreach (explode("\n", $table) as $line) {
+        // Check raw rows before whitespace normalization can erase corrupt bytes.
+        if (strpos($line, "\0") !== false) continue;
         $fields = pmssConfigLineColumns($line, 0, []);
         if (count($fields) < 10 || $fields[3] !== '0A'
-            || !ctype_digit($fields[7]) || !ctype_digit($fields[9]) || $fields[9] === '0') continue;
+            || !ctype_digit($fields[9]) || $fields[9] === '0') continue;
+        // A saturated integer cast cannot establish another account's ownership.
+        $owner = pmssUnsignedDecimalIntParse($fields[7]);
+        if ($owner === null) continue;
         if (preg_match('/\A(?:0100007F|00000000):([0-9A-Fa-f]{4})\z/', $fields[1], $match) !== 1) continue;
         // Same-UID launchers and stray instances are not cross-account collisions.
-        if (hexdec($match[1]) === $port && (int) $fields[7] !== $uid) return true;
+        if (hexdec($match[1]) === $port && $owner !== $uid) return true;
     }
     return false;
 }

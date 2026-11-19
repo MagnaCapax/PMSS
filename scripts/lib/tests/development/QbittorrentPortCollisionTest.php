@@ -48,6 +48,32 @@ final class QbittorrentPortCollisionTest extends TestCase
             $this->assertTrue(\pmssQbittorrentPortHasForeignListener($this->row('0100007F', $hex), $port, 1001));
     }
 
+    public function testCorruptRowsCannotProveOwnershipOrHideValidSiblings(): void
+    {
+        $row = rtrim($this->row(), "\n");
+        foreach (["\0".$row, $row."\0", " \0".$row, $row."\0 ",
+            str_replace('00000000:0000', "00000000:\0".'0000', $row),
+            str_replace(' 1002 ', " 10\0".'02 ', $row)] as $corrupt) {
+            $this->assertFalse(\pmssQbittorrentPortHasForeignListener($corrupt, 23456, 1001));
+            foreach ([$corrupt."\n".$this->row(), $this->row().$corrupt] as $table)
+                $this->assertTrue(\pmssQbittorrentPortHasForeignListener($table, 23456, 1001));
+        }
+    }
+
+    public function testUnrepresentableOwnersAreIgnoredBeforeComparison(): void
+    {
+        foreach ([(string) PHP_INT_MAX.'0', str_repeat('9', 40), '000'.PHP_INT_MAX.'0'] as $owner) {
+            $row = $this->row('0100007F', '5BA0', $owner);
+            $this->assertFalse(\pmssQbittorrentPortHasForeignListener($row, 23456, 1001));
+            $this->assertFalse(\pmssQbittorrentPortHasForeignListener($row, 23456, PHP_INT_MAX));
+            $this->assertTrue(\pmssQbittorrentPortHasForeignListener($row.$this->row(), 23456, 1001));
+        }
+        foreach (['0', '0000', '0001002', (string) PHP_INT_MAX] as $owner)
+            $this->assertTrue(\pmssQbittorrentPortHasForeignListener($this->row('0100007F', '5BA0', $owner), 23456, 1001));
+        $this->assertFalse(\pmssQbittorrentPortHasForeignListener($this->row('0100007F', '5BA0', '0001001'), 23456, 1001));
+        $this->assertFalse(\pmssQbittorrentPortHasForeignListener($this->row('0100007F', '5BA0', (string) PHP_INT_MAX), 23456, PHP_INT_MAX));
+    }
+
     public function testOwnListenerDoesNotHideASeparateForeignListener(): void
     {
         $own = $this->row('0100007F', '5BA0', '1001');
@@ -69,7 +95,8 @@ final class QbittorrentPortCollisionTest extends TestCase
         $this->assertSame([['fixtur01', 23456]], $events);
         $this->assertSame("23456\n", file_get_contents($portPath));
         $this->assertSame($config, file_get_contents($path));
-        foreach ([null, false, '', $this->row('0100007F', '5BA0', '1001')] as $table)
+        foreach ([null, false, '', $this->row('0100007F', '5BA0', '1001'),
+            "\0".$this->row(), $this->row('0100007F', '5BA0', PHP_INT_MAX.'0')] as $table)
             $this->assertFalse(\pmssQbittorrentPortCollisionObserve('fixtur01', $home,
                 self::pmssMakeCallbacks(['read' => $table]) + $ops));
         foreach ([false, [], ['uid' => 0], ['uid' => '1001']] as $account)
