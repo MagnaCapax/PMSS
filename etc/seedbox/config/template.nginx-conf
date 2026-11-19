@@ -41,8 +41,10 @@ http {
 
         # Keep the combined prefix stable; the suffix lets the lighttpd
         # watchdog distinguish transport failures from application-level 502s.
+        # Request lifetime precedes the watchdog's unchanged, end-anchored suffix.
         log_format pmss_combined '$remote_addr - $remote_user [$time_local] "$request" '
                                  '$status $body_bytes_sent "$http_referer" "$http_user_agent" '
+                                 'pmss_request_time="$request_time" '
                                  'pmss_status="$status" pmss_upstream_addr="$upstream_addr" '
                                  'pmss_upstream_status="$upstream_status" '
                                  'pmss_upstream_header_time="$upstream_header_time"';
