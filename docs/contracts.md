@@ -575,6 +575,16 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ## System Preparation
 
+- `pmssBalloonHeldMiB()` rejects NUL-containing vmstat rows and unrepresentable
+  balloon counters through its existing zero fallback. Valid counters retain
+  last-value precedence, missing-counter zeroes and the nonnegative page delta;
+  dividing pages directly by 256 avoids overflowing an intermediate KiB count.
+- `pmssMinFreeMiB()` uses the shared checked integer-file reader before converting
+  KiB to MiB. NUL-containing, oversized, zero or unreadable values retain the
+  1024 MiB fallback. Valid whitespace, leading zeroes, truncation and environment
+  override precedence remain unchanged. `HostMemoryObservationSafetyTest` covers
+  these readers using private files; execution stays on testing machines.
+
 - pmssTotalCpuThreads(): int
   - Honors `PMSS_TOTAL_CPU_THREADS`, including zero; otherwise counts line-anchored
     `processor:` fields in `/proc/cpuinfo` via `pmssCpuInfoThreadCount()`.

@@ -24,12 +24,17 @@ function pmssBalloonHeldMiB(string $path = '/proc/vmstat'): int
     }
     $count = ['balloon_inflate' => 0, 'balloon_deflate' => 0];
     foreach (pmssReadRegularFileNonEmptyLines($path) as $line) {
+        // Corrupt bytes cannot certify a held-memory observation, even after trimming.
+        if (strpos($line, "\0") !== false) return 0;
         $parts = preg_split('/\s+/', trim($line));
         if (count($parts) === 2 && isset($count[$parts[0]]) && ctype_digit($parts[1])) {
-            $count[$parts[0]] = (int) $parts[1];
+            $value = pmssUnsignedDecimalIntParse($parts[1]);
+            if ($value === null) return 0;
+            $count[$parts[0]] = $value;
         }
     }
-    return intdiv(max(0, $count['balloon_inflate'] - $count['balloon_deflate']) * 4, 1024);
+    // Divide 4 KiB pages directly to avoid overflowing an intermediate KiB count.
+    return intdiv(max(0, $count['balloon_inflate'] - $count['balloon_deflate']), 256);
 }
 
 /** Live vm.min_free_kbytes in MiB; 1024 (the PMSS floor) when it cannot be read. */
@@ -38,8 +43,8 @@ function pmssMinFreeMiB(string $path = '/proc/sys/vm/min_free_kbytes'): int
     if (($override = pmssEnvReadDigits('PMSS_MIN_FREE_KBYTES')) !== null) {
         return intdiv($override, 1024);
     }
-    $value = trim((string) (pmssReadRegularFileContents($path) ?? ''));
-    return ctype_digit($value) && (int) $value > 0 ? intdiv((int) $value, 1024) : 1024;
+    $value = pmssReadRegularFileInt($path);
+    return $value > 0 ? intdiv($value, 1024) : 1024;
 }
 
 /**
