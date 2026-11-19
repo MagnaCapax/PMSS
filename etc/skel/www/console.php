@@ -185,8 +185,8 @@ if (!$running) {
         .' >/dev/null 2>>'.escapeshellarg($spawnLog).' &');
 
     // Give ttyd a moment to create the socket before the iframe hits the proxy.
-    for ($i = 0; $i < 100 && !file_exists($sock); $i++) {
-        usleep(20000); // up to ~2s
+    for ($i = 0; $i < 500 && !file_exists($sock); $i++) {
+        usleep(20000); // up to ~10s for a slow start under CPU load
     }
 
     if (!file_exists($sock)) {
