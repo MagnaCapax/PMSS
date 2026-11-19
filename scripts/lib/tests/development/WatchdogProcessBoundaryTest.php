@@ -94,6 +94,22 @@ class WatchdogProcessBoundaryTest extends TestCase
         }
     }
 
+    public function testNulCorruptionAnywhereInKernelMetadataKeepsInodeFallback(): void
+    {
+        foreach (['stat', '77/stat'] as $target) {
+            $proc = $this->procFixture('1000', '100');
+            $raw = file_get_contents($proc.'/'.$target);
+            // Include corruption outside the matched fields and bytes trim() would erase.
+            foreach (["\0".$raw, $raw."\0", "other\0\n".$raw,
+                $raw."\nother=\0", substr_replace($raw, "\0", 2, 0)] as $corrupt) {
+                $this->pmssWriteFile($proc.'/'.$target, $corrupt);
+                touch($proc.'/77', 1234567890);
+                clearstatcache();
+                $this->assertSame(1234567890, pmssUserWatchdogProcStartTime($proc, '77'), $target);
+            }
+        }
+    }
+
     /** Field 22 follows nineteen fields after the parenthesised command name. */
     private function procFixture(string $boot, string $ticks): string
     {

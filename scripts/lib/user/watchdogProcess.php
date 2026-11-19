@@ -100,10 +100,12 @@ function pmssUserWatchdogProcStartTime(string $procRoot, string $pid): ?int
 {
     // Reject malformed paths and non-process identifiers before touching the filesystem.
     if (strpos($procRoot, "\0") !== false || (pmssUnsignedDecimalIntParse($pid) ?? 0) < 1) return null;
-    $boot = preg_match('/^btime\s+(\d+)$/m', (string) @file_get_contents($procRoot.'/stat'), $m) === 1
+    $bootRaw = (string) @file_get_contents($procRoot.'/stat');
+    // Corruption anywhere in either observation cannot certify a kernel start time.
+    $boot = strpos($bootRaw, "\0") === false && preg_match('/^btime\s+(\d+)$/m', $bootRaw, $m) === 1
         ? pmssUnsignedDecimalIntParse($m[1]) : null;
     $stat = (string) @file_get_contents($procRoot.'/'.$pid.'/stat');
-    $close = strrpos($stat, ')');
+    $close = strpos($stat, "\0") === false ? strrpos($stat, ')') : false;
     // Fields after the parenthesised command name start at field 3, so field 22 is index 19.
     $fields = $close === false ? array() : pmssConfigLineColumns(substr($stat, $close + 1), 0, []);
     $ticks = isset($fields[19]) ? pmssUnsignedDecimalIntParse($fields[19]) : null;

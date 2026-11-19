@@ -299,6 +299,14 @@ and serialized field order retain their contracts.
 
 ## Minimal Contract Rules (Joukahainen)
 
+Watchdog process start-time reads reject NUL-containing boot and process-stat
+observations before matching fields or normalizing whitespace. Corruption anywhere
+in either read uses the existing inode-time fallback. Valid command names, clock
+tick truncation, timestamp bounds and read order remain unchanged (ADR 0211).
+`WatchdogProcessBoundaryTest` covers both raw observations with temporary proc
+fixtures; execution stays on testing machines, with changed-file PHP syntax checks
+on the devbox.
+
 Media-stack port discovery rejects NUL-containing home/configuration paths before
 filesystem probes and NUL-containing configuration bytes before port matching.
 These observations retain the existing null/empty-array fallbacks; valid paths,
