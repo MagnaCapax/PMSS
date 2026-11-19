@@ -105,7 +105,13 @@ if ($device !== '/dev/watchdog') {
 
 runStep('Enabling watchdog service', 'systemctl enable --now watchdog.service');
 
-// enable --now leaves a running daemon on its old configuration; restart only when something changed.
+// enable --now leaves a running daemon on its old configuration; reload it only when something changed.
+// Stop, then start; not `systemctl restart`. Debian's unit fails its ExecStopPost on purpose (run_wd_keepalive=1) so that
+// OnFailure= starts wd_keepalive, which holds the hardware heartbeat; wd_keepalive Conflicts= watchdog.service, so on a
+// restart it cancels the start half ("Job for watchdog.service canceled") and the daemon stays dead with only the
+// keepalive running (measured on Debian 12, watchdog 5.16-1+b2). A plain start replaces the keepalive, and one of the
+// two holds the heartbeat throughout.
 if ($wasActive && $installedBefore !== pmssWatchdogInstalledContents(['/etc/watchdog.conf', $scriptTarget, $homeCheckTarget])) {
-    runStep('Restarting watchdog service to load changed configuration', 'systemctl restart watchdog.service');
+    runStep('Stopping watchdog service to load changed configuration', 'systemctl stop watchdog.service');
+    runStep('Starting watchdog service with changed configuration', 'systemctl start watchdog.service');
 }

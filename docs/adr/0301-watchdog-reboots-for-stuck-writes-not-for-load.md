@@ -86,10 +86,14 @@ change to either never reached a live host before its next boot.
    `/var/log/pmss/checkHomeWriteWatchdog.log` and syslog. Entering and leaving the
    stuck state is logged with the device, counters, load average and I/O pressure, so
    the reason for a reboot survives it.
-6. The installer installs the shim with mode 0755, and runs `systemctl restart
-   watchdog.service` after `enable --now` only when the unit was already active and
-   `/etc/watchdog.conf` or an installed test changed. A run with nothing new does not
-   touch the daemon.
+6. The installer installs the shim with mode 0755, and runs `systemctl stop
+   watchdog.service` then `systemctl start watchdog.service` after `enable --now`
+   only when the unit was already active and `/etc/watchdog.conf` or an installed test
+   changed. A run with nothing new does not touch the daemon. Not `systemctl restart`:
+   Debian's unit fails its `ExecStopPost` on purpose so that `OnFailure=` starts
+   `wd_keepalive`, which `Conflicts=` with `watchdog.service` and cancels the start half
+   of a restart, leaving the daemon dead with only the heartbeat keeper running (seen
+   on a Debian 12 guest, watchdog 5.16-1+b2). The start after a stop replaces the keeper.
 
 ## Consequences
 

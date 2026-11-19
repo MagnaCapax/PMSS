@@ -234,8 +234,10 @@ class WatchdogHomeWriteCheckTest extends TestCase
             "['Installing watchdog home write check'",
             "runStep('Enabling watchdog service', 'systemctl enable --now watchdog.service');",
             'if ($wasActive && $installedBefore !== pmssWatchdogInstalledContents(',
-            "'systemctl restart watchdog.service'",
+            "'systemctl stop watchdog.service'",
+            "'systemctl start watchdog.service'",
         ], $source);
+        $this->assertStringNotContainsString('systemctl restart watchdog.service', $source, 'restart is cancelled by wd_keepalive on Debian');
         // Both the shim and its PHP logic must be present before activation.
         $this->assertStringContainsString('!is_file($homeCheckTemplate) || !is_file($homeCheckLogic)', $source);
     }
