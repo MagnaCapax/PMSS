@@ -169,3 +169,13 @@ Verification is the browser journey, not the rendered rule: sign in through
 the panel address, finish the first-run password change, reload, load an
 authenticated page, go to the panel and back. Rollback removes the row flag;
 the next managed-fragment refresh restores the gate on each node.
+
+### Pin-bump credential verification (2026-11-18, Refs #1242)
+
+Status: Proposed.
+
+The pre-bump first-run journey on a testing host also confirms that Scryer
+creates its database at the catalog's `credentialStore` path and, after forcing
+a repair on the started instance (for example by changing `scryer.pw` to mode
+0644), the saved Login remains byte-identical and still signs in before the
+owner changes it in-app (ADR 0101).

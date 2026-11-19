@@ -206,6 +206,15 @@ password does not widen exposure, because a rotated value never reached the
 store and the old one kept working. Accounts whose Login already diverged
 from the store are not repaired by this change. Rollback removes the key.
 
+### Pin-bump verification (2026-11-18, Refs #1242)
+
+Status: Proposed.
+
+Before a Scryer pin bump, confirm on a testing host that a started instance
+creates its database at the catalog's `credentialStore` path and, after forcing
+a repair (for example by changing `scryer.pw` to mode 0644), the saved Login
+remains byte-identical and still signs in before the owner changes it in-app.
+
 ## Resume an interrupted qui repair (2026-11-15, Refs #1271)
 
 The 15-second bootstrap deadline can interrupt qui account creation or password
