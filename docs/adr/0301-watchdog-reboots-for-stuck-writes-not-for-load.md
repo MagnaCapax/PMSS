@@ -114,6 +114,13 @@ change to either never reached a live host before its next boot.
 - Follow-ups: restart behaviour is verified on a host with a watchdog device at
   rollout, not by the repository tests. A reset-count check per host after rollout
   shows whether `realtime` removed the heartbeat resets.
+- Follow-ups: the QA proof of the stuck-write test used a `dm-delay` device. Whether
+  `/sys/class/block/<md device>/inflight` and the `/proc/diskstats` write counter
+  move with real load on the md array behind `/home` is checked on the first rollout
+  host (read both under tenant load before the rest follow). If the in-flight count
+  stays 0 there, the test never fires and the host has no stuck-write reboot at all.
+  The test and the shim fail open by design, so that state is silent: the shim maps an
+  interpreter failure to "not stuck" without a log line.
 
 ## References
 
