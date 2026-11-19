@@ -1,5 +1,12 @@
 # Refactoring Guidelines
 
+Fork-failure diagnostics omit `/proc/meminfo` counters above `PHP_INT_MAX`
+instead of rendering saturated integer casts as memory readings. The existing
+checked decimal parser preserves zero, leading zeroes, representable limits,
+field order and independent valid counters. `RuntimeForkDiagnosticsCounterSafetyTest`
+isolates all host reads and covers each memory field; execution stays on testing
+machines, with changed-file PHP syntax checks on the devbox.
+
 Repository maintenance retains its `repositories.php` and `apt.php` includes and
 public helpers while separating Docker/Sonarr prerequisites, source discovery
 and publication, release dispatch, and APT housekeeping (ADR 0295). Source-line

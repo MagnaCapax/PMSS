@@ -8,7 +8,7 @@ class RuntimeForkDiagnosticsInputSafetyTest extends TestCase
 {
     public function testCorruptKernelReadsRetainUnavailableResults(): void
     {
-        $load = $this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/commandDiagnostics.php', 'ForkInputFixture');
+        $load = $this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/commandDiagnostics.php', 'ForkInputFixture', ['values.php']);
         $results = $this->pmssRunInlinePhpJson(<<<'PHP'
 namespace ForkInputFixture;
 // Every observation is synthetic; neither /proc nor cgroups are read.

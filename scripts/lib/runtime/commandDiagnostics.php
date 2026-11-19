@@ -82,13 +82,14 @@ function pmssDumpForkDiagnostics(string $context, ?callable $logger = null): voi
 
     $meminfoRaw = $readTrim('/proc/meminfo', 16384);
     if ($meminfoRaw !== null) {
-        // Read and render one field catalog in the established diagnostic order.
+        // Render only representable counters, retaining the established diagnostic order.
         $wanted = ['MemAvailable' => 'avail', 'MemTotal' => 'total', 'SwapFree' => 'swap_free',
             'SwapTotal' => 'swap_total', 'Committed_AS' => 'committed', 'CommitLimit' => 'commit_limit'];
         $vals = [];
         foreach ($wanted as $key => $label) {
-            if (preg_match('/^'.$key.':\s+([0-9]+)\s+kB$/m', $meminfoRaw, $match)) {
-                $vals[] = $label.'='.sprintf('%0.1fMiB', (int) $match[1] / 1024.0);
+            if (preg_match('/^'.$key.':\s+([0-9]+)\s+kB$/m', $meminfoRaw, $match)
+                && ($value = pmssUnsignedDecimalIntParse($match[1])) !== null) {
+                $vals[] = $label.'='.sprintf('%0.1fMiB', $value / 1024.0);
             }
         }
         if ($vals !== []) $log($prefix.'mem '.implode(' ', $vals));
