@@ -44,7 +44,7 @@ self-heal slots as `cgroupBfqWeightApply.php`) and once after the slice step of 
 - A lowering of the memsw limit below what the tenants hold as anonymous memory, shared memory and
   swap is not written (the kernel would purge all page cache and then fail); the script logs it and
   retries on the next run.
-- The write goes through `timeout 30 tee`. A host without `memory.memsw.limit_in_bytes` (cgroup v2,
+- The write goes through `timeout --kill-after=5s 30s tee`. A host without `memory.memsw.limit_in_bytes` (cgroup v2,
   kernel without the v1 memory controller) exits 0 with an INFO line. Output goes to
   `/var/log/pmss/cgroupUserSliceMemswApply.log` (rotated).
 - No limit is raised or removed. `pmssEnsureSystemdSlices` and the per-account limits are unchanged.

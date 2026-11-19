@@ -69,7 +69,7 @@ function pmssUserSliceMemswAnonPlusSwap(string $memoryStat): int
 /** One sysfs write through timeout(1): lowering a limit below usage reclaims inside the write. */
 function pmssUserSliceMemswWrite(string $file, string $value): bool
 {
-    $p = proc_open('timeout 30 tee '.escapeshellarg($file), [0 => ['pipe', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes);
+    $p = proc_open('timeout --kill-after=5s 30s tee '.escapeshellarg($file), [0 => ['pipe', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes);
     if (!is_resource($p)) {
         return false;
     }
