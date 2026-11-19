@@ -51,8 +51,9 @@ FILE SIZE AND INTENT (BINDING):
   Keep code files at or under 150 lines; split a file instead of growing it.
   A code file your commit grows and leaves over 175 lines needs this trailer line in the commit message:
     Split-Reason: <repo-relative path> -- <why this change cannot split it>
-  A new file states its one job in its first comment or heading line. If it cannot, add this trailer line:
+  Every new file needs this trailer line in the commit message; the commit is refused without it:
     Intent: <repo-relative path> -- <one-line job of the file>
+  State the same job in the file's first comment or heading line.
   Never commit a file that crosses 750 lines: split it.
   An ADR you add or change keeps "Status: Proposed". The lane refuses a commit that adds a "Status: Accepted" line.
 
