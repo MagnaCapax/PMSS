@@ -5,12 +5,13 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class WatchdogNetworkCheckTemplateTest extends TestCase
 {
-    public function testWatchdogLoadThresholdsAreExplicit(): void
+    public function testWatchdogHasNoLoadThresholds(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('etc/seedbox/config/template.watchdog.conf', [
-            'max-load-1 = 300',
-            'max-load-5 = 225',
-            'max-load-15 = 150',
+        // ADR 0301 replaced the load-average reboot with a stuck-write test.
+        $this->pmssAssertRepoFileNotContainsStrings('etc/seedbox/config/template.watchdog.conf', [
+            'max-load-1 =',
+            'max-load-5 =',
+            'max-load-15 =',
         ]);
     }
 

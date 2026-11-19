@@ -32,7 +32,9 @@ before it touches the services that keep the node reachable.
 - A user-space OOM daemon (earlyoom, systemd-oomd): a new runtime component with
   its own policy and failure modes, for a result the kernel gives with one line.
 - Deleting the watchdog's load rule: it recovers a guest that is really wedged;
-  with the bound the thrash does not start in the first place.
+  with the bound the thrash does not start in the first place. (ADR 0301 later
+  replaced the load rule with a test for a stuck write path, so a busy guest is no
+  longer rebooted and a wedged one still is.)
 - One `MemoryMax` on `user.slice`, rendered by the existing slice step (chosen),
   following ADR 0176's pattern of one aggregate slice as the single enforcement
   point.

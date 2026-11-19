@@ -2,7 +2,7 @@
 
 Date: 2026-09-28
 Category: architecture
-Status: Accepted
+Status: Accepted. The load-reboot sentence in the Decision is superseded by ADR 0301.
 
 ## Context
 

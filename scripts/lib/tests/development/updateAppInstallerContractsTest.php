@@ -231,6 +231,7 @@ class UpdateAppInstallerContractsTest extends TestCase
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/apps/watchdog.php', [
             'template.watchdog.conf',
             'template.watchdog.network-check.sh',
+            'template.watchdog.home-write-check.sh',
             '/etc/watchdog.d',
             '/dev/watchdog0',
             'systemctl disable --now watchdog.service',

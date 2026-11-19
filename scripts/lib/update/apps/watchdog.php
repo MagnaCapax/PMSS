@@ -32,6 +32,12 @@ function pmssWatchdogDevice(array $candidates = ['/dev/watchdog', '/dev/watchdog
     return '';
 }
 
+/** Contents of the given files, false for one that is missing: a before/after snapshot of what the daemon loads. */
+function pmssWatchdogInstalledContents(array $paths): array
+{
+    return array_map(function (string $path) { return @file_get_contents($path); }, $paths);
+}
+
 // An operator mask takes precedence over package and PMSS service policy.
 if (pmssSystemdUnitState('is-enabled', 'watchdog.service') === 'masked') {
     logMessage('[INFO] Watchdog service masked by operator; leaving it unchanged.');
@@ -51,19 +57,28 @@ if ($device === '') {
 $configDir = pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config');
 $configTemplate = $configDir.'/template.watchdog.conf';
 $scriptTemplate = $configDir.'/template.watchdog.network-check.sh';
+$homeCheckTemplate = $configDir.'/template.watchdog.home-write-check.sh';
+// The shim runs this PHP logic in place; both must exist or the check could only ever pass (ADR 0301).
+$homeCheckLogic = $configDir.'/template.watchdog.home-write-check.php';
 $scriptDir = '/etc/watchdog.d';
 $scriptTarget = $scriptDir.'/network-check.sh';
+$homeCheckTarget = $scriptDir.'/home-write-check.sh';
 
-if (!is_file($configTemplate) || !is_file($scriptTemplate)) {
+if (!is_file($configTemplate) || !is_file($scriptTemplate) || !is_file($homeCheckTemplate) || !is_file($homeCheckLogic)) {
     logMessage('[WARN] Watchdog templates missing; skipping watchdog enablement.');
     return;
 }
+
+// The daemon reads its configuration and test directory only at start: remember what runs now.
+$wasActive = pmssSystemdUnitState('is-active', 'watchdog.service') === 'active';
+$installedBefore = pmssWatchdogInstalledContents(['/etc/watchdog.conf', $scriptTarget, $homeCheckTarget]);
 
 // Keep preparation ordered and stop before activation if any required step fails.
 foreach ([
     ['Ensuring watchdog script directory exists', pmssBuildCommand('mkdir', ['-p', $scriptDir])],
     ['Installing watchdog configuration', pmssBuildCommand('install', ['-m', '0644', $configTemplate, '/etc/watchdog.conf'])],
     ['Installing watchdog network check', pmssBuildCommand('install', ['-m', '0755', $scriptTemplate, $scriptTarget])],
+    ['Installing watchdog home write check', pmssBuildCommand('install', ['-m', '0755', $homeCheckTemplate, $homeCheckTarget])],
 ] as [$description, $command]) {
     if (!pmssWatchdogRunRequiredStep($description, $command)) return;
 }
@@ -89,3 +104,8 @@ if ($device !== '/dev/watchdog') {
 }
 
 runStep('Enabling watchdog service', 'systemctl enable --now watchdog.service');
+
+// enable --now leaves a running daemon on its old configuration; restart only when something changed.
+if ($wasActive && $installedBefore !== pmssWatchdogInstalledContents(['/etc/watchdog.conf', $scriptTarget, $homeCheckTarget])) {
+    runStep('Restarting watchdog service to load changed configuration', 'systemctl restart watchdog.service');
+}
