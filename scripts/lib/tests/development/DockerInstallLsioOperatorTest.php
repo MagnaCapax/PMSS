@@ -20,9 +20,7 @@ final class DockerInstallLsioOperatorTest extends TestCase
         }
         $uid = (int) fileowner($home);
         $entry = static function (string $dir, int $owner): callable {
-            return static function () use ($dir, $owner): array {
-                return ['name' => 'pmss-test', 'uid' => $owner, 'gid' => $owner, 'dir' => $dir];
-            };
+            return self::pmssMakeCallbacks(['account' => ['name' => 'pmss-test', 'uid' => $owner, 'gid' => $owner, 'dir' => $dir]])['account'];
         };
         $link = $home.'-link';
         $this->pmssCreateSymlinkOrSkip($home, $link);
@@ -32,7 +30,7 @@ final class DockerInstallLsioOperatorTest extends TestCase
             foreach ([
                 [$home, $entry($home.'/other', $uid)],
                 [$home, $entry($home, $uid + 1)],
-                [$home, static function () { return false; }],
+                [$home, self::pmssMakeCallbacks(['account' => false])['account']],
                 [$home.'/', $entry($home, $uid)],
                 [$link, $entry($link, $uid)],
                 [$file, $entry($file, $uid)],

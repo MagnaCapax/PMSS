@@ -97,7 +97,7 @@ class QuotaPolicyCharacterizationTest extends TestCase
                     $exitCode = 7;
                     [$result, $output] = $this->pmssCaptureStdout(function () use ($rc, $query, $critical, &$messages, &$exitCode): array {
                         return \pmssQuotaFixRunCommand('description', 'quotaon -p /home', $critical, $exitCode, $query,
-                            static function () use ($rc): array { return ['rc' => $rc, 'stdout' => "out\n", 'stderr' => "err\n"]; },
+                            self::pmssMakeCallbacks(['run' => ['rc' => $rc, 'stdout' => "out\n", 'stderr' => "err\n"]])['run'],
                             $this->pmssMakeArrayLogger($messages));
                     });
                     $this->assertSame(['ok' => $rc === 0, 'rc' => $rc, 'output' => "out\nerr\n"], $result);

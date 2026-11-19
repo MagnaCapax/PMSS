@@ -397,8 +397,10 @@ Keep the canonical installer/update details under `docs/install.md` and
 String-only fixture observations reuse `TestCase::pmssMakeArrayLogger()` for
 diagnostics, failed paths, fetched filenames and command traces. Callers retain
 record transformations and callbacks that inspect publication ordering.
-Ordered cgroup apply steps reuse `pmssMakeStepRunner()`; fixed statistics, RPC,
-socket and client-link probes use `pmssMakeCallbacks()` with caller-owned results.
+Ordered cgroup apply steps reuse `pmssMakeStepRunner()`. Fixed statistics, RPC,
+socket, client-link, hardware, quota, account-lookup and incomplete-write probes
+use `pmssMakeCallbacks()` with caller-owned results, including console process
+snapshots. Argument-dependent, stateful and throwing callbacks remain explicit.
 
 Test fixtures call constructors and shared helpers directly when a private
 adapter adds no policy. Single-use setup and assertions stay with their scenario,

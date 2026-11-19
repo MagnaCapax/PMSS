@@ -240,7 +240,7 @@ class BrowserConsoleArtifactsTest extends TestCase
             list($state, $signalResult, $expected, $signalCount) = $case;
             $signals = array();
             $actual = \pmssConsoleSpawnAllowed(12345, '/usr/bin/ttyd', '/fixture/console.sock', array(
-                'processes' => static function () use ($state) { return $state; },
+                'processes' => self::pmssMakeCallbacks(['processes' => $state])['processes'],
                 'signal' => static function ($pid) use (&$signals, $signalResult) {
                     $signals[] = $pid;
                     return $signalResult;

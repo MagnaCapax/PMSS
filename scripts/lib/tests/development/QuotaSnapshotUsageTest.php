@@ -109,7 +109,7 @@ class QuotaSnapshotUsageTest extends TestCase
     public function testFailedUnrecognizedAndTimedOutReportsCannotPublishPartialTotals(): void
     {
         foreach ([$this->report([], 2), $this->report(['error']), $this->report([], 124, true)] as $usage) {
-            $result = \pmssQuotaSnapshotAggregateReport('fixtur01', $this->primary(), static function () use ($usage) { return $usage; });
+            $result = \pmssQuotaSnapshotAggregateReport('fixtur01', $this->primary(), self::pmssMakeCallbacks(['usage' => $usage])['usage']);
             $this->assertSame($this->report([], 2, $usage['timed_out']), $result);
         }
         foreach ([$this->report([], 2), $this->report([], 124, true), $this->report(['bad header'])] as $primary) {
@@ -130,7 +130,7 @@ class QuotaSnapshotUsageTest extends TestCase
         $usage = $this->usage();
         $usage['lines'][1] = '#1000 -- '.PHP_INT_MAX.' 20 25 2 100000 125000';
         $this->assertSame($this->report([], 2), \pmssQuotaSnapshotAggregateReport('fixtur01', $this->primary(),
-            static function () use ($usage) { return $usage; }));
+            self::pmssMakeCallbacks(['usage' => $usage])['usage']));
     }
 
     public function testOverlapsDuplicatesEmptyRowsAndCounterBounds(): void

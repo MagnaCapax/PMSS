@@ -44,7 +44,7 @@ class I915DisplayPowerTest extends TestCase
     {
         $root = $this->pmssMakeTempDir('pmss-i915-nonintel-', 0700);
         $commands = [];
-        \pmssEnsureI915DisplayPowerStatesOff(static function (): void {}, $root.'/dc.conf', static function (): bool { return false; }, $this->shellRunner($commands));
+        \pmssEnsureI915DisplayPowerStatesOff(static function (): void {}, $root.'/dc.conf', self::pmssMakeCallbacks(['intelDisplay' => false])['intelDisplay'], $this->shellRunner($commands));
         $this->assertFalse(file_exists($root.'/dc.conf'));
         $this->assertSame([], $commands);
     }
@@ -60,7 +60,7 @@ class I915DisplayPowerTest extends TestCase
         $commands = [];
         $path = static function (string $name) use ($ls, $update): string { return $name === 'lsinitramfs' ? $ls : $update; };
 
-        \pmssEnsureI915DisplayPowerStatesOff($this->pmssMakeArrayLogger($messages), $target, static function (): bool { return true; }, $this->shellRunner($commands), $path, $boot);
+        \pmssEnsureI915DisplayPowerStatesOff($this->pmssMakeArrayLogger($messages), $target, self::pmssMakeCallbacks(['intelDisplay' => true])['intelDisplay'], $this->shellRunner($commands), $path, $boot);
 
         $this->assertSame(self::CONTENT, file_get_contents($target));
         $this->assertSame(0644, fileperms($target) & 0777);
@@ -76,7 +76,7 @@ class I915DisplayPowerTest extends TestCase
 
         // Second run: file up to date and every initrd carries it, so no rebuild.
         $commands = [];
-        \pmssEnsureI915DisplayPowerStatesOff($this->pmssMakeArrayLogger($messages), $target, static function (): bool { return true; }, $this->shellRunner($commands), $path, $boot);
+        \pmssEnsureI915DisplayPowerStatesOff($this->pmssMakeArrayLogger($messages), $target, self::pmssMakeCallbacks(['intelDisplay' => true])['intelDisplay'], $this->shellRunner($commands), $path, $boot);
         $this->assertSame(2, count($commands));
         $this->assertTrue(in_array('[SKIP] i915 display power-state option already present and up to date', $messages, true));
     }
@@ -90,7 +90,7 @@ class I915DisplayPowerTest extends TestCase
         $messages = [];
         $commands = [];
         $path = static function (string $name) use ($ls, $update): string { return $name === 'lsinitramfs' ? $ls : $update; };
-        \pmssEnsureI915DisplayPowerStatesOff($this->pmssMakeArrayLogger($messages), $target, static function (): bool { return true; }, $this->shellRunner($commands), $path, $boot);
+        \pmssEnsureI915DisplayPowerStatesOff($this->pmssMakeArrayLogger($messages), $target, self::pmssMakeCallbacks(['intelDisplay' => true])['intelDisplay'], $this->shellRunner($commands), $path, $boot);
         $this->assertTrue(in_array('[WARN] i915 power-state option still missing from initrd.img-6.1.0-41-amd64', $messages, true));
     }
 
@@ -103,12 +103,12 @@ class I915DisplayPowerTest extends TestCase
         $messages = [];
         $commands = [];
         $path = static function (string $name) use ($ls, $update): string { return $name === 'lsinitramfs' ? $ls : $update; };
-        \pmssEnsureI915DisplayPowerStatesOff($this->pmssMakeArrayLogger($messages), $target, static function (): bool { return true; }, $this->shellRunner($commands), $path, $boot);
+        \pmssEnsureI915DisplayPowerStatesOff($this->pmssMakeArrayLogger($messages), $target, self::pmssMakeCallbacks(['intelDisplay' => true])['intelDisplay'], $this->shellRunner($commands), $path, $boot);
         $this->assertTrue(in_array('[WARN] update-initramfs failed; the i915 power-state option is not in every initrd yet', $messages, true));
 
         $messages = [];
         $commands = [];
-        \pmssEnsureI915DisplayPowerStatesOff($this->pmssMakeArrayLogger($messages), $root.'/other.conf', static function (): bool { return true; }, $this->shellRunner($commands), static function (): string { return ''; }, $boot);
+        \pmssEnsureI915DisplayPowerStatesOff($this->pmssMakeArrayLogger($messages), $root.'/other.conf', self::pmssMakeCallbacks(['intelDisplay' => true])['intelDisplay'], $this->shellRunner($commands), self::pmssMakeCallbacks(['path' => ''])['path'], $boot);
         $this->assertSame(self::CONTENT, file_get_contents($root.'/other.conf'));
         $this->assertSame([], $commands);
         $this->assertTrue(in_array('[WARN] initramfs-tools unavailable; the i915 power-state option is not confirmed in the initrd', $messages, true));

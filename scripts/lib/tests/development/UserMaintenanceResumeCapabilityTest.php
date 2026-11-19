@@ -145,7 +145,7 @@ class UserMaintenanceResumeCapabilityTest extends TestCase
         $this->pmssWithEnv(['PMSS_USER_REFRESH_STATE_DIR' => $stateDir], function () use ($stateDir): void {
             foreach ([false, 0, 2] as $written) {
                 [, $output] = $this->pmssCaptureStdout(static function () use ($written): void {
-                    pmssUserRefreshMarkDone('fixtur01', 'new-signature', static function () use ($written) { return $written; });
+                    pmssUserRefreshMarkDone('fixtur01', 'new-signature', self::pmssMakeCallbacks(['write' => $written])['write']);
                 });
                 $this->assertStringContainsString('Unable to write user refresh marker', $output);
                 $this->assertFalse(file_exists($stateDir.'/fixtur01'));
