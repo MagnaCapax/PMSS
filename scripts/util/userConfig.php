@@ -34,7 +34,7 @@ require_once __DIR__.'/../lib/torrentClients/identity.php';
  */
 $usage = pmssUserConfigCliUsage()."\nIntel iGPU access:\n  --gpu-enabled=true|false  Persist Intel iGPU access (default: true).\n";
 $resourceOptions = pmssUserConfigCliResourceOptionNames();
-$parsed = pmssParseCliTokens(pmssCliArgv($argv ?? null), array_merge(['upload-throttle-kib', 'welcome-message', 'docker-enabled', 'bonus-quota-gib', 'gpu-enabled'], $resourceOptions));
+$parsed = pmssParseCliTokens(pmssCliArgv($argv ?? null), array_merge(['upload-throttle-kib', 'welcome-message', 'docker-enabled', 'bonus-quota-gib', 'gpu-enabled', 'lighttpd-min-threads'], $resourceOptions));
 $helpRequested = pmssCliOption($parsed, 'help', 'h', false) !== false;
 $args = array_merge([''], $parsed['arguments']);
 if ($helpRequested) {
@@ -52,6 +52,7 @@ try {
 }
 try {
     $bonusQuotaGiB = pmssAddUserBonusQuotaGiBParse(pmssCliOption($parsed, 'bonus-quota-gib'));
+    $lighttpdMinThreads = pmssUserConfigParseLighttpdMinThreadsOption(pmssCliOption($parsed, 'lighttpd-min-threads'));
 } catch (InvalidArgumentException $exception) {
     pmssCliExitWithStderr($exception->getMessage()."\n", 1);
 }
@@ -60,6 +61,7 @@ $namedConfigChange = $uploadThrottleKib !== null
     || $dockerEnabled !== null
     || $gpuEnabled !== null
     || $bonusQuotaGiB !== null
+    || $lighttpdMinThreads !== null
     || count($explicitResourceOverrides) > 0;
 $configMode = pmssUserConfigInvocationMode($args, $welcomeMessage !== null, $namedConfigChange);
 if ($configMode === '') {
@@ -119,6 +121,7 @@ if ($configMode === 'named') {
 $presence = array_fill_keys(array_keys($explicitResourceOverrides), true);
 
 $payload = pmssUserConfigPayloadBuild($store, $existing, $user, $presence, $dockerEnabled, $gpuEnabled);
+if ($lighttpdMinThreads !== null) $payload['lighttpdMinThreads'] = $lighttpdMinThreads;
 if ($welcomeMessage !== null) {
     if (!pmssWelcomeUserMessageSet($user['name'], $expectedHome, $welcomeMessage)) {
         fwrite(STDERR, "Warning: failed to persist welcome message for {$user['name']}\n");
@@ -134,6 +137,11 @@ if ($uploadThrottleKib !== null) {
 if (!$store->persist($user['name'], $payload)) {
     if (function_exists('pmssUserLog')) pmssUserLog($user['name'], 'userConfig: user store write failed; no settings applied');
     pmssCliExitWithStderr("Error: failed to persist user config for {$user['name']}\n", 1);
+}
+// Retry explicit requests even when unchanged, so a failed refresh can converge.
+if ($lighttpdMinThreads !== null
+    && runStep('Configuring lighttpd worker floor', pmssBuildCommand('/scripts/util/userConfigLighttpd.php', ['--strict', $user['name']])) !== 0) {
+    pmssCliExitWithStderr("Error: lighttpd config refresh failed; worker floor saved, rerun userConfig.php\n", 1);
 }
 pmssUserConfigApplyGpuPolicy($user['name'], $existing, $payload);
 // Display copy of the upload cap for the account's panel and tools.

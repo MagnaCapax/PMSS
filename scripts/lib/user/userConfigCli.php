@@ -69,6 +69,7 @@ function pmssUserConfigCliUsage(): string
             pmssCliHelpLine('--bonus-quota-gib=BONUS_QUOTA_GiB', 'Additional disk quota already included in the total; positive values update the display, 0 leaves it unchanged.'),
             pmssCliHelpLine('--welcome-message=HTML', 'Set or clear ~/.config/welcome-message.html.'),
             pmssCliHelpLine('--docker-enabled=true|false', 'Persist the rootless Docker policy for this user.'),
+            pmssCliHelpLine('--lighttpd-min-threads=THREADS', 'Persist a php-cgi worker floor (capped at 48); 0 restores CPU-derived sizing.'),
             pmssCliHelpLine('-h, --help', 'Show this help and exit.'),
         ]),
         'Examples' => [

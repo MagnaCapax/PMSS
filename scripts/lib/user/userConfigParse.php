@@ -59,6 +59,17 @@ function pmssUserConfigParseGpuEnabledOption($rawOption): ?bool
     }
 }
 
+/** Parse the optional worker floor; the lighttpd planner retains its thread cap. */
+function pmssUserConfigParseLighttpdMinThreadsOption($rawOption): ?int
+{
+    if ($rawOption === null) return null;
+    if (!is_string($rawOption) || preg_match('/^(0|[1-9][0-9]*)$/D', $rawOption) !== 1
+        || ($value = pmssUnsignedDecimalIntParse($rawOption)) === null) {
+        throw new InvalidArgumentException('Invalid --lighttpd-min-threads value; expected a non-negative integer');
+    }
+    return $value;
+}
+
 /** Parse the optional torrent throttle while ignoring legacy empty flags. */
 function pmssUserConfigCliParseUploadThrottleOption($rawOption, string $negativeMessage = 'Upload throttle must be >= 0'): ?int
 {
