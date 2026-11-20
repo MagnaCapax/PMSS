@@ -10,9 +10,12 @@
  */
 function pmssSystemdUserSliceAggregateMemoryMiB(int $fullMiB, int $minFreeMiB = 1024): int
 {
-    // Integer ceilings keep the reserve rounded up and the tenant bound rounded down.
-    $tenthMiB = intdiv(max(0, $fullMiB) + 9, 10);
-    $watermarkMiB = intdiv(max(0, $minFreeMiB) * 5 + 3, 4) + 512;
+    // Divide before rounding so even the largest integer cannot overflow.
+    $fullMiB = max(0, $fullMiB);
+    $tenthMiB = intdiv($fullMiB, 10) + ($fullMiB % 10 > 0 ? 1 : 0);
+    // Only a watermark below the tenth can win; cap its operand before scaling.
+    $watermarkBaseMiB = min(max(0, $minFreeMiB), $tenthMiB);
+    $watermarkMiB = $watermarkBaseMiB + intdiv($watermarkBaseMiB + 3, 4) + 512;
     $boundMiB = $fullMiB - max(1536, min($tenthMiB, $watermarkMiB));
     // Below 1 GiB the host is too small to split into a reserve and a tenant share.
     return $boundMiB >= 1024 ? $boundMiB : 0;
@@ -37,6 +40,11 @@ function pmssSystemdUserSliceAggregateInstall(string $dropDir, string $cfgDir, i
     // A ballooned guest's MemTotal shrinks with the balloon; size from the RAM it holds when deflated,
     // so a bound rendered at the floor does not cap tenants once the host returns the memory.
     $balloonMiB = pmssBalloonHeldMiB();
+    if ($totalMiB > PHP_INT_MAX - $balloonMiB) {
+        // Keep the working drop-in when individually valid counters cannot be summed.
+        $log('[WARN] Skipping user.slice aggregate memory bound: MemTotal plus balloon exceeds integer range');
+        return false;
+    }
     $fullMiB = $totalMiB + $balloonMiB;
     $minFreeMiB = pmssMinFreeMiB();
     $boundMiB = pmssSystemdUserSliceAggregateMemoryMiB($fullMiB, $minFreeMiB);

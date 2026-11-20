@@ -1,5 +1,14 @@
 # Refactoring Guidelines
 
+Aggregate user-slice memory sizing divides before rounding and caps the watermark
+operand at the percentage reserve before scaling, preserving the ADR 0296 formula
+without overflowing integer intermediates. An unrepresentable MemTotal-plus-balloon
+sum logs a warning and leaves the existing drop-in untouched before reading min_free
+or publishing. Ordinary bounds, rounding, publication and diagnostics stay unchanged.
+`SystemdSliceAggregateArithmeticSafetyTest` covers extreme counters, rounding edges
+and installer ordering with in-memory probes; execution stays on testing machines,
+with changed-file PHP syntax checks on the devbox.
+
 Fork-failure diagnostics omit `/proc/meminfo` counters above `PHP_INT_MAX`
 instead of rendering saturated integer casts as memory readings. The existing
 checked decimal parser preserves zero, leading zeroes, representable limits,
