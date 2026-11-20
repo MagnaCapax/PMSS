@@ -64,8 +64,7 @@ final class TorrentClientsCardsAvailabilityRenderTest extends TestCase
     {
         $this->withProjection($this->entries(array('qbittorrent' => array('system'), 'deluge' => array('system'),
             'transmission' => array('4.1.3'), 'rtorrent' => array('system'))), function ($page, $home): void {
-                $this->pmssEnsureDir($home.'/bin/transmission');
-                $this->pmssCreateSymlinkOrSkip('/home/.pmss/clients/transmission/4.1.3', $home.'/bin/transmission/default');
+                $this->pmssWriteSymlinks($home, ['bin/transmission/default' => '/home/.pmss/clients/transmission/4.1.3']);
                 $cards = $page();
                 $this->assertSame(array('torrent-client-versions'), array_keys($cards));
                 $html = $cards['torrent-client-versions'];
@@ -80,8 +79,7 @@ final class TorrentClientsCardsAvailabilityRenderTest extends TestCase
         $this->withProjection($this->entries(array('qbittorrent' => array('system'), 'deluge' => array('system'),
             'rtorrent' => array('system'))), function ($page, $home): void {
                 foreach (array('qbittorrent', 'deluge', 'rtorrent') as $client) {
-                    $this->pmssEnsureDir($home.'/bin/'.$client);
-                    $this->pmssCreateSymlinkOrSkip('system', $home.'/bin/'.$client.'/default');
+                    $this->pmssWriteSymlinks($home, ['bin/'.$client.'/default' => 'system']);
                 }
                 $cards = $page();
                 $this->assertSame(array('qbittorrent-version', 'deluge-version', 'rtorrent-version'), array_keys($cards));

@@ -71,8 +71,7 @@ final class TorrentClientsRcPreflightTest extends TestCase
     public function testRefusalPrecedesBackupAndStopAndReleasesTheLock(): void
     {
         $home = $this->pmssMakeTempDir('pmss-rc-switch-');
-        $this->pmssEnsureDir($home.'/bin/rtorrent');
-        $this->pmssCreateSymlinkOrSkip('/home/.pmss/clients/rtorrent/0.9.8-r16', $home.'/bin/rtorrent/default');
+        $this->pmssWriteSymlinks($home, ['bin/rtorrent/default' => '/home/.pmss/clients/rtorrent/0.9.8-r16']);
         $dir = $this->pmssEnsureDir($home.'/.config/pmss/torrentClients');
         foreach (array('lastRun', 'lastgood') as $suffix)
             $this->pmssWriteFile($dir.'/rtorrent.'.$suffix, "0.9.8-r16\n");

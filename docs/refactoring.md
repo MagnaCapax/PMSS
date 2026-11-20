@@ -880,7 +880,8 @@ retain newline normalization and explicitly create deliberately empty directorie
 assertions stay with their tests and execute only on testing machines.
 
 Torrent store, virtualenv, web archive, port and custom-config fixtures reuse
-the same checked writers for parent creation and payload writes. Keep simulated
+the same checked writers for parent creation and payload writes. Selected-build
+links use `pmssWriteSymlinks()`, preserving relative and dangling targets. Keep simulated
 installer return values and staged missing-file cases explicit; these exercise
 runtime failure boundaries rather than fixture setup. Empty directories and
 permission transitions remain separate from file publication.

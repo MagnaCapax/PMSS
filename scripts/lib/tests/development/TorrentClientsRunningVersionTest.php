@@ -19,8 +19,7 @@ final class TorrentClientsRunningVersionTest extends TestCase
         foreach (['qbittorrent', 'rtorrent', 'deluge', 'transmission'] as $client) {
             foreach (['missing', '5.2.4-lt2.0', '0.9.8-r16', '2.2.0', '4.1.3'] as $version) {
                 $home = $this->pmssMakeTempDir('pmss-running-unavailable-');
-                $this->pmssEnsureDir($home.'/bin/'.$client);
-                $this->pmssCreateSymlinkOrSkip('/home/.pmss/clients/'.$client.'/'.$version, $home.'/bin/'.$client.'/default');
+                $this->pmssWriteSymlinks($home, ['bin/'.$client.'/default' => '/home/.pmss/clients/'.$client.'/'.$version]);
                 $ops = self::pmssMakeCallbacks(['pids' => [1], 'resolve' => null]);
                 $this->assertSame('system; '.$version.' is not installed on this server', $this->running($home, $client, $ops));
                 $ops = self::pmssMakeCallbacks(['pids' => [], 'resolve' => null]);

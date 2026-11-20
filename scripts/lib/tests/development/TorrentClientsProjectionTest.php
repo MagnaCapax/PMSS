@@ -43,8 +43,7 @@ final class TorrentClientsProjectionTest extends TestCase
                 + ($client === 'transmission' ? ['rpcUnixSocket' => true] : []);
             $catalog[] = array_replace($entry, ['version' => 'missing']);
             $linked = \pmssTorrentClientsStoreBinaryPath($store, $client, 'linked', $kind);
-            $this->pmssEnsureDir(dirname($linked));
-            $this->pmssCreateSymlinkOrSkip($binary, $linked);
+            $this->pmssWriteSymlinks(dirname($linked), [basename($linked) => $binary]);
             $catalog[] = array_replace($entry, ['version' => 'linked']);
             // Both installed and missing disabled rows are excluded from counts and versions.
             $catalog[] = array_replace($entry, ['disabled' => true]);

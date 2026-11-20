@@ -74,8 +74,7 @@ final class TorrentClientsNotesTest extends TestCase
         $entries = $this->entries(['qbittorrent' => ['5.2.4-lt2.0']]);
         $entries[0]['note'] = 'Selected but not running';
         $this->withProjection($entries, function ($page, $home): void {
-            $this->pmssEnsureDir($home.'/bin/qbittorrent');
-            $this->pmssCreateSymlinkOrSkip('/home/.pmss/clients/qbittorrent/5.2.4-lt2.0', $home.'/bin/qbittorrent/default');
+            $this->pmssWriteSymlinks($home, ['bin/qbittorrent/default' => '/home/.pmss/clients/qbittorrent/5.2.4-lt2.0']);
             $card = $page()['torrent-client-versions'];
             $this->assertStringNotContainsString('Selected but not running', $card);
         });
