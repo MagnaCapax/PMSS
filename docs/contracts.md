@@ -991,6 +991,12 @@ Sub-handlers:
 
 - pmssCgroupPolicyLoad(?string $configDir=null): array → loads the shipped `cgroup.policy.php` only; a non-array return yields `[]`. No host-local file is read (ADR 0233). Existing consumer validation still applies.
 
+- pmssUserSliceMemswAnonPlusSwap(string $memoryStat): int → sums the cgroup v1
+  anonymous, shared-memory and swap counters, saturating at `PHP_INT_MAX` before
+  addition can overflow. Oversized usage retains ADR 0298's existing refusal to
+  lower memsw below usage; representable sums, missing-field defaults, diagnostics
+  and write ordering remain unchanged. `UserSliceMemswTest` covers the boundaries.
+
 - pmssEnsureSystemdSlices(?callable $logger=null): void → writes user slice override template to `/etc/systemd/system/user-.slice.d/15-pmss.conf` (never vendor paths), resolves the `/home` backing device for optional `IODeviceLatencyTargetSec` rendering from `cgroup.policy.php` on cgroup v2 hosts, optionally installs user manager `LimitNOFILE` drop-in at `/etc/systemd/system/user@.service.d/20-pmss-limits.conf` from `cgroup.policy.php` (`limitNoFileSoft`/`limitNoFileHard`), installs per-user log namespace drop-in at `/etc/systemd/system/user@.service.d/30-pmss-log-namespace.conf` (`LogNamespace=user-%i`), then runs `daemon-reload`. A failed template read warns and leaves the existing slice drop-in untouched.
 
 - pmssConfigureTempMountNoexec(?callable $logger=null): void → when `PMSS_HARDEN_TMP_NOEXEC` is enabled, ensures `/tmp` and `/dev/shm` fstab entries include `noexec,nosuid,nodev`, and remounts when mounted; warns on missing mounts, unreadable fstab, or unsafe override paths.

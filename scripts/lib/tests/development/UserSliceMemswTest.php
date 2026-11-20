@@ -88,6 +88,36 @@ class UserSliceMemswTest extends TestCase
         $this->assertSame(0, \pmssUserSliceMemswAnonPlusSwap('garbage'));
     }
 
+    public function testAnonymousPlusSwapSaturatesBeforeIntegerOverflow(): void
+    {
+        $max = (string) PHP_INT_MAX;
+        // Include exact bounds, overflow at either addition and an oversized single field.
+        foreach ([
+            [0, '0', '0', '0'], [6, '1', '2', '3'],
+            [PHP_INT_MAX, $max, '0', '0'],
+            [PHP_INT_MAX, (string) (PHP_INT_MAX - 1), '1', '0'],
+            [PHP_INT_MAX, (string) (PHP_INT_MAX - 2), '1', '1'],
+            [PHP_INT_MAX, $max, '1', '0'],
+            [PHP_INT_MAX, '1', $max, '0'],
+            [PHP_INT_MAX, '0', '1', $max],
+            [PHP_INT_MAX, (string) (PHP_INT_MAX - 1), '1', '1'],
+            [PHP_INT_MAX, $max.'0', '1', '1'],
+        ] as [$expected, $rss, $shmem, $swap]) {
+            $stat = "total_rss $rss\ntotal_shmem $shmem\ntotal_swap $swap\n";
+            $this->assertSame($expected, \pmssUserSliceMemswAnonPlusSwap($stat), $stat);
+        }
+    }
+
+    public function testOverflowedUsageRetainsTheExistingLoweringRefusal(): void
+    {
+        $held = \pmssUserSliceMemswAnonPlusSwap('total_rss '.PHP_INT_MAX."\ntotal_swap 1\n");
+        $plan = $this->memsw(self::L, self::L, self::UNLIMITED, $held);
+        $this->assertSame([], $plan['writes']);
+        $this->assertSame('tenants hold '.PHP_INT_MAX.' bytes of anonymous memory plus swap, above the bound '.self::L.': memsw limit not written', $plan['note']);
+        $this->assertSame($this->memsw(-1, self::L, self::L), $this->memsw(-1, self::L, self::L, $held));
+        $this->assertSame($this->memsw(2 * self::L, self::L, self::L), $this->memsw(2 * self::L, self::L, self::L, $held));
+    }
+
     public function testWiringContracts(): void
     {
         $this->pmssAssertRepoFileContainsString('etc/seedbox/config/root.cron',
