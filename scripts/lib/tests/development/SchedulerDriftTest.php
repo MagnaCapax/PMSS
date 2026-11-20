@@ -56,14 +56,14 @@ class SchedulerDriftTest extends TestCase
         $this->assertSame(['sdb'], pmssCgroupPolicyMountDriftedLeaves('/home', '/dev/md5', $root));
     }
 
-    /** NVMe runs none by the boot-tuning unit's own rule (ADR 0064); it is not drift and must not trigger a re-run. */
-    public function testNvmeLeavesOnNoneAreNotDrift(): void
+    /** NVMe runs bfq as well (ADR 0064 amendment 2026-11-20): an NVMe member left on none is drift like any other. */
+    public function testNvmeMemberOnNoneIsDrift(): void
     {
         $root = $this->sysBlock(
-            ['md1' => '[none]', 'nvme0n1' => '[none] mq-deadline', 'nvme1n1' => '[none] mq-deadline'],
+            ['md1' => '[none]', 'nvme0n1' => 'mq-deadline [bfq] none', 'nvme1n1' => '[none] mq-deadline bfq'],
             ['md1' => ['nvme0n1', 'nvme1n1']]
         );
-        $this->assertSame([], pmssCgroupPolicyMountDriftedLeaves('/home', '/dev/md1', $root));
+        $this->assertSame(['nvme1n1'], pmssCgroupPolicyMountDriftedLeaves('/home', '/dev/md1', $root));
     }
 
     public function testAllMembersOnBfqIsNoDrift(): void

@@ -14,8 +14,8 @@
 require_once __DIR__.'/../blockDeviceLeaves.php';
 require_once __DIR__.'/policy.php';
 
-/** Device-name prefixes the boot-tuning unit sets to bfq (template.pmss-boot-tuning.sh). nvme is set to none there. */
-const PMSS_BFQ_DEVICE_CLASS_RE = '/^(sd|vd|xvd|bcache)[a-z0-9]*$/';
+/** Device-name prefixes the boot-tuning unit sets to bfq (template.pmss-boot-tuning.sh). */
+const PMSS_BFQ_DEVICE_CLASS_RE = '/^(sd|vd|xvd|bcache|nvme)[a-z0-9]*$/';
 
 /**
  * @return list<string>|null leaves of the mount's backing device that should run bfq and do not; null when the

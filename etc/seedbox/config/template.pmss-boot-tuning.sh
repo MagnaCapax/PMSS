@@ -71,7 +71,7 @@ write_hardware_summary() {
     "rotational_read_ahead_kb": 4096,
     "nonrotational_scheduler": "bfq",
     "nonrotational_read_ahead_kb": 4096,
-    "nvme_scheduler": "none",
+    "nvme_scheduler": "bfq",
     "nvme_read_ahead_kb": 128,
     "bcache_scheduler": "bfq",
     "bcache_read_ahead_kb": 4096
@@ -146,9 +146,14 @@ for disk in /sys/block/sd*; do
 	write_sys "$disk/queue/scheduler" bfq
 	write_sys "$disk/queue/read_ahead_kb" 4096
 done
+# NVMe runs bfq too: none leaves the per-user blkio.bfq.weight tiers and the bonus multiplier
+# with nothing to act on, so every account on an NVMe /home would share the device unweighted and
+# cgroupBfqWeightApply.php would FATAL on every run. Per-user resource control is the requirement on
+# shared hosts; schedulers are chosen among those that keep it (ADR 0064 amendment 2026-11-20).
+# read_ahead_kb stays 128, a separate knob.
 for disk in /sys/block/nvme*; do
 	[ -d "$disk/queue" ] || continue
-	write_sys "$disk/queue/scheduler" none
+	write_sys "$disk/queue/scheduler" bfq
 	write_sys "$disk/queue/read_ahead_kb" 128
 done
 
