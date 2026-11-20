@@ -20,20 +20,20 @@ if (!defined('PMSS_MEDIA_STACK_RELAUNCH_MAX_DELAY')) {
     define('PMSS_MEDIA_STACK_RELAUNCH_MAX_DELAY', 300);
 }
 
-/** Read the kernel boot ID; an empty string means the value is unusable. */
+/** Read the kernel boot ID; invalid paths or corrupt bytes retain the empty fallback. */
 function pmssMediaStackBootIdRead(string $path = '/proc/sys/kernel/random/boot_id'): string
 {
-    $raw = @file_get_contents($path);
-    $id = is_string($raw) ? trim($raw) : '';
+    $raw = $path === '' || pmssFilesystemPathHasNulByte($path) ? false : @file_get_contents($path);
+    $id = is_string($raw) && strpos($raw, "\0") === false ? trim($raw) : '';
     return preg_match('/^[0-9a-f-]{8,64}$/D', $id) === 1 ? $id : '';
 }
 
-/** Read the seconds since boot from /proc/uptime; 0.0 when unreadable. */
+/** Read finite seconds since boot; invalid paths or corrupt bytes retain the zero fallback. */
 function pmssMediaStackBootUptimeRead(string $path = '/proc/uptime'): float
 {
-    $raw = @file_get_contents($path);
-    $first = is_string($raw) ? explode(' ', trim($raw))[0] : '';
-    return is_numeric($first) && (float) $first > 0 ? (float) $first : 0.0;
+    $raw = $path === '' || pmssFilesystemPathHasNulByte($path) ? false : @file_get_contents($path);
+    $first = is_string($raw) && strpos($raw, "\0") === false ? explode(' ', trim($raw))[0] : '';
+    return is_numeric($first) && is_finite((float) $first) && (float) $first > 0 ? (float) $first : 0.0;
 }
 
 /** Production context: boot ID, uptime, clock and the launcher that runs a root command. */

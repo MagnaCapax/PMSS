@@ -28,6 +28,13 @@ Keep the canonical installer/update details under `docs/install.md` and
    documented in [`docs/update.md`](./update.md#phase-2--scriptsutilupdate-step2php).
 
 ## Key Modules
+- **scripts/lib/mediaStackBootRelaunch.php** rejects empty or NUL-containing boot
+  observation paths before file I/O and NUL-containing observations before trimming.
+  Non-finite uptime readings also retain the existing zero fallback; unusable boot
+  IDs retain the empty fallback. Valid readings, default proc paths and relaunch
+  policy stay unchanged (ADR 0302). `MediaStackBootInputSafetyTest` intercepts
+  reads to cover these boundaries without inspecting the host; execution belongs
+  on the testing machine, with changed-file PHP syntax checks on the devbox.
 - **scripts/lib/runtime/filesystemHost.php** requires complete meminfo counter
   rows: unsigned decimal digits, an optional `kB` unit, and whitespace. Decimal,
   exponent, attached-unit and trailing-junk suffixes cannot certify a memory
