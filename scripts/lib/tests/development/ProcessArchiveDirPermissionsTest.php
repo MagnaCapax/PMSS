@@ -60,12 +60,9 @@ class ProcessArchiveDirPermissionsTest extends TestCase
     {
         $root = $this->pmssMakeTempDir('pmss-atop-dry-');
         $target = $this->makeDir($root, 0755);
-        putenv('PMSS_DRY_RUN=1');
-        try {
+        $this->pmssWithEnv(['PMSS_DRY_RUN' => '1'], function () use ($root): void {
             $this->assertTrue(\pmssProcessArchiveDirHarden($root));
-        } finally {
-            putenv('PMSS_DRY_RUN');
-        }
+        });
         clearstatcache(true, $target);
         $this->assertSame(0755, fileperms($target) & 07777);
     }

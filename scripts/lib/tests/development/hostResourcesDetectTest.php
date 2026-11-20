@@ -6,11 +6,6 @@ require_once dirname(__DIR__, 2).'/update/systemPrep.php';
 
 class hostResourcesDetectTest extends TestCase
 {
-    public function setUp(): void
-    {
-        $this->pmssTrackEnvKeys(['PMSS_TOTAL_MEM_MIB', 'PMSS_TOTAL_CPU_THREADS']);
-    }
-
     public function testCpuInfoThreadCountMatchesOnlyProcessorFields(): void
     {
         // Exercise the pure parser in systemPrep/hostEnvironment.php without reading host files.
@@ -52,7 +47,7 @@ class hostResourcesDetectTest extends TestCase
             ['PMSS_TOTAL_CPU_THREADS', '0', '\pmssTotalCpuThreads', 0],
             ['PMSS_TOTAL_CPU_THREADS', 'invalid', '\pmssTotalCpuThreads', null],
         ] as $case) {
-            putenv($case[0].'='.$case[1]);
+            $this->pmssTrackEnvOverrides([$case[0] => $case[1]]);
             $actual = call_user_func($case[2]);
             $case[3] === null
                 ? $this->assertTrue($actual >= 0, 'Expected fallback for '.$case[0])
