@@ -33,6 +33,54 @@ class StorageBenchmarkFileSafetyTest extends TestCase
         $this->assertFalse(\storageBenchmarkFileCleanup($path, $identity));
     }
 
+    public function testIncompleteSnapshotsCannotAuthorizeAllocationOrRemoval(): void
+    {
+        // All filesystem operations are intercepted; only memory streams are opened.
+        $script = "namespace BenchmarkFileSnapshotFixture;\nrequire_once ".
+            var_export($this->pmssRepoPath('scripts/lib/runtime.php'), true).";\n";
+        $script .= <<<'PHP'
+function fopen($path, $mode) { return $GLOBALS['handle'] = \fopen('php://memory', 'w+'); }
+function fstat($handle) { return $GLOBALS['snapshot']; }
+function fclose($handle) { ++$GLOBALS['closes']; return \fclose($handle); }
+function clearstatcache($clear, $path) {}
+function lstat($path) { return $GLOBALS['snapshot']; }
+function unlink($path) { ++$GLOBALS['unlinks']; return true; }
+// A partial fstat result must not emit an undefined-key warning either.
+\set_error_handler(static function ($level, $message) { throw new \ErrorException($message, 0, $level); });
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/storageBenchmark/file.php', 'BenchmarkFileSnapshotFixture');
+        $script .= <<<'PHP'
+$rows = [];
+foreach ([false, [], ['dev' => 7], ['ino' => 19], ['dev' => null, 'ino' => 19],
+    ['dev' => 7, 'ino' => null], ['dev' => null, 'ino' => null],
+    ['dev' => 7, 'ino' => 19, 'size' => 0], ['dev' => 0, 'ino' => 0]] as $snapshot) {
+    $GLOBALS['snapshot'] = $snapshot;
+    $GLOBALS['closes'] = 0;
+    $reserved = storageBenchmarkFileReserve('/unused/reserved.dat');
+    $cleanups = [];
+    foreach ([[], ['dev' => 7], ['ino' => 19], ['dev' => null, 'ino' => 19],
+        ['dev' => 7, 'ino' => null], ['dev' => 7, 'ino' => 19],
+        ['dev' => 0, 'ino' => 0], ['dev' => '7', 'ino' => 19]] as $identity) {
+        $GLOBALS['unlinks'] = 0;
+        $cleanups[] = [storageBenchmarkFileCleanup('/unused/reserved.dat', $identity), $GLOBALS['unlinks']];
+    }
+    $rows[] = [$reserved, $GLOBALS['closes'], is_resource($GLOBALS['handle']), $cleanups];
+}
+echo json_encode($rows);
+PHP;
+        $rows = $this->pmssRunInlinePhpJson($script);
+        $this->assertSame(9, count($rows));
+        foreach ($rows as $index => [$reserved, $closes, $open, $cleanups]) {
+            $expected = $index === 7 ? ['dev' => 7, 'ino' => 19] : ($index === 8 ? ['dev' => 0, 'ino' => 0] : null);
+            $this->assertSame($expected, $reserved);
+            $this->assertSame(1, $closes);
+            $this->assertFalse($open);
+            $expectedCleanups = array_fill(0, 8, [false, 0]);
+            if ($index >= 7) $expectedCleanups[$index === 7 ? 5 : 6] = [true, 1];
+            $this->assertSame($expectedCleanups, $cleanups);
+        }
+    }
+
     public function testReservationClosesItsStreamWhenMetadataInspectionThrows(): void
     {
         // Intercept native I/O in a child namespace; never allocate or run a benchmark.

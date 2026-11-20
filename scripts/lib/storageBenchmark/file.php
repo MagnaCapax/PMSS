@@ -13,8 +13,9 @@ function storageBenchmarkFileReserve(string $path): ?array
     } finally {
         $closed = @fclose($handle);
     }
-    // Do not authorize allocation after a failed close; keep metadata throwables propagating.
-    return $closed && is_array($identity) ? ['dev' => $identity['dev'], 'ino' => $identity['ino']] : null;
+    // Allocation needs both inode fields and a successful close; metadata faults still propagate.
+    return $closed && is_array($identity) && isset($identity['dev'], $identity['ino'])
+        ? ['dev' => $identity['dev'], 'ino' => $identity['ino']] : null;
 }
 
 /** Never remove a path replaced after this run reserved its file. */
@@ -24,7 +25,9 @@ function storageBenchmarkFileCleanup(string $path, array $identity): bool
     if ($path === '' || pmssFilesystemPathHasNulByte($path)) return false;
     clearstatcache(true, $path);
     $current = @lstat($path);
-    return is_array($current) && pmssFilesystemStatSameInode($current, $identity) && @unlink($path);
+    // Missing fields in two snapshots must never compare equal and authorize removal.
+    return is_array($current) && isset($current['dev'], $current['ino'], $identity['dev'], $identity['ino'])
+        && pmssFilesystemStatSameInode($current, $identity) && @unlink($path);
 }
 
 /**
