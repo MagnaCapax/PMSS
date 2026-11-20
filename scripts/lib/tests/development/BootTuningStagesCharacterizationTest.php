@@ -62,8 +62,12 @@ PHP;
         return $this->pmssDecodeJsonArray($run['result']['output']);
     }
 
-    private function trace(string $script = self::SCRIPT_TARGET, string $service = self::SERVICE_TARGET): array
+    /** $changed: the fixture install reports a content change (its default), so the unit is re-run, not just started. */
+    private function trace(string $script = self::SCRIPT_TARGET, string $service = self::SERVICE_TARGET, bool $changed = true): array
     {
+        $last = $changed
+            ? ['step', 'Re-running PMSS boot tuning service (script or unit changed)', 'systemctl restart pmss-boot-tuning.service || true']
+            : ['step', 'Starting PMSS boot tuning service', 'systemctl start pmss-boot-tuning.service || true'];
         return [
             ['exists', self::SCRIPT], ['exists', self::SERVICE], ['read', self::SCRIPT], ['read', self::SERVICE],
             ['write', $script, 'raw %%PMSS_BOOT_TUNING_SCRIPT%%', 'Boot tuning script', ['mode' => 0755]],
@@ -71,7 +75,7 @@ PHP;
             ['reason', null, true, true], ['skip', 'fixture', 'Enabling PMSS boot tuning service'],
             ['step', 'Reloading systemd unit files (PMSS boot tuning)', 'systemctl daemon-reload || true'],
             ['step', 'Enabling PMSS boot tuning service', 'systemctl enable pmss-boot-tuning.service || true'],
-            ['step', 'Starting PMSS boot tuning service', 'systemctl start pmss-boot-tuning.service || true'],
+            $last,
         ];
     }
 
@@ -97,7 +101,8 @@ PHP;
 
     public function testFailedWritesAndCommandsRetainBestEffortProgressAndSkipOrder(): void
     {
-        $this->assertSame([$this->trace(), null], $this->observe(['write' => false, 'rc' => 1]));
+        // An unchanged (or failed) install only starts the unit: nothing new to apply.
+        $this->assertSame([$this->trace(self::SCRIPT_TARGET, self::SERVICE_TARGET, false), null], $this->observe(['write' => false, 'rc' => 1]));
         $this->assertSame([array_slice($this->trace(), 0, 8), null], $this->observe(['skip' => true]));
     }
 

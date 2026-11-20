@@ -41,11 +41,14 @@ resource control is the requirement, and settings are chosen among those that ke
   still off BFQ. `--dry-run` changes nothing.
 - `template.pmss-boot-tuning.sh` writes `bfq` for `nvme*` and its `hardware.json` advertises
   `"nvme_scheduler": "bfq"`. `read_ahead_kb` for NVMe stays 128, a separate knob.
+- `pmssEnsureBootTuning()` (update path) restarts the unit when it installed a changed script or unit file,
+  and only starts it otherwise, so a changed template takes effect during the update, not at the next boot.
 
 ## Consequences
 
 - A runtime scheduler write on a `/home` device is undone within one cron cycle on hosts with the unit.
-- NVMe hosts move to BFQ at the first weight-cron run after the update (drift heal), not at the next boot.
+- NVMe hosts move to BFQ during the update that installs the changed script; the weight cron's drift heal
+  catches any host where that re-run did not happen.
   BFQ costs more CPU per I/O than `none`; its effect on NVMe hosts under seedbox load is measured on the
   first hosts the update reaches.
 - Re-running the unit also re-writes the other knobs it owns (md stripe cache, sync speeds, read-ahead).

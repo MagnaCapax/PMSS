@@ -32,12 +32,19 @@ function pmssEnsureBootTuning(?callable $logger = null, ?string $scriptTarget = 
     }
 
     // Write files only when content changes to keep the run idempotent.
+    $changed = false;
     foreach ($files as [$template, $target, $mode, $label, $content]) {
-        pmssInstallManagedPathFile($target, $content, $label, $log, ['mode' => $mode]);
+        $changed = pmssInstallManagedPathFile($target, $content, $label, $log, ['mode' => $mode]) || $changed;
     }
 
     if (pmssSystemdActionSkip(pmssSystemdActionSkipReason(null, true, true), 'Enabling PMSS boot tuning service')) return;
     runStep('Reloading systemd unit files (PMSS boot tuning)', 'systemctl daemon-reload || true');
     runStep('Enabling PMSS boot tuning service', 'systemctl enable pmss-boot-tuning.service || true');
+    // The unit is a RemainAfterExit oneshot: `start` is a no-op once it ran, so a changed script would wait for the next
+    // boot. Re-run it when the script or unit changed (ADR 0315; the same re-run the weight cron does on drift).
+    if ($changed) {
+        runStep('Re-running PMSS boot tuning service (script or unit changed)', 'systemctl restart pmss-boot-tuning.service || true');
+        return;
+    }
     runStep('Starting PMSS boot tuning service', 'systemctl start pmss-boot-tuning.service || true');
 }
