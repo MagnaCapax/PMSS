@@ -81,4 +81,38 @@ class SchedulerDriftTest extends TestCase
         $root = $this->sysBlock(['sda' => 'mq-deadline [bfq] none']);
         $this->assertSame(null, pmssCgroupPolicyMountDriftedLeaves('/home', '/dev/vdz', $root));
     }
+
+    public function testNulInputsCannotBecomeAValidMountOrDevice(): void
+    {
+        $root = $this->sysBlock(['vda' => 'mq-deadline bfq [none]']);
+        foreach (["\0/dev/vda", "/dev/vda\0", "/dev/\0/vda", "/dev/vd\0a", " \0/dev/vda\0\n"] as $source) {
+            $this->pmssAssertNoPhpWarnings(function () use ($root, $source): void {
+                $this->assertSame(null, pmssCgroupPolicyMountDriftedLeaves('/home', $source, $root));
+            });
+        }
+        foreach (["\0/home", "/home\0", "/ho\0me", " \0/home\0\n", "\0"] as $mount) {
+            $this->pmssAssertNoPhpWarnings(function () use ($root, $mount): void {
+                $this->assertSame(null, pmssCgroupPolicyMountDriftedLeaves($mount, null, $root));
+            });
+        }
+        // An explicit source still leaves the mount path unused; whitespace normalization remains.
+        $this->assertSame(['vda'], pmssCgroupPolicyMountDriftedLeaves("/unused\0mount", " /dev/vda\n", $root));
+    }
+
+    public function testUnusableSchedulerReadsCannotCertifyEvenAPartialDriftList(): void
+    {
+        foreach (['', " \t\r\n", "\0", "\0[bfq] none", "[bfq] none\0", "[b\0fq] none",
+            "mq-deadline bfq [none]\0", "mq-deadline\0 bfq [none]"] as $scheduler) {
+            $root = $this->sysBlock(['md2' => '[none]', 'sda' => '[none] bfq', 'sdb' => $scheduler],
+                ['md2' => ['sda', 'sdb']]);
+            $this->pmssAssertNoPhpWarnings(function () use ($root): void {
+                $this->assertSame(null, pmssCgroupPolicyMountDriftedLeaves('/home', '/dev/sdb', $root));
+                $this->assertSame(null, pmssCgroupPolicyMountDriftedLeaves('/home', '/dev/md2', $root));
+            });
+        }
+        // Keep valid scheduler whitespace and the existing healthy-versus-drift distinction.
+        $root = $this->sysBlock(['sda' => " \t[bfq] none ", 'sdb' => " \tbfq [none] "]);
+        $this->assertSame([], pmssCgroupPolicyMountDriftedLeaves('/home', '/dev/sda', $root));
+        $this->assertSame(['sdb'], pmssCgroupPolicyMountDriftedLeaves('/home', '/dev/sdb', $root));
+    }
 }

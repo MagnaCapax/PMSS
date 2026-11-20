@@ -1,5 +1,14 @@
 # Refactoring Guidelines
 
+Scheduler drift inspection rejects NUL-containing explicit sources before basename
+selection and NUL-containing mount paths before implicit source lookup. Empty,
+whitespace-only or NUL-containing scheduler observations retain the existing unknown
+topology result, including after an earlier leaf reported drift, so unusable reads
+cannot authorize a boot-tuning restart or certify BFQ health (ADR 0315). Valid
+observations, whitespace normalization and explicit-source precedence stay unchanged.
+`SchedulerDriftTest` covers these boundaries with private sysfs fixtures; execution
+stays on testing machines, with changed-file PHP syntax checks on the devbox.
+
 Aggregate user-slice memory sizing divides before rounding and caps the watermark
 operand at the percentage reserve before scaling, preserving the ADR 0296 formula
 without overflowing integer intermediates. An unrepresentable MemTotal-plus-balloon

@@ -23,6 +23,9 @@ const PMSS_BFQ_DEVICE_CLASS_RE = '/^(sd|vd|xvd|bcache|nvme)[a-z0-9]*$/';
  */
 function pmssCgroupPolicyMountDriftedLeaves(string $mountPath = '/home', ?string $source = null, string $sysBlock = '/sys/block'): ?array
 {
+    // Reject raw corruption before trim/basename can hide it or mount lookup can run.
+    if (($source === null && strpos($mountPath, "\0") !== false)
+        || ($source !== null && strpos($source, "\0") !== false)) return null;
     $device = basename(trim($source ?? pmssCgroupPolicyMountSourceResolve($mountPath)));
     if ($device === '' || preg_match('/^[A-Za-z0-9_-]+$/', $device) !== 1) return null;
 
@@ -32,7 +35,8 @@ function pmssCgroupPolicyMountDriftedLeaves(string $mountPath = '/home', ?string
     foreach ($topology['leaves'] as $leaf) {
         if (preg_match(PMSS_BFQ_DEVICE_CLASS_RE, $leaf) !== 1) continue;
         $scheduler = @file_get_contents($sysBlock.'/'.$leaf.'/queue/scheduler');
-        if ($scheduler === false) return null;
+        // An empty or corrupt observation proves neither drift nor an active BFQ scheduler.
+        if ($scheduler === false || strpos($scheduler, "\0") !== false || trim($scheduler) === '') return null;
         if (preg_match('/\[bfq\]/', $scheduler) !== 1) $drifted[] = $leaf;
     }
     return $drifted;
