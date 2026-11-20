@@ -202,6 +202,12 @@ Keep the canonical installer/update details under `docs/install.md` and
   temporary workspaces, stream writes, file reads, and host values. Its sibling
   modules keep those responsibilities separate. Bounded and unbounded readers
   share one checked-open lifetime and the existing inode matcher (ADR 0167).
+  Contents and opened-inode metadata are returned only after successful stream
+  closure; a failed close retains the null read-failure result and null metadata.
+  Read and close throwables retain PHP's `finally` precedence. Valid bytes,
+  bounded owner/size checks and unbounded pseudo-file support stay unchanged.
+  `RuntimeFileReadCompletionSafetyTest` covers closure faults with memory streams;
+  execution stays on testing machines, with changed-file syntax checks on the devbox.
 - **scripts/lib/log.php** and **lighttpd/watchdogNginxLogReader.php** snapshot regular
   logs before non-blocking acquisition and verify the opened device/inode before
   reading. Failed snapshots, opens and inode checks retain their false/empty

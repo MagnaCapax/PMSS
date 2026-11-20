@@ -25,11 +25,13 @@ function pmssRegularFileRead(string $path, ?int $requiredUid = null, ?int $maxBy
             || ($maxBytes !== null && ($opened['size'] ?? PHP_INT_MAX) > $maxBytes)) return null;
         $contents = $maxBytes === null ? @stream_get_contents($handle) : @stream_get_contents($handle, $maxBytes + 1);
         if (!is_string($contents) || ($maxBytes !== null && (strlen($contents) > $maxBytes || strlen($contents) !== $opened['size']))) return null;
-        $metadata = $opened;
-        return $contents;
     } finally {
-        @fclose($handle);
+        $closed = @fclose($handle);
     }
+    // A failed close cannot certify contents or publish an opened-inode snapshot.
+    if (!$closed) return null;
+    $metadata = $opened;
+    return $contents;
 }
 
 function pmssReadRegularFileTrimmed(string $path): ?string { return (($contents = pmssReadRegularFileContents($path)) === null) ? null : trim($contents); }
