@@ -62,8 +62,8 @@ class StorageBenchmarkPostInstallTest extends TestCase
                 return 0;
             };
 
-            $probes = self::pmssMakeCallbacks(['users' => [], 'devices' => 0]);
-            $rc = \pmssStorageBenchmarkPostInstallRun($this->pmssMakeArrayLogger($logs), $runner, $probes['users'], $probes['devices']);
+            $probes = self::pmssMakeCallbacks(['users' => [], 'devices' => 0, 'guest' => false]);
+            $rc = \pmssStorageBenchmarkPostInstallRun($this->pmssMakeArrayLogger($logs), $runner, $probes['users'], $probes['devices'], $probes['guest']);
             $this->assertSame(0, $rc);
         });
 
@@ -72,6 +72,73 @@ class StorageBenchmarkPostInstallTest extends TestCase
         $this->assertTrue(is_file($marker));
         $this->assertSame('storage_benchmark_post_install', $this->pmssReadJsonArrayFile($marker)['event'] ?? '');
         $this->assertStringContainsString('[storage-benchmark] WARN: /dev/sdb seqread < 60% median', implode("\n", $logs));
+    }
+
+    public function testSkipsOnVirtualizedGuestWithoutRunningOrRecordingMarker(): void
+    {
+        $marker = $this->pmssMakeTempDir('pmss-bench-post-install-', 0700).'/marker.json';
+        $calls = [];
+        $logs = [];
+
+        $this->pmssWithEnv(['PMSS_STORAGE_BENCHMARK_INSTALL_MARKER' => $marker], function () use (&$calls, &$logs): void {
+            $runner = static function () use (&$calls): int { $calls[] = true; return 0; };
+            $probes = self::pmssMakeCallbacks(['users' => [], 'devices' => 14, 'guest' => true]);
+            $rc = \pmssStorageBenchmarkPostInstallRun($this->pmssMakeArrayLogger($logs), $runner, $probes['users'], $probes['devices'], $probes['guest']);
+            $this->assertSame(0, $rc);
+        });
+
+        $this->assertSame([], $calls);
+        $this->assertFalse(file_exists($marker));
+        $this->assertStringContainsAllStrings(['[SKIP]', 'Virtualized guest', 'manual /scripts/util/storageBenchmark.php'], implode("\n", $logs));
+    }
+
+    public function testManagedUsersStillSkipBeforeTheGuestProbeRuns(): void
+    {
+        $marker = $this->pmssMakeTempDir('pmss-bench-post-install-', 0700).'/marker.json';
+        $probed = [];
+        $calls = [];
+        $logs = [];
+
+        $this->pmssWithEnv(['PMSS_STORAGE_BENCHMARK_INSTALL_MARKER' => $marker], function () use (&$probed, &$calls, &$logs): void {
+            $detector = static function () use (&$probed): bool { $probed[] = true; return false; };
+            $rc = \pmssStorageBenchmarkPostInstallRun(
+                $this->pmssMakeArrayLogger($logs),
+                static function () use (&$calls): int { $calls[] = true; return 0; },
+                self::pmssMakeCallbacks(['users' => ['fixtur01']])['users'],
+                null,
+                $detector
+            );
+            $this->assertSame(0, $rc);
+        });
+
+        $this->assertSame([], $calls);
+        $this->assertSame([], $probed);
+        $this->assertFalse(file_exists($marker));
+        $this->assertStringContainsString('Managed users already exist', implode("\n", $logs));
+    }
+
+    public function testDefaultGuestDetectionFollowsSystemdDetectVirt(): void
+    {
+        // Exit 0 = guest (skip), exit 1 = bare metal (run); the shared pmssSysctlIsVm() is the one detector.
+        foreach ([0 => 0, 1 => 1] as $virtExit => $expectedRuns) {
+            $binDir = $this->pmssMakeExecutableStub(
+                'systemd-detect-virt',
+                "#!/bin/sh\n[ \"\$1\" = '--quiet' ] || exit 9\nexit ".$virtExit."\n",
+                'pmss-bench-virt-'
+            );
+            $marker = $this->pmssMakeTempDir('pmss-bench-post-install-', 0700).'/marker.json';
+            $calls = [];
+            $logs = [];
+
+            $this->pmssWithPathPrefixedEnv($binDir, ['PMSS_SYSCTL_IS_VM' => null, 'PMSS_STORAGE_BENCHMARK_INSTALL_MARKER' => $marker], function () use (&$calls, &$logs): void {
+                $runner = static function () use (&$calls): int { $calls[] = true; $GLOBALS['PMSS_LAST_COMMAND_OUTPUT'] = ['stdout' => '', 'stderr' => '']; return 0; };
+                $probes = self::pmssMakeCallbacks(['users' => [], 'devices' => 0]);
+                $this->assertSame(0, \pmssStorageBenchmarkPostInstallRun($this->pmssMakeArrayLogger($logs), $runner, $probes['users'], $probes['devices']));
+            });
+
+            $this->assertSame($expectedRuns, count($calls), 'runner calls for systemd-detect-virt exit '.$virtExit);
+            $this->assertSame($expectedRuns === 1, is_file($marker), 'marker for systemd-detect-virt exit '.$virtExit);
+        }
     }
 
     public function testFailedBenchmarkLeavesMarkerUnset(): void
@@ -85,8 +152,8 @@ class StorageBenchmarkPostInstallTest extends TestCase
                 return 2;
             };
 
-            $probes = self::pmssMakeCallbacks(['users' => [], 'devices' => 0]);
-            $rc = \pmssStorageBenchmarkPostInstallRun($this->pmssMakeArrayLogger($logs), $runner, $probes['users'], $probes['devices']);
+            $probes = self::pmssMakeCallbacks(['users' => [], 'devices' => 0, 'guest' => false]);
+            $rc = \pmssStorageBenchmarkPostInstallRun($this->pmssMakeArrayLogger($logs), $runner, $probes['users'], $probes['devices'], $probes['guest']);
             $this->assertSame(2, $rc);
         });
 
@@ -119,8 +186,8 @@ class StorageBenchmarkPostInstallTest extends TestCase
                 $GLOBALS['PMSS_LAST_COMMAND_OUTPUT'] = ['stdout' => '', 'stderr' => ''];
                 return 124;
             };
-            $probes = self::pmssMakeCallbacks(['users' => [], 'devices' => 14]);
-            $rc = \pmssStorageBenchmarkPostInstallRun($this->pmssMakeArrayLogger($logs), $runner, $probes['users'], $probes['devices']);
+            $probes = self::pmssMakeCallbacks(['users' => [], 'devices' => 14, 'guest' => false]);
+            $rc = \pmssStorageBenchmarkPostInstallRun($this->pmssMakeArrayLogger($logs), $runner, $probes['users'], $probes['devices'], $probes['guest']);
             $this->assertSame(124, $rc);
             $this->assertSame('1300', getenv('PMSS_COMMAND_TIMEOUT'));
         });

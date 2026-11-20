@@ -10,7 +10,7 @@
  */
 
 require_once __DIR__.'/../runtime.php';
-pmssRequireRelativeFiles(__DIR__, ['managedPath.php', '../user/selection.php', '../storageHealth/common.php']);
+pmssRequireRelativeFiles(__DIR__, ['managedPath.php', '../user/selection.php', '../storageHealth/common.php', 'systemPrep/sysctlProfile.php']);
 
 /** Return the durable success marker path for the post-install benchmark. */
 function pmssStorageBenchmarkPostInstallMarkerPath(): string
@@ -38,8 +38,9 @@ function pmssStorageBenchmarkPostInstallTimeoutSeconds(int $deviceCount): int
  * @param callable|null $runner
  * @param callable|null $userLister
  * @param callable|null $deviceCounter returns the inventory device count
+ * @param callable|null $guestDetector returns true on a virtualized guest (default: pmssSysctlIsVm)
  */
-function pmssStorageBenchmarkPostInstallRun(?callable $logger = null, ?callable $runner = null, ?callable $userLister = null, ?callable $deviceCounter = null): int
+function pmssStorageBenchmarkPostInstallRun(?callable $logger = null, ?callable $runner = null, ?callable $userLister = null, ?callable $deviceCounter = null, ?callable $guestDetector = null): int
 {
     $log = $logger ?: 'logmsg';
     $rawUsers = $userLister === null ? pmssManagedHomeUsersList(true) : $userLister();
@@ -60,6 +61,12 @@ function pmssStorageBenchmarkPostInstallRun(?callable $logger = null, ?callable 
     }
     if ($markerExists) {
         $log('[SKIP] Post-install storage benchmark already completed');
+        return 0;
+    }
+    // A guest cannot see its host's array resync or the real devices behind a virtual disk, and a
+    // 500G fio run there starves neighbouring guests and slows the host's array recovery (ADR 0313).
+    if ($guestDetector === null ? pmssSysctlIsVm() : (bool) $guestDetector()) {
+        $log('[SKIP] Virtualized guest; skipping post-install storage benchmark (--require-idle and --devices cannot see the host layer); run a bounded manual /scripts/util/storageBenchmark.php instead');
         return 0;
     }
 
