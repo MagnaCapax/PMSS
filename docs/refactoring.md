@@ -885,6 +885,8 @@ links use `pmssWriteSymlinks()`, preserving relative and dangling targets. Keep 
 installer return values and staged missing-file cases explicit; these exercise
 runtime failure boundaries rather than fixture setup. Empty directories and
 permission transitions remain separate from file publication.
+Torrent selection, recovery, convergence and launch fixtures delegate populated
+link parents to that writer too; retain empty directories observed before selection.
 Repository discovery, bootstrap staging and ruTorrent fixtures batch related writes
 through the same helper, preserving publication order and exact payload bytes.
 Let checked writers create populated parent directories; retain explicit setup

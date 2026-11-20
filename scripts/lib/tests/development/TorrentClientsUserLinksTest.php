@@ -12,9 +12,9 @@ final class TorrentClientsUserLinksTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-clients-links-');
         $home = $root.'/t';
         $store = $root.'/store/qbittorrent';
-        mkdir($home, 0755);
+        $this->pmssEnsureDir($home);
         $this->pmssWriteRelativeFile($store, '5.1.0/qbittorrent-nox', 'binary');
-        symlink('5.1.0', $store.'/default');
+        $this->pmssWriteSymlinks($store, ['default' => '5.1.0']);
         $ops = ['root' => $root.'/store', 'homeRoot' => $root, 'run' => $this->pmssAccountPathCommandRunner(),
             'catalog' => dirname(__DIR__, 4).'/etc/seedbox/config/torrentClients.json'];
         $this->assertTrue(\pmssTorrentClientsUserLinksConverge('t', $home, $ops));
@@ -23,7 +23,7 @@ final class TorrentClientsUserLinksTest extends TestCase
         $this->assertSame($store.'/5.1.0', readlink($versionLink));
         $this->assertFalse(is_link($defaultLink));
         $this->pmssWriteRelativeFile($home, 'bin/qbittorrent/custom/qbittorrent-nox', 'custom', 0777);
-        symlink('custom', $defaultLink);
+        $this->pmssWriteSymlinks($home, ['bin/qbittorrent/default' => 'custom']);
         $this->assertTrue(\pmssTorrentClientsUserLinksConverge('t', $home, $ops));
         $this->assertSame('custom', readlink($defaultLink));
         $this->assertSame($home.'/bin/qbittorrent/custom/qbittorrent-nox', \pmssTorrentClientResolve($home, 'qbittorrent'));
@@ -33,14 +33,13 @@ final class TorrentClientsUserLinksTest extends TestCase
     {
         $root = $this->pmssMakeTempDir('pmss-clients-resolve-');
         $home = $root.'/t';
-        mkdir($home.'/bin/qbittorrent', 0755, true);
         $default = $home.'/bin/qbittorrent/default';
-        symlink('../../other', $default);
+        $this->pmssWriteSymlinks($home, ['bin/qbittorrent/default' => '../../other']);
         $this->assertSame(null, \pmssTorrentClientResolve($home, 'qbittorrent'));
         unlink($default);
-        symlink('linked', $default);
-        mkdir($root.'/other');
-        symlink($root.'/other', $home.'/bin/qbittorrent/linked');
+        $this->pmssWriteSymlinks($home, ['bin/qbittorrent/default' => 'linked']);
+        $this->pmssEnsureDir($root.'/other', 0777);
+        $this->pmssWriteSymlinks($home, ['bin/qbittorrent/linked' => $root.'/other']);
         $this->assertSame(null, \pmssTorrentClientResolve($home, 'qbittorrent'));
     }
 }

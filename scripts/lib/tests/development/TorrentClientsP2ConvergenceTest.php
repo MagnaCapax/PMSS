@@ -25,7 +25,7 @@ final class TorrentClientsP2ConvergenceTest extends TestCase
         $entry = ['client' => 'qbittorrent', 'version' => '5.1.0'];
         $this->pmssWriteFile($path, json_encode(['versions' => [$entry]]));
         $this->assertSame([$entry], \pmssTorrentClientsProjectionVersionsRead($path));
-        symlink($path, $root.'/linked.json');
+        $this->pmssWriteSymlinks($root, ['linked.json' => $path]);
         $this->assertSame([], \pmssTorrentClientsProjectionVersionsRead($root.'/linked.json'));
         link($path, $root.'/hardlinked.json');
         $this->assertSame([], \pmssTorrentClientsProjectionVersionsRead($path));
@@ -42,7 +42,7 @@ final class TorrentClientsP2ConvergenceTest extends TestCase
         $this->pmssWriteFile($root.'/store/qbittorrent/5.1.0/qbittorrent-nox', 'binary');
         $this->pmssWriteFile($root.'/projection.json', '{"versions":[{"client":"qbittorrent","version":"5.1.0","kind":"static"}]}');
         $target = $root.'/store/qbittorrent/5.1.0';
-        symlink($target, $home.'/bin/qbittorrent/default');
+        $this->pmssWriteSymlinks($home, ['bin/qbittorrent/default' => $target]);
         \pmssTorrentClientsPostSetupConverge('t', $home, $ops);
         $this->assertSame($target, readlink($home.'/bin/qbittorrent/5.1.0'));
         $this->assertSame($target, readlink($home.'/bin/qbittorrent/default'));
@@ -53,7 +53,7 @@ final class TorrentClientsP2ConvergenceTest extends TestCase
     {
         [$root, $home, $ops, $events] = $this->fixture('custom');
         $this->pmssWriteFile($home.'/bin/qbittorrent/custom/qbittorrent-nox', 'custom');
-        symlink('custom', $home.'/bin/qbittorrent/default');
+        $this->pmssWriteSymlinks($home, ['bin/qbittorrent/default' => 'custom']);
         \pmssTorrentClientsPostSetupConverge('t', $home, $ops);
         $this->assertSame('custom', readlink($home.'/bin/qbittorrent/default'));
         $this->assertSame([], $events->logs);
@@ -63,7 +63,7 @@ final class TorrentClientsP2ConvergenceTest extends TestCase
     {
         [$root, $home, $ops, $events] = $this->fixture('fallback');
         $this->pmssWriteFile($home.'/bin/qbittorrent/custom/qbittorrent-nox', 'custom');
-        symlink($root.'/store/qbittorrent/old', $home.'/bin/qbittorrent/default');
+        $this->pmssWriteSymlinks($home, ['bin/qbittorrent/default' => $root.'/store/qbittorrent/old']);
         \pmssTorrentClientsPostSetupConverge('t', $home, $ops);
         $this->assertFalse(is_link($home.'/bin/qbittorrent/default'));
         $this->assertSame('custom', file_get_contents($home.'/bin/qbittorrent/custom/qbittorrent-nox'));
@@ -80,12 +80,11 @@ final class TorrentClientsP2ConvergenceTest extends TestCase
     {
         // A Deluge store version is a virtualenv whose daemon lives in bin/ (ADR 0110), not at the top level.
         [$root, $home, $ops, $events] = $this->fixture('deluge-venv');
-        $this->pmssEnsureDir($home.'/bin/deluge');
         $target = $root.'/store/deluge/2.2.0';
         $this->pmssWriteFile($target.'/bin/deluged', '#!/usr/bin/python3');
         $this->pmssWriteFile($target.'/bin/deluge-web', '#!/usr/bin/python3');
         $this->pmssWriteFile($root.'/projection.json', '{"versions":[{"client":"deluge","version":"2.2.0","kind":"venv"}]}');
-        symlink($target, $home.'/bin/deluge/default');
+        $this->pmssWriteSymlinks($home, ['bin/deluge/default' => $target]);
         \pmssTorrentClientsPostSetupConverge('t', $home, $ops);
         $this->assertSame($target, readlink($home.'/bin/deluge/default'));
         $this->assertFalse(is_file($home.'/.config/pmss/torrentClients/deluge.notice'));
@@ -97,8 +96,7 @@ final class TorrentClientsP2ConvergenceTest extends TestCase
         foreach (['qbittorrent' => 'qBittorrent', 'rtorrent' => 'rTorrent',
             'deluge' => 'Deluge', 'transmission' => 'Transmission'] as $client => $label) {
             [$root, $home, $ops] = $this->fixture('notice-'.$client);
-            $this->pmssEnsureDir($home.'/bin/'.$client);
-            $this->pmssCreateSymlinkOrSkip($root.'/store/'.$client.'/missing', $home.'/bin/'.$client.'/default');
+            $this->pmssWriteSymlinks($home, ['bin/'.$client.'/default' => $root.'/store/'.$client.'/missing']);
             $this->assertTrue(\pmssTorrentClientsPostSetupFallback('t', $home, $client, [], 'system', $ops));
             $message = 'The '.$label.' version selected for this account is not installed on this server; the server\'s build is used.';
             $this->assertSame($message."\n", file_get_contents($home.'/.config/pmss/torrentClients/'.$client.'.notice'));
@@ -119,7 +117,7 @@ final class TorrentClientsP2ConvergenceTest extends TestCase
         $this->pmssWriteFile($root.'/projection.json', '{"versions":[{"client":"qbittorrent","version":"5.2.0","kind":"static"}]}');
         $target = $root.'/store/qbittorrent/5.2.0';
         $this->pmssWriteFile($target.'/qbittorrent-nox', 'binary');
-        symlink($root.'/store/qbittorrent/old', $home.'/bin/qbittorrent/default');
+        $this->pmssWriteSymlinks($home, ['bin/qbittorrent/default' => $root.'/store/qbittorrent/old']);
         \pmssTorrentClientsPostSetupConverge('t', $home, $ops);
         $this->assertSame($target, readlink($home.'/bin/qbittorrent/default'));
         $this->assertSame(1, count($events->logs));
@@ -131,7 +129,7 @@ final class TorrentClientsP2ConvergenceTest extends TestCase
         $backup = $root.'/backup';
         $this->pmssWriteFile($home.'/bin/support', 'fresh skeleton');
         $this->pmssWriteFile($backup.'/bin/qbittorrent/custom/qbittorrent-nox', 'user build');
-        symlink('custom', $backup.'/bin/qbittorrent/default');
+        $this->pmssWriteSymlinks($backup, ['bin/qbittorrent/default' => 'custom']);
         chmod($home, 0700); chmod($backup, 0700);
         $uid = posix_geteuid(); $gid = posix_getegid();
         $left = \pmssRecreateRestoreHome($home, $backup, true, $uid, $gid, $uid, $uid);

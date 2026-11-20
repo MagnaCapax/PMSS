@@ -20,9 +20,8 @@ final class TorrentClientsSwitchRecoveryTest extends TestCase
         foreach (['qbittorrent', 'deluge', 'rtorrent'] as $client) foreach ([true, false] as $starts) {
             foreach (['/home/.pmss/clients/'.$client.'/withdrawn', 'missing-custom', 'system'] as $target) {
                 $home = $this->pmssMakeTempDir('pmss-invalid-recovery-');
-                $this->pmssEnsureDir($home.'/bin/'.$client);
                 $link = $home.'/bin/'.$client.'/default';
-                $this->pmssCreateSymlinkOrSkip($target, $link);
+                $this->pmssWriteSymlinks($home, ['bin/'.$client.'/default' => $target]);
                 $events = [];
                 $ops = ['versions' => ['system' => ['kind' => 'system'], '4.2.0' => ['kind' => $client === 'deluge' ? 'venv' : 'static']],
                     'repoint' => static function ($home, ...$args) use ($client, &$events): bool {
@@ -58,9 +57,8 @@ final class TorrentClientsSwitchRecoveryTest extends TestCase
         foreach (['qbittorrent', 'rtorrent', 'deluge', 'transmission'] as $client) {
             foreach ([['ok' => false, 'message' => 'Not enough free space.'], false, null] as $snapshot) {
                 $home = $this->pmssMakeTempDir('pmss-backup-failed-');
-                $this->pmssEnsureDir($home.'/bin/'.$client);
                 $target = '/home/.pmss/clients/'.$client.'/4.1.3';
-                $this->pmssCreateSymlinkOrSkip($target, $home.'/bin/'.$client.'/default');
+                $this->pmssWriteSymlinks($home, ['bin/'.$client.'/default' => $target]);
                 $dir = $this->pmssEnsureDir($home.'/.config/pmss/torrentClients');
                 foreach (['lastRun', 'lastgood'] as $suffix) $this->pmssWriteFile($dir.'/'.$client.'.'.$suffix, "4.1.3\n");
                 $events = [];
@@ -90,9 +88,8 @@ final class TorrentClientsSwitchRecoveryTest extends TestCase
         foreach (['qbittorrent', 'rtorrent', 'deluge', 'transmission'] as $client) {
             foreach (['mkdir(): Disk quota exceeded', 'fwrite(): No space left on device'] as $warning) {
                 $home = $this->pmssMakeTempDir('pmss-backup-full-');
-                $this->pmssEnsureDir($home.'/bin/'.$client);
                 $target = '/home/.pmss/clients/'.$client.'/4.1.3';
-                $this->pmssCreateSymlinkOrSkip($target, $home.'/bin/'.$client.'/default');
+                $this->pmssWriteSymlinks($home, ['bin/'.$client.'/default' => $target]);
                 $dir = $this->pmssEnsureDir($home.'/.config/pmss/torrentClients');
                 $unexpected = static function (): void { throw new \RuntimeException('Backup failure changed the client'); };
                 // The backup fails the way the real one does at quota: a suppressed filesystem warning, then a false result.
@@ -111,8 +108,7 @@ final class TorrentClientsSwitchRecoveryTest extends TestCase
     public function testInvalidTransmissionStillCannotSelectSystem(): void
     {
         $home = $this->pmssMakeTempDir('pmss-invalid-transmission-');
-        $this->pmssEnsureDir($home.'/bin/transmission');
-        $this->pmssCreateSymlinkOrSkip('/home/.pmss/clients/transmission/missing', $home.'/bin/transmission/default');
+        $this->pmssWriteSymlinks($home, ['bin/transmission/default' => '/home/.pmss/clients/transmission/missing']);
         $ops = ['versions' => ['system' => ['kind' => 'system', 'rpcUnixSocket' => true]]] + self::pmssMakeCallbacks(['resolve' => null]);
         $this->assertSame(400, $this->apply($home, 'transmission', 'system', $ops)['status']);
         $this->assertFalse(is_dir($home.'/.config'));

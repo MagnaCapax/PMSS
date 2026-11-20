@@ -35,7 +35,7 @@ final class TorrentClientsRunningVersionTest extends TestCase
             $this->pmssEnsureDir($home.'/bin/'.$client);
             $ops = self::pmssMakeCallbacks(['pids' => [1], 'resolve' => null]);
             $this->assertSame('system', $this->running($home, $client, $ops));
-            $this->pmssCreateSymlinkOrSkip('custom', $home.'/bin/'.$client.'/default');
+            $this->pmssWriteSymlinks($home, ['bin/'.$client.'/default' => 'custom']);
             $this->assertSame('custom', $this->running($home, $client, $ops));
         }
     }

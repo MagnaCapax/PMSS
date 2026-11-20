@@ -28,8 +28,7 @@ final class TorrentClientsP1LaunchTest extends TestCase
         foreach ([false, true] as $selected) {
             $home = $this->pmssMakeTempDir('pmss-qbt-resolver-behaviour-');
             if ($selected) {
-                $this->pmssEnsureDir($home.'/bin/qbittorrent');
-                $this->pmssCreateSymlinkOrSkip('custom', $home.'/bin/qbittorrent/default');
+                $this->pmssWriteSymlinks($home, ['bin/qbittorrent/default' => 'custom']);
             }
             $events = [];
             $this->assertTrue(\pmssTorrentClientResolverLaunch($home, 'qbittorrent', false, [
@@ -44,7 +43,7 @@ final class TorrentClientsP1LaunchTest extends TestCase
     {
         $home = $this->pmssMakeTempDir('pmss-p1-launch-');
         $this->pmssWriteFile($home.'/bin/qbittorrent/custom/qbittorrent-nox', 'fixture');
-        $this->pmssCreateSymlinkOrSkip('custom', $home.'/bin/qbittorrent/default');
+        $this->pmssWriteSymlinks($home, ['bin/qbittorrent/default' => 'custom']);
         $dir = $this->pmssEnsureDir($home.'/.config/pmss/torrentClients');
         $handle = fopen($dir.'/qbittorrent.lock', 'c');
         flock($handle, LOCK_EX);
