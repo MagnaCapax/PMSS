@@ -9,12 +9,14 @@ class LighttpdConfigRefreshResultTest extends TestCase
     public function testPreparationFailuresStillInstallCurrentConfigAndFailOnlyInStrictMode(): void
     {
         foreach ([[], ['--strict']] as $arguments) {
-            foreach (['public-link', 'dangling-public', 'lighttpd-link', 'custom-directory'] as $kind) {
+            foreach (['public-link', 'public-relative', 'dangling-public', 'lighttpd-link', 'custom-directory'] as $kind) {
                 $result = $this->refreshFixture($kind, $arguments);
                 $this->assertSame($arguments === [] ? 0 : 1, $result['rc'], $kind);
                 $this->assertSame(['fixtur01', 'fixtur02'], $result['attempted'], 'later accounts must still run');
                 $this->assertStringContainsAllStrings(['Password protected area (fixtur01)', '/user-fixtur01/'], $result['config']);
-                $this->pmssAssertArraySubsetSame(['writes' => [['root', 0644]], 'auxiliary' => [],
+                // php.ini hardening needs only a real ~/.lighttpd; a refused www/public or custom path must not skip it.
+                $this->pmssAssertArraySubsetSame(['writes' => [['root', 0644]],
+                    'auxiliary' => $kind === 'lighttpd-link' ? [] : ['php.ini'],
                     'linkChanged' => false, 'elsewhere' => ['.', '..']], $result, $kind.' after refused preparation: ');
                 $this->pmssAssertStringNotContainsString('lighttpd configured', $result['output']);
             }
@@ -95,8 +97,9 @@ class LighttpdConfigRefreshResultTest extends TestCase
         mkdir($home.'/www', 0755);
         mkdir($home.'/elsewhere', 0700);
         $this->pmssWriteFile($home.'/.rtorrent.rc', 'fixture');
-        if (in_array($kind, ['public-link', 'dangling-public', 'lighttpd-link'], true)) {
-            symlink($kind === 'dangling-public' ? $home.'/missing' : $home.'/elsewhere',
+        if (in_array($kind, ['public-link', 'public-relative', 'dangling-public', 'lighttpd-link'], true)) {
+            // public-relative is the customer-made shape seen live: www/public -> ../public (a real directory).
+            symlink($kind === 'dangling-public' ? $home.'/missing' : ($kind === 'public-relative' ? '../elsewhere' : $home.'/elsewhere'),
                 $home.($kind === 'lighttpd-link' ? '/.lighttpd' : '/www/public'));
         } elseif ($kind === 'custom-directory') {
             mkdir($home.'/.lighttpd/custom', 0755, true);
@@ -111,6 +114,9 @@ function pmssPrepareLighttpdUserDirectories($user, $home, $deflate, &$reason) {
     // The second account succeeds without overwriting the first account's result.
     if ($user === 'fixtur02') return true;
     return \pmssPrepareLighttpdUserDirectories($user, $GLOBALS['home'], $deflate, $reason);
+}
+function pmssLighttpdAccountDirReady($home) {
+    return $home === '/home/fixtur02' ? true : \pmssLighttpdAccountDirReady($GLOBALS['home']);
 }
 function pmssReadRegularFileInt($path) { return 31234; }
 function pmssLighttpdProxyPortsEnsure($paths) { return ['rclone' => 31235, 'qbittorrent' => 31236]; }
@@ -170,7 +176,7 @@ $output = \ob_get_clean();
 echo json_encode(['rc' => $rc, 'attempted' => $GLOBALS['attempted'], 'writes' => $GLOBALS['writes'],
     'config' => \is_file($GLOBALS['home'].'/.lighttpd.conf') ? \file_get_contents($GLOBALS['home'].'/.lighttpd.conf') : null,
     'auxiliary' => $GLOBALS['auxiliary'], 'output' => preg_replace('/^\[user:fixtur02\].*\n/m', '', $output),
-    'linkChanged' => in_array($GLOBALS['kind'], ['public-link', 'dangling-public', 'lighttpd-link'], true)
+    'linkChanged' => in_array($GLOBALS['kind'], ['public-link', 'public-relative', 'dangling-public', 'lighttpd-link'], true)
         && !\is_link($GLOBALS['home'].($GLOBALS['kind'] === 'lighttpd-link' ? '/.lighttpd' : '/www/public')),
     'elsewhere' => \scandir($GLOBALS['home'].'/elsewhere')]);
 PHP;

@@ -160,13 +160,18 @@ function pmssUserConfigLighttpdConfigureUser(
         return false;
     }
 
+    // php.ini needs only a real ~/.lighttpd of the account: a refused unrelated path (www/public)
+    // must not skip its managed hardening. The sync writes as the account through its own checks.
+    $phpIniFailure = '';
+    $phpIniSynced = pmssLighttpdAccountDirReady($homeDir)
+        && pmssLighttpdSyncPhpIni($homeDir.'/.lighttpd/php.ini', $thisUser, $resources['memoryLimit'], $phpIniFailure);
+
     // Leave refused paths untouched and keep this account eligible for retry.
     if (!$directoriesReady) {
         return false;
     }
 
-    $phpIniFailure = '';
-    if (!pmssLighttpdSyncPhpIni($homeDir.'/.lighttpd/php.ini', $thisUser, $resources['memoryLimit'], $phpIniFailure)) {
+    if (!$phpIniSynced) {
         $message = $phpIniFailure === 'unsafe'
             ? 'Refusing to operate on unsafe php.ini path'
             : ($phpIniFailure === 'seed' ? 'Failed to seed php.ini' : 'Failed to update php.ini');

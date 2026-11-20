@@ -117,6 +117,17 @@ function pmssPrepareLighttpdUserDirectories(string $user, string $homeDir, bool 
     return true;
 }
 
+/** True when ~/.lighttpd itself is a real directory of the home's owner, never a link root would follow. */
+function pmssLighttpdAccountDirReady(string $homeDir): bool
+{
+    $directory = rtrim($homeDir, '/').'/.lighttpd';
+    clearstatcache(true, $directory);
+    $entry = @lstat($directory);
+    $home = @lstat($homeDir);
+    return is_array($entry) && is_array($home) && ($entry['mode'] & 0170000) === 0040000
+        && ($home['mode'] & 0170000) === 0040000 && $entry['uid'] === $home['uid'];
+}
+
 function pmssEnsureWebdavLockDatabase(string $user, string $homeDir): void
 {
     $lighttpdDir = $homeDir.'/.lighttpd';
