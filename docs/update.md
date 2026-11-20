@@ -197,6 +197,13 @@ list in the installer, the post-install benchmark checks skip conditions and bui
 its command in the trigger, and locale preparation handles the single shared
 LANG/LC_TIME baseline directly. Command bytes, log messages and skip order are preserved.
 
+Storage benchmark modes already share fio/dd execution in
+`scripts/lib/storageBenchmark/jobs.php`. Their parameter schemas, read-only flags
+and result presentation remain mode-specific; file reservation and inode-checked
+cleanup stay with the file-backed controller. Consult [ADR 0178](adr/0178-storage-benchmark-job-execution-boundary.md)
+and [ADR 0189](adr/0189-storage-benchmark-probe-boundaries.md) before consolidating
+these boundaries further.
+
 Base system preparation retains `systemPrep.php` as its include (ADR 0267).
 Temporary-mount policy, boot-tuning installation, locale/timezone convergence
 and root-shell defaults have separate modules. Boot templates share ordered
