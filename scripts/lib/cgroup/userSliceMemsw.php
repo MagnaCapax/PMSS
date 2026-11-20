@@ -73,7 +73,16 @@ function pmssUserSliceMemswWrite(string $file, string $value): bool
     if (!is_resource($p)) {
         return false;
     }
-    fwrite($pipes[0], $value."\n");
-    fclose($pipes[0]);
-    return proc_close($p) === 0;
+    $input = $value."\n";
+    try {
+        $written = fwrite($pipes[0], $input) === strlen($input);
+    } finally {
+        // Attempt both cleanup steps even when writing or closing stdin throws.
+        try {
+            $closed = fclose($pipes[0]);
+        } finally {
+            $rc = proc_close($p);
+        }
+    }
+    return $written && $closed && $rc === 0;
 }

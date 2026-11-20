@@ -140,6 +140,14 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   whitespace, control bytes and duplicate assignments are preserved. Systemd,
   cgroup CLI and rTorrent callers retain their own filtering and value policy.
 
+- `pmssUserSliceMemswWrite()` reports success only after a complete stdin write,
+  successful pipe closure and child exit zero. Pipe closure and reaping are
+  attempted in nested `finally` blocks even when I/O throws; lone throwables
+  propagate unchanged and combined faults retain PHP's `finally` precedence.
+  The sysfs command, timeout, newline and successful result remain unchanged
+  (ADR 0298). `UserSliceMemswWriteSafetyTest` covers failures with memory streams
+  and fake process operations; execution stays on testing machines.
+
 - `pmssSerializedArrayDecode()` decodes legacy serialized payloads with class
   instantiation disabled and returns only arrays, or `null` for malformed and
   non-array payloads. Regular-file reads and both serialized I/O history readers
