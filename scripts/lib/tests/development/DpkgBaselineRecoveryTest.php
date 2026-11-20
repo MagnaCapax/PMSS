@@ -117,6 +117,21 @@ class DpkgBaselineRecoveryTest extends TestCase
         }
     }
 
+    public function testReinstallRequiredPackagesAreReinstalledBeforeConfigure(): void
+    {
+        // iUR: unpack killed mid-way (hypervisor power-off); configure and fix-broken both refuse it until reinstalled.
+        $status = "ii  alpha\niUR php8.2-gd\niHR libbeta:amd64\nrc  gamma\n";
+        $result = $this->fixture(['install' => [100, 0], 'status' => $status]);
+        $this->pmssAssertArraySubsetSame(['ok' => true, 'actions' => ['install', 'reinstall', 'configure', 'fix', 'install']], $result);
+        $this->assertTrue(in_array(['Reinstalling packages dpkg marks reinstall-required', "apt-get install --reinstall -y 'php8.2-gd' 'libbeta:amd64'"], $result['trace'], true));
+    }
+
+    public function testNoReinstallStepWithoutReinstallRequiredPackages(): void
+    {
+        $result = $this->fixture(['install' => [100, 0], 'status' => "ii  alpha\niU  beta\n"]);
+        $this->pmssAssertArraySubsetSame(['ok' => true, 'actions' => ['install', 'configure', 'fix', 'install']], $result);
+    }
+
     public function testBusyLockStopsRecoveryWithinSixtySeconds(): void
     {
         $result = $this->fixture(['release' => 1000]);
@@ -199,7 +214,9 @@ function pmssAptDpkgEnvPrefix() { return ''; }
 function pmssSystemdRuntimeAvailable() { return $GLOBALS['options']['systemd'] ?? false; }
 function pmssSystemdUnitState($verb, $unit) { return $GLOBALS['options']['unit']; }
 function runCommand($command) { $GLOBALS['trace'][] = ['command', $command]; return 0; }
-function shell_exec($command) { $GLOBALS['trace'][] = ['fuse-query']; return !empty($GLOBALS['options']['fuse']) ? 'install ok installed' : ''; }
+function shell_exec($command) {
+    if (strpos($command, 'db:Status-Abbrev') !== false) { $GLOBALS['trace'][] = ['status-query']; return $GLOBALS['options']['status'] ?? ''; }
+    $GLOBALS['trace'][] = ['fuse-query']; return !empty($GLOBALS['options']['fuse']) ? 'install ok installed' : ''; }
 function file($path, $flags) { $GLOBALS['trace'][] = ['read', $path]; return $GLOBALS['options']['lines']; }
 function unlink($path) { $GLOBALS['trace'][] = ['unlink', $path]; $GLOBALS['cleaned'] = true; }
 function pmssSelectDpkgSelectionsBaseline($version) { return $GLOBALS['options']['baseline']; }
@@ -223,10 +240,11 @@ function runStep($description, $command) {
     $GLOBALS['trace'][] = [$description, $command];
     if (($GLOBALS['options']['throwAt'] ?? '') === $description) throw $GLOBALS['failure'];
     if ($description === 'Applying dpkg selection baseline') return $GLOBALS['options']['setRc'] ?? 0;
-    $action = strpos($command, 'dselect-upgrade') !== false ? 'install'
+    $action = strpos($command, '--reinstall') !== false ? 'reinstall'
+        : (strpos($command, 'dselect-upgrade') !== false ? 'install'
         : (strpos($command, '--fix-broken') !== false ? 'fix'
         : (strpos($command, '--configure -a') !== false ? 'configure'
-        : (strpos($command, '--configure proftpd') !== false ? 'proftpd' : '')));
+        : (strpos($command, '--configure proftpd') !== false ? 'proftpd' : ''))));
     if ($action === '') return 0; // availability merge and set-selections are also inert
     if (time() < $GLOBALS['busy']) throw new \RuntimeException('Package writer raced a dying lock owner');
     $GLOBALS['actions'][] = $action;
