@@ -246,10 +246,14 @@ Consequences:
   includes older servers whose AMD/ATI graphics run on the `radeon` driver, not
   `amdgpu`. The package is inert there, and the access rules match only
   `amdgpu` nodes.
-- With `MODULES=most`, each initrd also carries the amdgpu firmware it
-  declares, so each initrd grows. A host with a separate small `/boot` needs
-  room for that on every installed kernel. The first host checked had a 451 MB
-  `/boot` with 333 MB free and 33 MB initrds.
+- The initrd does not grow. amdgpu is not in the initrd on these hosts, so
+  initramfs-tools copies none of its firmware. amdgpu loads from the root
+  filesystem through udev after the switch to the real root, and reads its
+  firmware from `/lib/firmware/amdgpu` there. Measured 2026-11-20: a Ryzen host
+  with firmware-amd-graphics installed had 0 amdgpu files in its 33 MB initrd.
+  (An earlier line in this amendment said each initrd grows; that was wrong.)
+  Because amdgpu starts before any userspace watchdog is armed, a boot-time
+  amdgpu hang on a host without remote power needs hands on site.
 - On AMD hosts, accounts share the iGPU with no GPU cgroup, the same as on
   Intel. amdgpu driver bugs are reachable from local accounts through render
   ioctls, so keep kernels current.
