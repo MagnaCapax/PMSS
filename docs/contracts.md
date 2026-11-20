@@ -1930,6 +1930,10 @@ Automation often invokes these utilities; below are expected inputs and effects.
   Server storage row. The row is absent when `/proc/pressure/io` is missing,
   unavailable when it cannot be read or parsed, and heavy when live five-minute
   full I/O PSI reaches 20% or fresh `/home` ioping exceeds 100 ms.
+- `readLimitNotice.php` shows a neutral Disk read limit box with a heading, small
+  disk reads per second and the recalculation cadence. Only accounts held at
+  their limit see the download/file-access slowdown explanation. Missing,
+  malformed or stale status hides the entire box (ADR 0232; Refs #1251).
 - `welcome.php` retains an alert-only notice, with RAID taking precedence over
   heavy host pressure. Root cron publishes the optional ioping measurement to
   `/var/lib/pmss/public/host-pressure.json` at mode 0644. Snapshots older than

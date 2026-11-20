@@ -29,10 +29,11 @@ if (!function_exists('pmssReadLimitHtmlBuild')) {
     {
         if (!is_array($status)) return '';
         $limit = htmlspecialchars(number_format((int) $status['limit']), ENT_QUOTES, 'UTF-8');
-        $text = '<p>Disk reads for your account right now: up to '.$limit.' per second. '
-            .'This follows how busy the shared disk is and is recalculated every few minutes.</p>';
+        $text = '<strong>Disk read limit</strong>'
+            .'<p>While the shared disk is busy, your account can make up to '.$limit.' small disk reads per second.</p>'
+            .'<p>This limit follows how busy the shared disk is and is recalculated every few minutes.</p>';
         if ($status['held']) {
-            $text .= '<p>Your account is reading at this rate now, so further reads wait their turn. '
+            $text .= '<p>Your account is currently at this limit. '
                 .'Downloads and file access can feel slower until the disk is less busy or your reading slows.</p>';
         }
         return '<div class="pmss-raid-notice pmss-storage-status-neutral pmss-read-limit">'.$text.'</div>';

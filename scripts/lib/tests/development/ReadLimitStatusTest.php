@@ -38,6 +38,7 @@ class ReadLimitStatusTest extends TestCase
         $this->assertSame(['limit' => 40, 'held' => true], \pmssReadLimitStatusRead($root.'/held', $now));
         foreach (['stale', 'future', 'zero', 'text', 'bad', 'big', 'missing'] as $name) {
             $this->assertSame(null, \pmssReadLimitStatusRead($root.'/'.$name, $now), $name);
+            $this->assertSame('', \pmssReadLimitHtmlBuild(\pmssReadLimitStatusRead($root.'/'.$name, $now)), $name);
         }
         $this->pmssCreateSymlinkOrSkip($root.'/good', $root.'/link');
         $this->assertSame(null, \pmssReadLimitStatusRead($root.'/link', $now));
@@ -47,8 +48,16 @@ class ReadLimitStatusTest extends TestCase
     {
         $this->assertSame('', \pmssReadLimitHtmlBuild(null));
         $quiet = \pmssReadLimitHtmlBuild(['limit' => 1240, 'held' => false]);
-        $this->assertStringContainsAndOmitsStrings(['up to 1,240 per second'], ['wait their turn'], $quiet);
-        $this->assertStringContainsString('wait their turn', \pmssReadLimitHtmlBuild(['limit' => 20, 'held' => true]));
+        $this->assertStringContainsAndOmitsStrings([
+            '<strong>Disk read limit</strong>', 'pmss-storage-status-neutral',
+            '<p>While the shared disk is busy, your account can make up to 1,240 small disk reads per second.</p>',
+            '<p>This limit follows how busy the shared disk is and is recalculated every few minutes.</p>',
+        ], ['currently at this limit', 'Downloads and file access can feel slower'], $quiet);
+        $this->assertStringContainsAllStrings([
+            '<strong>Disk read limit</strong>', 'pmss-storage-status-neutral', 'up to 20 small disk reads per second',
+            'Your account is currently at this limit.',
+            'Downloads and file access can feel slower until the disk is less busy or your reading slows.',
+        ], \pmssReadLimitHtmlBuild(['limit' => 20, 'held' => true]));
     }
 
     public function testSlicePrivacyRefusesSystemIdsAndNeverTouchesNonRootDirectories(): void
