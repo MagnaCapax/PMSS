@@ -10,6 +10,7 @@ require_once __DIR__.'/../lib/lighttpd/userConfigApply.php';
 require_once __DIR__.'/../lib/lighttpd/watchdogErrorPage.php';
 require_once __DIR__.'/../lib/lighttpd/watchdogNginxLogReader.php';
 require_once __DIR__.'/../lib/lighttpd/watchdogSocketProbe.php';
+require_once __DIR__.'/../lib/lighttpd/watchdogPhpCgiDrift.php';
 require_once __DIR__.'/../lib/lighttpd/watchdogCustomConfig.php';
 require_once __DIR__.'/../lib/lighttpd/hermesUiConverge.php';
 require_once __DIR__.'/../lib/lighttpd/transmissionProxy.php';
@@ -119,6 +120,13 @@ foreach($users AS $thisUser) {
         echo "lighttpd config newer than running process, for user: {$thisUser}. Restarting lighttpd instances.\n";
         pmssUserLog($thisUser, 'lighttpd restart requested (config newer than process)');
     }
+    // A PHP package upgrade replaces the binary but leaves the running pool on the old one (ADR 0314).
+    $phpCgiBinaryReplaced = $lighttpdRunningBeforeRestart && !$configChangedAfterStart
+        && pmssLighttpdWatchdogPhpCgiBinaryReplaced($thisUser);
+    if ($phpCgiBinaryReplaced) {
+        echo "php-cgi binary replaced since the pool started, for user: {$thisUser}. Restarting lighttpd instances.\n";
+        pmssUserLog($thisUser, 'lighttpd restart requested (php-cgi binary replaced)');
+    }
 
     if ($socketError || !$lighttpdRunningBeforeRestart || $nginxRecoveryRequired) {
         $watchdogReason = pmssLighttpdWatchdogDetectReason($thisUser, $homeDir, $configPath, $socketError);
@@ -128,7 +136,7 @@ foreach($users AS $thisUser) {
         pmssLighttpdWatchdogDeleteErrorPage($thisUser, $watchdogWebRoot);
     }
 
-    $restartRequired = $socketError || $configChangedAfterStart || $nginxRecoveryRequired;
+    $restartRequired = $socketError || $configChangedAfterStart || $phpCgiBinaryReplaced || $nginxRecoveryRequired;
     // Keep a live daemon when its replacement cannot start on the home mount.
     if ($restartRequired && $lighttpdRunningBeforeRestart && !pmssAccountRestartSpaceAllows(
         $thisUser,
