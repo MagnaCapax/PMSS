@@ -7,7 +7,7 @@
  * - /home/<user>/.iopsLimit (user-visible limit file)
  *
  * Resource usage source:
- * - /etc/seedbox/runtime/resourceStats/<user> or /home/<user>/.resourceData
+ * - /var/run/pmss/resourceStats/<user> (PMSS_RUNTIME_DIR overrides the runtime root)
  *
  * @license GPL-3.0-only
  * @author PMSS Team

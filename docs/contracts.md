@@ -1072,6 +1072,12 @@ iptables helpers:
 
 ## Resource Statistics
 
+- Monthly IOPS enforcement reads the resource writer's root-owned cache at
+  `/var/run/pmss/resourceStats/<user>`, honoring `PMSS_RUNTIME_DIR` through
+  `pmssRuntimeDir()`. Limit settings and enforcement markers retain their
+  `/etc/seedbox/runtime` default. `IopsLimitUsagePathTest` covers both defaults,
+  runtime overrides and the enforcement threshold without host reads or writes.
+
 - The host-pressure payload in `systemStats/hostPressure.php` rejects non-scalar
   PSI containers before string conversion. Arrays, objects and resources yield
   the existing `null` metric without warnings or object conversion hooks;

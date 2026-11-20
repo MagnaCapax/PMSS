@@ -55,7 +55,7 @@ function pmssIopsLimitsRun(): int
 
     foreach ($users as $user) {
         $limit = pmssIntegerSettingFileRead(pmssIopsLimitRuntimePath($user), 'pmssIopsLimitParseMonthlyOperations');
-        $usage = pmssReadUserMonthlyIopsUsage(pmssIntegerSettingRuntimeUserPath('resourceStats', $user));
+        $usage = pmssReadUserMonthlyIopsUsage(pmssRuntimeDir().'/resourceStats/'.$user);
         $markerPath = pmssIntegerSettingRuntimeUserPath('iopsLimitEnforced', $user);
         $markerExists = pmssRegularFilePathIsReadable($markerPath);
         $plan = pmssIopsLimitEnforcementPlan($limit, $usage, $markerExists);
