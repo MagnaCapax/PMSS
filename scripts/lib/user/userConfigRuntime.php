@@ -145,12 +145,12 @@ function pmssUserConfigPayloadBuild($store, array $existing, array $user, array 
     return $payload;
 }
 
-/** Reconcile a changed, successfully persisted GPU policy on Intel hosts only. */
+/** Reconcile a changed, successfully persisted GPU policy on Intel or AMD iGPU hosts only. */
 function pmssUserConfigApplyGpuPolicy(string $username, array $existing, array $payload, ?callable $intelProbe = null, ?callable $denyConverge = null, ?callable $groupMember = null): void
 {
     if (!pmssValidateUsername($username)
         || pmssUserConfigNormaliseToggleValue($existing, 'gpuEnabled') === pmssUserConfigNormaliseToggleValue($payload, 'gpuEnabled')) return;
-    $intelProbe = $intelProbe ?: 'pmssHostHasIntelDisplayPciDevice';
+    $intelProbe = $intelProbe ?: 'pmssHostHasRenderGpuDisplayPciDevice';
     if (!$intelProbe()) return;
     $denyConverge = $denyConverge ?: 'pmssEnsureIntelRenderNodeDenies';
     $groupMember = $groupMember ?: 'pmssEnsureIntelRenderGroupMember';

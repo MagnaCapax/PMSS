@@ -14,10 +14,12 @@ function pmssDpkgSelectionsDrop(array &$result, string $bucket, string $package)
  * @param array<int,string> $lines
  * @return array{sanitised:array<int,string>,warnings:bool,short_form_seen:bool,dropped_unavailable:array<int,string>,dropped_obsolete:array<int,string>,dropped_kernel:array<int,string>,dropped_hardware:array<int,string>,started_at:float}
  */
-function pmssDpkgSelectionsSanitise(array $lines, int $runtimeVersion, ?callable $packageAvailable = null, ?callable $intelDisplayPresent = null): array
+function pmssDpkgSelectionsSanitise(array $lines, int $runtimeVersion, ?callable $packageAvailable = null, ?callable $displayVendorPresent = null): array
 {
     $packageAvailable = $packageAvailable ?: 'pmssPackageAvailable';
-    $intelDisplayPresent = $intelDisplayPresent ?: 'pmssHostHasIntelDisplayPciDevice';
+    // Called with a PCI vendor id: '0x8086' (Intel) or '0x1002' (AMD).
+    $displayVendorPresent = $displayVendorPresent ?: 'pmssHostHasDisplayPciVendor';
+    $intelDisplayPresent = static function () use ($displayVendorPresent): bool { return (bool) $displayVendorPresent('0x8086'); };
     $result = ['sanitised' => [], 'warnings' => false, 'short_form_seen' => false, 'dropped_unavailable' => [], 'dropped_obsolete' => [], 'dropped_kernel' => [], 'dropped_hardware' => [], 'started_at' => microtime(true)];
     foreach (pmssConfigLines($lines) as $idx => $trimmed) {
         if (($parts = pmssConfigLineColumns($trimmed, 0, [])) === []) { pmssLogStatus('WARN', sprintf('Ignoring malformed dpkg selection line %d: %s', $idx + 1, $trimmed), 0); $result['warnings'] = true; continue; }
@@ -42,6 +44,11 @@ function pmssDpkgSelectionsSanitise(array $lines, int $runtimeVersion, ?callable
             continue;
         }
         if ($lower === 'firmware-misc-nonfree' && strtolower($state) === 'install' && !$intelDisplayPresent()) {
+            pmssDpkgSelectionsDrop($result, 'dropped_hardware', $package);
+            continue;
+        }
+        // ADR 0096 amendment 2026-11-20 (AMD): amdgpu cannot start a Raven/Picasso iGPU without these blobs.
+        if ($lower === 'firmware-amd-graphics' && strtolower($state) === 'install' && !$displayVendorPresent('0x1002')) {
             pmssDpkgSelectionsDrop($result, 'dropped_hardware', $package);
             continue;
         }

@@ -30,8 +30,8 @@ class RenderNodeDenyTest extends TestCase
         for ($pass = 0; $pass < 2; $pass++) {
             \pmssEnsureIntelRenderNodeDenies($logger, $target, $runner, $path, $ops['intel'], $ops['users'], $lookup, $ops['nodes']);
             $this->assertSame(
-                'SUBSYSTEM=="drm", KERNEL=="renderD*", DRIVERS=="i915|xe", RUN+="/usr/bin/setfacl -m u:alice:--- $devnode"'."\n"
-                .'SUBSYSTEM=="drm", KERNEL=="renderD*", DRIVERS=="i915|xe", RUN+="/usr/bin/setfacl -m u:bob:--- $devnode"'."\n",
+                'SUBSYSTEM=="drm", KERNEL=="renderD*", DRIVERS=="i915|xe|amdgpu", RUN+="/usr/bin/setfacl -m u:alice:--- $devnode"'."\n"
+                .'SUBSYSTEM=="drm", KERNEL=="renderD*", DRIVERS=="i915|xe|amdgpu", RUN+="/usr/bin/setfacl -m u:bob:--- $devnode"'."\n",
                 file_get_contents($target));
             $this->assertSame(0644, fileperms($target) & 0777);
         }
@@ -121,6 +121,6 @@ class RenderNodeDenyTest extends TestCase
         $this->pmssWithEnv(['PMSS_CONFIG_DIR' => $root.'/config'], function () use ($root, $ops, &$messages, &$commands): void {
             \pmssEnsureIntelRenderNodeDenies($this->pmssMakeArrayLogger($messages), $root.'/rule', $this->pmssMakeStepRunner($commands), $ops['path'], $ops['intel'], null, $ops['account'], $ops['nodes']);
         });
-        $this->assertSame('SUBSYSTEM=="drm", KERNEL=="renderD*", DRIVERS=="i915|xe", RUN+="/usr/bin/setfacl -m u:alice:--- $devnode"'."\n", file_get_contents($root.'/rule'));
+        $this->assertSame('SUBSYSTEM=="drm", KERNEL=="renderD*", DRIVERS=="i915|xe|amdgpu", RUN+="/usr/bin/setfacl -m u:alice:--- $devnode"'."\n", file_get_contents($root.'/rule'));
     }
 }

@@ -78,6 +78,48 @@ class IntelGpuFirmwareSelectionTest extends TestCase
         }
     }
 
+    public function testAmdFirmwareFollowsAmdDisplayOnlyAndIntelFirmwareFollowsIntelOnly(): void
+    {
+        $lines = ['firmware-misc-nonfree install', 'firmware-amd-graphics install'];
+        foreach ([
+            ['0x1002', ["firmware-amd-graphics\tinstall"], ['firmware-misc-nonfree']],
+            ['0x8086', ["firmware-misc-nonfree\tinstall"], ['firmware-amd-graphics']],
+            ['none', [], ['firmware-misc-nonfree', 'firmware-amd-graphics']],
+        ] as $case) {
+            $present = function (string $vendor) use ($case): bool { return $vendor === $case[0]; };
+            $plan = \pmssDpkgSelectionsSanitise($lines, 12, ...array_merge(self::pmssMakeCallbacks([true]), [$present]));
+            $this->assertSame($case[1], $plan['sanitised']);
+            $this->assertSame($case[2], $plan['dropped_hardware']);
+        }
+    }
+
+    public function testShippedDebian12BaselineSelectsAmdFirmwareOnAmdHosts(): void
+    {
+        $lines = file(dirname(__DIR__, 2).'/update/dpkg/selections-debian12.txt', FILE_IGNORE_NEW_LINES);
+        $amd = \pmssDpkgSelectionsSanitise($lines, 12, ...array_merge(self::pmssMakeCallbacks([true]), [function (string $v): bool { return $v === '0x1002'; }]));
+        $this->assertTrue(in_array("firmware-amd-graphics\tinstall", $amd['sanitised'], true));
+        $this->assertTrue(in_array("intel-media-va-driver:amd64\tinstall", $amd['sanitised'], true));
+        $intel = \pmssDpkgSelectionsSanitise($lines, 12, ...self::pmssMakeCallbacks([true, false]));
+        $this->assertTrue(in_array('firmware-amd-graphics', $intel['dropped_hardware'], true));
+    }
+
+    public function testRenderGpuDetectorAcceptsIntelAndAmdDisplayOnly(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-pci-render-gpu-', 0700);
+        $this->assertFalse(\pmssHostHasRenderGpuDisplayPciDevice($root));
+        foreach ([
+            ['0x030000', '0x1a03', false, false],
+            ['0x038000', '0x10de', false, false],
+            ['0x040300', '0x1002', false, false],
+            ['0x030000', '0x1002', true, false],
+        ] as $index => $device) {
+            $this->pmssWriteFiles($root.'/0000:00:0'.$index.'.0', ['class' => $device[0]."\n", 'vendor' => $device[1]."\n"]);
+            $this->assertSame($device[2], \pmssHostHasRenderGpuDisplayPciDevice($root));
+            $this->assertSame($device[3], \pmssHostHasIntelDisplayPciDevice($root));
+            $this->assertSame($device[2], \pmssHostHasDisplayPciVendor('0x1002', $root));
+        }
+    }
+
     public function testIntelDisplayPciDetectorRejectsMissingVendor(): void
     {
         $root = $this->pmssMakeTempDir('pmss-pci-missing-vendor-', 0700);

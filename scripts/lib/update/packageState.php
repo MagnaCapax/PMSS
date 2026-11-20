@@ -112,6 +112,18 @@ function pmssPackageAvailable(string $package): bool
 /** Detect an Intel display controller from read-only PCI sysfs metadata. */
 function pmssHostHasIntelDisplayPciDevice(string $devicesPath = '/sys/bus/pci/devices'): bool
 {
+    return pmssHostHasDisplayPciVendor('0x8086', $devicesPath);
+}
+
+/** Intel (i915/xe) or AMD (amdgpu) display hardware: the iGPU vendors PMSS opens render nodes for (ADR 0096). */
+function pmssHostHasRenderGpuDisplayPciDevice(string $devicesPath = '/sys/bus/pci/devices'): bool
+{
+    return pmssHostHasDisplayPciVendor('0x8086', $devicesPath) || pmssHostHasDisplayPciVendor('0x1002', $devicesPath);
+}
+
+/** Detect a display-class (0x03) PCI device from one vendor ('0x8086' Intel, '0x1002' AMD) in read-only sysfs. */
+function pmssHostHasDisplayPciVendor(string $vendorId, string $devicesPath = '/sys/bus/pci/devices'): bool
+{
     // glob() must never observe the valid prefix of a NUL-containing path.
     if (strpos($devicesPath, "\0") !== false) {
         return false;
@@ -122,7 +134,7 @@ function pmssHostHasIntelDisplayPciDevice(string $devicesPath = '/sys/bus/pci/de
         if (is_string($class) && is_string($vendor)
             && strpos($class, "\0") === false && strpos($vendor, "\0") === false
             && strpos(strtolower(trim($class)), '0x03') === 0
-            && strtolower(trim($vendor)) === '0x8086') {
+            && strtolower(trim($vendor)) === strtolower($vendorId)) {
             return true;
         }
     }

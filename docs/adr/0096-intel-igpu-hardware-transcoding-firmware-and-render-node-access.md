@@ -199,3 +199,60 @@ Implementation references: systemd v252
 [ACL flushing](https://github.com/systemd/systemd/blob/v252/src/shared/devnode-acl.c),
 [ordered RUN execution](https://github.com/systemd/systemd/blob/v252/src/udev/udev-event.c)
 and [seat ACL changes](https://github.com/systemd/systemd/blob/v252/src/login/logind-seat.c).
+
+## Amendment 2026-11-20: AMD iGPU hosts (amdgpu)
+
+The operator decided on 2026-11-20 that AMD iGPU hosts get the same hardware
+transcoding as Intel ones. This covers the Ryzen APUs with Vega graphics
+already running PMSS and new ones being installed. Measured on a Radeon
+Vega 11 (Ryzen 5 PRO 2400G), the iGPU does full hardware H.264 and HEVC 8-bit
+decode and encode, and HEVC 10-bit decode. It has no HEVC 10-bit encode and no
+hardware HDR tone mapping.
+
+Decision:
+
+- One driver list, `pmssRenderNodeDrivers()` = `i915`, `xe`, `amdgpu`, feeds
+  both rules: the 70- access rule (`MODE="0666"`) and the 74- per-account deny
+  rule. A `gpuEnabled=false` account is therefore denied on AMD exactly as on
+  Intel. The deny read-back lists render nodes from the same driver list.
+- The hardware gate for render access, render-group membership and the deny
+  converge is `pmssHostHasRenderGpuDisplayPciDevice()`: a display-class PCI
+  device from Intel (`0x8086`) or AMD (`0x1002`).
+- `firmware-amd-graphics` is in the Debian 12 baseline and is kept only on
+  hosts with an AMD display-class device. This is the same runtime sanitiser
+  category as `firmware-misc-nonfree`. Without it, amdgpu cannot start a
+  Raven or Picasso iGPU. The firmware loads at the next boot.
+- Intel-only parts stay Intel-only: `firmware-misc-nonfree`, the non-free iHD
+  media driver swap and the i915 display power-state pin.
+- Function names and log text keep "Intel" so that existing callers, tests and
+  the #1298 acceptance keep working. Their docblocks say Intel and AMD.
+
+Open-source stack only: the in-kernel `amdgpu` driver, Mesa `radeonsi` for VAAPI
+and RADV for Vulkan, from Debian or bundled by jellyfin-ffmpeg. No AMDGPU-PRO,
+no DKMS. A DKMS `amdgpu` module left by `amdgpu-install` breaks kernel postinst
+(no initrd is written), so it is purged before any kernel change on these hosts.
+
+What PMSS does not do: remove `nomodeset` from the kernel command line. Hosts
+installed by older installers carry `GRUB_CMDLINE_LINUX="text vga=normal
+nomodeset ..."`, which stops amdgpu from probing (-22), so neither `/dev/dri`
+nor any of the above takes effect there. Changing the boot command line needs a
+planned reboot. The minidedi hosts have no remote power, so it is done host by
+host as a separate operation, outside update.php, with its own journal. Hosts
+from current installers have no `nomodeset`.
+
+Consequences:
+
+- A host with any `0x1002` display device also gets the firmware package. This
+  includes older servers whose AMD/ATI graphics run on the `radeon` driver, not
+  `amdgpu`. The package is inert there, and the access rules match only
+  `amdgpu` nodes.
+- With `MODULES=most`, each initrd also carries the amdgpu firmware it
+  declares, so each initrd grows. A host with a separate small `/boot` needs
+  room for that on every installed kernel. The first host checked had a 451 MB
+  `/boot` with 333 MB free and 33 MB initrds.
+- On AMD hosts, accounts share the iGPU with no GPU cgroup, the same as on
+  Intel. amdgpu driver bugs are reachable from local accounts through render
+  ioctls, so keep kernels current.
+- Acceptance needs real AMD hardware: firmware present, amdgpu bound without
+  `nomodeset`, `/dev/dri/renderD128` mode 0666, `vainfo` H.264/HEVC encode
+  entrypoints, and a `gpuEnabled=false` account denied (`getfacl`).

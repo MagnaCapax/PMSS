@@ -1,11 +1,17 @@
 <?php
-/** Per-account Intel render-node deny: a late udev rule adds user:<name>:--- for gpuEnabled=false accounts (ADR 0096 amendment 2026-11-20). */
+/** Per-account render-node deny (Intel i915/xe, AMD amdgpu): a late udev rule adds user:<name>:--- for gpuEnabled=false accounts (ADR 0096 amendments 2026-11-20). */
 
 require_once __DIR__.'/../managedPath.php';
 require_once __DIR__.'/../runtime/commands.php';
 require_once __DIR__.'/../dpkgSelections.php';
 require_once dirname(__DIR__, 2).'/user/selection.php';
 require_once dirname(__DIR__, 2).'/user/userConfigStore.php';
+
+/** Kernel DRM drivers whose render nodes PMSS opens to accounts (ADR 0096): Intel i915/xe and AMD amdgpu (in-tree, no DKMS). */
+function pmssRenderNodeDrivers(): array
+{
+    return ['i915', 'xe', 'amdgpu'];
+}
 
 /** Apply operator-owned per-account denies after uaccess, then verify the live ACLs. */
 function pmssEnsureIntelRenderNodeDenies(
@@ -14,7 +20,7 @@ function pmssEnsureIntelRenderNodeDenies(
     ?callable $userLookup = null, ?callable $nodeLister = null
 ): void {
     $log = $logger ?: 'logMessage';
-    $intelProbe = $intelProbe ?: 'pmssHostHasIntelDisplayPciDevice';
+    $intelProbe = $intelProbe ?: 'pmssHostHasRenderGpuDisplayPciDevice';
     if (!$intelProbe()) return;
     if (pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
         $log('[SKIP] Dry run: Intel render-node denies unchanged');
@@ -35,7 +41,7 @@ function pmssEnsureIntelRenderNodeDenies(
         $account = $userLookup($name);
         if (!is_array($account) || (int) ($account['uid'] ?? 0) <= 0) continue;
         $denied[$name] = (int) $account['uid'];
-        $lines[] = 'SUBSYSTEM=="drm", KERNEL=="renderD*", DRIVERS=="i915|xe", RUN+="/usr/bin/setfacl -m u:'.$name.':--- $devnode"';
+        $lines[] = 'SUBSYSTEM=="drm", KERNEL=="renderD*", DRIVERS=="'.implode('|', pmssRenderNodeDrivers()).'", RUN+="/usr/bin/setfacl -m u:'.$name.':--- $devnode"';
     }
     $removed = false;
     if ($lines !== []) {
@@ -66,7 +72,7 @@ function pmssEnsureIntelRenderNodeDenies(
     $nodeLister = $nodeLister ?: function (): array {
         $nodes = [];
         foreach (glob('/sys/class/drm/renderD*') ?: [] as $device) {
-            if (in_array(basename((string) realpath($device.'/device/driver')), ['i915', 'xe'], true)) {
+            if (in_array(basename((string) realpath($device.'/device/driver')), pmssRenderNodeDrivers(), true)) {
                 $nodes[] = '/dev/dri/'.basename($device);
             }
         }

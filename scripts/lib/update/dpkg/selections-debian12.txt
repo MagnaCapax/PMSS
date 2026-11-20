@@ -113,6 +113,7 @@ ffmpeg	install
 file	install
 filebot	install
 findutils	install
+firmware-amd-graphics	install
 firmware-bnx2	install
 firmware-bnx2x	install
 firmware-linux-free	install

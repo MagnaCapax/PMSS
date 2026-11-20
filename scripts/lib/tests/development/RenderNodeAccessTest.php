@@ -19,8 +19,8 @@ class RenderNodeAccessTest extends TestCase
 
         \pmssEnsureIntelRenderNodeAccess($logger, $target, $runner, $path);
         $this->assertSame(
-            "# PMSS-managed: allow all local accounts to use Intel render nodes.\n"
-                ."SUBSYSTEM==\"drm\", KERNEL==\"renderD*\", DRIVERS==\"i915|xe\", MODE=\"0666\"\n",
+            "# PMSS-managed: allow all local accounts to use Intel and AMD iGPU render nodes.\n"
+                ."SUBSYSTEM==\"drm\", KERNEL==\"renderD*\", DRIVERS==\"i915|xe|amdgpu\", MODE=\"0666\"\n",
             file_get_contents($target)
         );
         $this->assertSame(0644, fileperms($target) & 0777);

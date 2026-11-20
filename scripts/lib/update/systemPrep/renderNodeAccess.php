@@ -1,5 +1,5 @@
 <?php
-/** PMSS-managed Intel render-node access for shared hardware transcoding. */
+/** PMSS-managed iGPU render-node access (Intel i915/xe, AMD amdgpu) for shared hardware transcoding. */
 
 require_once __DIR__.'/../managedPath.php';
 require_once __DIR__.'/../runtime/commands.php';
@@ -7,15 +7,15 @@ require_once __DIR__.'/../dpkgSelections.php';
 require_once dirname(__DIR__, 2).'/user/selection.php';
 require_once __DIR__.'/renderNodeDeny.php';
 
-/** Install the Intel-only udev rule and apply it to existing DRM devices. */
+/** Install the iGPU (Intel and AMD) udev rule and apply it to existing DRM devices. Names keep "Intel" for callers. */
 function pmssEnsureIntelRenderNodeAccess(?callable $logger = null, ?string $target = null, ?callable $commandRunner = null, ?callable $commandPath = null): void
 {
     $log = $logger ?: 'logMessage';
     $target = $target ?? '/etc/udev/rules.d/70-pmss-render-node.rules';
     $commandRunner = $commandRunner ?: 'runStep';
     $commandPath = $commandPath ?: 'pmssCommandPath';
-    $content = "# PMSS-managed: allow all local accounts to use Intel render nodes.\n"
-        ."SUBSYSTEM==\"drm\", KERNEL==\"renderD*\", DRIVERS==\"i915|xe\", MODE=\"0666\"\n";
+    $content = "# PMSS-managed: allow all local accounts to use Intel and AMD iGPU render nodes.\n"
+        ."SUBSYSTEM==\"drm\", KERNEL==\"renderD*\", DRIVERS==\"".implode('|', pmssRenderNodeDrivers())."\", MODE=\"0666\"\n";
     if (!pmssInstallManagedPathFile($target, $content, 'Intel render-node access rule', $log, ['mode' => 0644])) {
         return;
     }
@@ -34,11 +34,11 @@ function pmssEnsureIntelRenderNodeAccess(?callable $logger = null, ?string $targ
     }
 }
 
-/** Add one validated account to render when Intel hardware and the group exist. */
+/** Add one validated account to render when Intel or AMD iGPU hardware and the group exist. */
 function pmssEnsureIntelRenderGroupMember(string $user, ?callable $logger = null, ?callable $intelProbe = null, ?callable $groupLookup = null, ?callable $commandRunner = null, ?callable $commandPath = null, ?callable $gpuEnabled = null): string
 {
     $log = $logger ?: 'logMessage';
-    $intelProbe = $intelProbe ?: 'pmssHostHasIntelDisplayPciDevice';
+    $intelProbe = $intelProbe ?: 'pmssHostHasRenderGpuDisplayPciDevice';
     $groupLookup = $groupLookup ?: 'posix_getgrnam';
     $commandRunner = $commandRunner ?: 'runStep';
     $commandPath = $commandPath ?: 'pmssCommandPath';
@@ -73,7 +73,7 @@ function pmssEnsureIntelRenderGroupMember(string $user, ?callable $logger = null
 function pmssEnsureIntelRenderGroupMembers(?callable $logger = null, ?callable $intelProbe = null, ?callable $groupLookup = null, ?callable $userLister = null, ?callable $commandRunner = null, ?callable $commandPath = null, ?callable $gpuEnabled = null): void
 {
     $log = $logger ?: 'logMessage';
-    $intelProbe = $intelProbe ?: 'pmssHostHasIntelDisplayPciDevice';
+    $intelProbe = $intelProbe ?: 'pmssHostHasRenderGpuDisplayPciDevice';
     $groupLookup = $groupLookup ?: 'posix_getgrnam';
     if (!$intelProbe()) return;
     $group = $groupLookup('render');

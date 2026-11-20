@@ -140,7 +140,47 @@ AMD iGPU support (Vega, RDNA) on Linux is less mature than Intel.
 - **10-bit HEVC encode**: not on Vega/Raven Ridge; the Jellyfin documentation lists Renoir (Ryzen 4000 APU) and Radeon RX 5000 as the first with it
 - **Encode quality**: the H.264 encoder has no B-frames; the Jellyfin documentation ranks Vega/Raven (VCN 1.0) lowest among AMD encoders and below Intel Quick Sync
 - **HDR tone mapping**: `tonemap_vaapi` is not available with `radeonsi`. Jellyfin tone-maps on AMD through Vulkan (libplacebo) or OpenCL; on the Vega 11 test the Vulkan zero-copy mapping failed, so tone mapping ran through copies or on the CPU, at about one 4K HDR to 1080p stream
-- **PMSS device access**: PMSS manages render-node access and `render` group membership on Intel iGPU hosts only
+
+### What PMSS Manages on AMD Hosts
+
+A host with an AMD display-class PCI device (vendor `0x1002`, for example a
+Ryzen APU with a Vega iGPU) gets the same managed setup as an Intel iGPU host
+(ADR 0096, AMD amendment 2026-11-20):
+
+- `firmware-amd-graphics` from the Debian 12 baseline. The open-source, in-kernel
+  `amdgpu` driver cannot start a Raven Ridge or Picasso iGPU without these
+  firmware files. They load at the next boot.
+- The udev rule `/etc/udev/rules.d/70-pmss-render-node.rules` opens render nodes
+  driven by `i915`, `xe` or `amdgpu` to every account (mode `0666`).
+- Every account with GPU access is added to `render`.
+- An account whose plan has no GPU access (`gpuEnabled=false`) is denied the
+  render node by `/etc/udev/rules.d/74-pmss-render-node-deny.rules`, on AMD as
+  on Intel.
+
+Everything here is the open-source stack: the `amdgpu` kernel driver, Mesa
+`radeonsi` for VAAPI and RADV for Vulkan. There are no AMDGPU-PRO packages and
+no DKMS module. A DKMS `amdgpu` package left over from an `amdgpu-install` run
+stops kernel upgrades: its build fails in the kernel postinst and no initrd is
+written. Remove it before installing a new kernel (`dkms status`, then
+`apt purge amdgpu-dkms amdgpu-install`).
+
+### AMD Prerequisites (host)
+
+1. **No `nomodeset` on the kernel command line.** With `nomodeset`, `amdgpu`
+   refuses to start (probe fails with error -22 in `dmesg`) and there is no
+   `/dev/dri` at all. Older installers wrote
+   `GRUB_CMDLINE_LINUX="text vga=normal nomodeset ..."` into `/etc/default/grub`.
+   It was there for a blank PXE console on Vega boards, not for stability.
+   Removing it needs `update-grub` and a reboot, so do it as a planned reboot.
+   Check: `grep -o nomodeset /proc/cmdline`.
+2. **Firmware present before that boot**: `dpkg -l firmware-amd-graphics`
+   (installed by the PMSS update on AMD hosts).
+3. **After the boot**: `lsmod | grep ^amdgpu`; `ls -l /dev/dri` shows
+   `renderD128` with mode `crw-rw-rw-`; `vainfo --display drm --device
+   /dev/dri/renderD128` lists `VAEntrypointEncSlice` for H.264 and HEVC Main.
+   Debian 12's own `mesa-va-drivers` 22.3.6 is built with H.264 and HEVC
+   encode and decode (`-Dvideo-codecs="vc1dec, h264dec, h264enc, h265dec,
+   h265enc"` in its `debian/rules`).
 
 ### AMD Driver Setup
 
@@ -373,10 +413,24 @@ Compare CPU usage with and without hardware transcoding:
 Failed to open VAAPI device: Permission denied
 ```
 
-**Solution**: On Intel iGPU hosts, PMSS adds accounts to `render` automatically
-and opens the render node through its udev rule. Check that the host update has
-run and restart sessions started before the group change. On other GPU hosts,
+**Solution**: On Intel and AMD iGPU hosts, PMSS adds accounts to `render`
+automatically and opens the render node through its udev rule. Check that the
+host update has run, and restart sessions started before the group change. If
+the account's plan has no GPU access, the deny rule blocks it on purpose:
+`getfacl /dev/dri/renderD128` shows `user:<name>:---`. On other GPU hosts,
 ask the administrator to check that GPU's device permissions.
+
+#### No /dev/dri on an AMD Host
+
+`ls /dev/dri` fails and `vainfo` finds no device on a Ryzen host. Check, in order:
+
+1. `grep -o nomodeset /proc/cmdline`: if it prints `nomodeset`, `amdgpu` is
+   blocked. Remove `nomodeset` from `/etc/default/grub` (and from any file in
+   `/etc/default/grub.d/`), run `update-grub`, and reboot as a planned reboot.
+2. `dmesg | grep -i amdgpu`: a firmware load failure means
+   `firmware-amd-graphics` is missing. Run the PMSS update, then reboot.
+3. `lsmod | grep ^amdgpu` is empty with no message: check `dkms status` for an
+   old DKMS `amdgpu` package and purge it.
 
 #### No VAAPI Support / Driver Not Found
 
