@@ -1,7 +1,7 @@
 <?php
 /** File-backed benchmark reservation, inode-checked cleanup and jobs. @license GPL-3.0-only */
 
-/** Reserve the benchmark name before fio or fallocate can touch it. */
+/** Reserve the benchmark name before fio or fallocate; failed inspection/closure returns null. */
 function storageBenchmarkFileReserve(string $path): ?array
 {
     // Keep malformed paths on the reservation-failure path before PHP file calls.
@@ -11,9 +11,10 @@ function storageBenchmarkFileReserve(string $path): ?array
     try {
         $identity = @fstat($handle);
     } finally {
-        @fclose($handle);
+        $closed = @fclose($handle);
     }
-    return is_array($identity) ? ['dev' => $identity['dev'], 'ino' => $identity['ino']] : null;
+    // Do not authorize allocation after a failed close; keep metadata throwables propagating.
+    return $closed && is_array($identity) ? ['dev' => $identity['dev'], 'ino' => $identity['ino']] : null;
 }
 
 /** Never remove a path replaced after this run reserved its file. */

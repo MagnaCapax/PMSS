@@ -49,33 +49,41 @@ function fstat($handle) {
 }
 function fclose($handle) {
     $GLOBALS['closes']++;
-    return \fclose($handle);
+    \fclose($handle);
+    if ($GLOBALS['closeResult'] instanceof \Throwable) throw $GLOBALS['closeResult'];
+    return $GLOBALS['closeResult'];
 }
 PHP;
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/storageBenchmark/file.php', 'BenchmarkFileLifetimeFixture');
         $script .= <<<'PHP'
 $results = [];
-foreach ([new \RuntimeException('metadata failure'), new \Error('metadata failure'), null] as $failure) {
-    foreach ([false, ['dev' => 7, 'ino' => 19]] as $metadata) {
-        $GLOBALS['failure'] = $failure;
-        $GLOBALS['metadata'] = $metadata;
-        $GLOBALS['closes'] = 0;
-        $caught = null;
-        $result = null;
-        try {
-            $result = storageBenchmarkFileReserve('/unused/reserved.dat');
-        } catch (\Throwable $error) {
-            $caught = $error;
+// A false close cannot certify a reservation or swallow a metadata failure.
+// A thrown close retains PHP's finally precedence over a metadata throwable.
+foreach ([true, false, new \RuntimeException('close failure'), new \Error('close failure')] as $closeResult) {
+    foreach ([new \RuntimeException('metadata failure'), new \Error('metadata failure'), null] as $failure) {
+        foreach ([false, ['dev' => 7, 'ino' => 19]] as $metadata) {
+            $GLOBALS['closeResult'] = $closeResult;
+            $GLOBALS['failure'] = $failure;
+            $GLOBALS['metadata'] = $metadata;
+            $GLOBALS['closes'] = 0;
+            $caught = null;
+            $result = null;
+            try {
+                $result = storageBenchmarkFileReserve('/unused/reserved.dat');
+            } catch (\Throwable $error) {
+                $caught = $error;
+            }
+            $expectedFailure = $closeResult instanceof \Throwable ? $closeResult : $failure;
+            $results[] = [$result, $caught === $expectedFailure, $GLOBALS['closes'], is_resource($GLOBALS['handle'])];
         }
-        $results[] = [$result, $caught === $failure, $GLOBALS['closes'], is_resource($GLOBALS['handle'])];
     }
 }
 echo json_encode($results);
 PHP;
-        $this->assertSame([
+        $this->assertSame(array_merge([
             [null, true, 1, false], [null, true, 1, false],
             [null, true, 1, false], [null, true, 1, false],
             [null, true, 1, false], [['dev' => 7, 'ino' => 19], true, 1, false],
-        ], $this->pmssRunInlinePhpJson($script));
+        ], array_fill(0, 18, [null, true, 1, false])), $this->pmssRunInlinePhpJson($script));
     }
 }
