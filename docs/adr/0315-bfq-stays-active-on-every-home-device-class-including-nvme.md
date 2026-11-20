@@ -51,6 +51,10 @@ resource control is the requirement, and settings are chosen among those that ke
   catches any host where that re-run did not happen.
   BFQ costs more CPU per I/O than `none`; its effect on NVMe hosts under seedbox load is measured on the
   first hosts the update reaches.
-- Re-running the unit also re-writes the other knobs it owns (md stripe cache, sync speeds, read-ahead).
+- Re-running the unit also re-writes the other knobs it owns (md stripe cache, sync speeds, read-ahead,
+  zswap; writing a value a knob already holds changes nothing) and re-runs the socket-table privacy step
+  (ADR 0068): /proc/net modes back to 0440 and the sock_diag filter unloaded and loaded again, the same
+  reload every update.php run already does in update-step2. The loader fails open, so a reload that fails
+  leaves the filter off until the next update or boot, as it would after a failed reload in either of those.
   `template.rc.local` writes the same md sync values, so no dynamic writer is overridden.
 - `pmssCgroupPolicyMountBfqActive()` keeps its any-leaf meaning for its existing callers.
