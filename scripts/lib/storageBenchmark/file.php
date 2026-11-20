@@ -26,6 +26,20 @@ function storageBenchmarkFileCleanup(string $path, array $identity): bool
     return is_array($current) && pmssFilesystemStatSameInode($current, $identity) && @unlink($path);
 }
 
+/**
+ * Make SIGTERM, SIGINT and SIGHUP a normal exit, so the shutdown cleanup of the reserved file runs.
+ * Without a handler PHP dies on the signal with neither shutdown functions nor finally blocks, and
+ * the preallocated file (up to --size, default 500G) stays behind. No pcntl: behaviour is unchanged.
+ */
+function storageBenchmarkSignalExitInstall(): void
+{
+    if (!function_exists('pcntl_signal') || !function_exists('pcntl_async_signals')) return;
+    pcntl_async_signals(true);
+    foreach (['SIGTERM', 'SIGINT', 'SIGHUP'] as $name) {
+        if (defined($name)) @pcntl_signal(constant($name), static function (int $signal): void { exit(128 + $signal); });
+    }
+}
+
 function storageBenchmarkRunFileTests(string $targetDir, string $jsonLog, string $runTs, string $label, string $runId, string $mntDev, string $fs, int $requested, int $runtime): array
 {
     $free = (int) storageBenchmarkRequireCommandField('df -PB1 '.escapeshellarg($targetDir).' | awk '.escapeshellarg('NR==2 {print $4}'), 'free space', true);
@@ -38,6 +52,8 @@ function storageBenchmarkRunFileTests(string $targetDir, string $jsonLog, string
         register_shutdown_function(static function () use ($testFile, $testFileIdentity): void {
             storageBenchmarkFileCleanup($testFile, $testFileIdentity);
         });
+        // Registered first: a signal must never arrive while the file has no cleanup.
+        storageBenchmarkSignalExitInstall();
         if (pmssCommandPath('fallocate') !== '' && runCommand('fallocate -l '.$use.' '.escapeshellarg($testFile)) !== 0) storageBenchmarkFail("Error: failed to preallocate benchmark file.\n");
         $summary = [];
         foreach (storageBenchmarkFioJobsRun($jsonLog, $testFile, $use, $runtime, storageBenchmarkFileJobs($runtime),
