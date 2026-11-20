@@ -132,8 +132,9 @@ if (!empty($rtorrentPids)) {
   writeLog('no live rtorrent pids found for restart');
 }
 
-if (file_exists('.rtorrentExecuteRun')) $lastRun = file_get_contents('.rtorrentExecuteRun');
- else $lastRun = 0;
+// The stamp is rewritten with file_put_contents, so a read can see an empty file; cast it, as on PHP 8 "" == 0 is false
+// and `int - string` throws a TypeError before the executor is started.
+$lastRun = file_exists('.rtorrentExecuteRun') ? (int) trim((string) file_get_contents('.rtorrentExecuteRun')) : 0;
 
 writeLog('Last rTorrent Execution read: ' . $lastRun);
 
