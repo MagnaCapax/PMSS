@@ -17,9 +17,7 @@ final class TorrentClientsP6CatalogTest extends TestCase
 
     private function load(array $entry): array
     {
-        $path = $this->pmssMakeTempDir('pmss-p6-catalog-').'/catalog.json';
-        file_put_contents($path, json_encode([$entry]));
-        return \pmssTorrentClientsCatalogLoad($path);
+        return \pmssTorrentClientsCatalogLoad($this->pmssWriteTempFile('p6-catalog', json_encode([$entry])));
     }
 
     public function testPinnedVenvAndCompatWindowLoad(): void
@@ -55,7 +53,7 @@ final class TorrentClientsP6CatalogTest extends TestCase
         symlink($store.'/deluge/2.1.1', $home.'/bin/deluge/default');
         $projection = $root.'/projection.json';
         foreach (['static', 'venv'] as $kind) {
-            file_put_contents($projection, json_encode(['versions' => [
+            $this->pmssWriteFile($projection, json_encode(['versions' => [
                 ['client' => 'deluge', 'version' => '2.1.1', 'kind' => $kind],
             ]]));
             $expected = $kind === 'venv' ? $store.'/deluge/2.1.1/bin/deluged' : null;

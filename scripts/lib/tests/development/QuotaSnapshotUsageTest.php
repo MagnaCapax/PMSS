@@ -9,12 +9,8 @@ class QuotaSnapshotUsageTest extends TestCase
 {
     public function setUp(): void
     {
-        $path = $this->pmssMakeTempFile('pmss-quota-subuid-');
-        $this->pmssWriteFile($path, "fixtur01:100000:65536\n1000:200000:2\nfixtur02:300000:2\n");
-        $this->pmssTrackEnvOverrides(['PMSS_SUBUID_PATH' => $path]);
-        $path = $this->pmssMakeTempFile('pmss-quota-subgid-');
-        $this->pmssWriteFile($path, "fixtur01:400000:65536\n");
-        $this->pmssTrackEnvOverrides(['PMSS_SUBGID_PATH' => $path]);
+        $this->pmssTrackEnvOverrides(['PMSS_SUBUID_PATH' => $this->pmssWriteFile($this->pmssMakeTempFile('pmss-quota-subuid-'), "fixtur01:100000:65536\n1000:200000:2\nfixtur02:300000:2\n")]);
+        $this->pmssTrackEnvOverrides(['PMSS_SUBGID_PATH' => $this->pmssWriteFile($this->pmssMakeTempFile('pmss-quota-subgid-'), "fixtur01:400000:65536\n")]);
     }
 
     private function report(array $lines, int $rc = 0, bool $timeout = false): array

@@ -2359,6 +2359,8 @@ Reflected characterization fixtures share `pmssTestingFunctionExport()` in
   `pmssWriteFiles()` for checked publication and parent creation. Preserve explicit
   directory modes; keep deliberately empty directories and injected runtime writes
   at their callers.
+  Standalone catalog payloads use `pmssWriteTempFile()` without a directory-only
+  fixture root; related-file fixtures retain their directory and filename layout.
 - Test environment scopes use `TestCase::pmssWithEnv()` and
   `pmssWithPathPrefixedEnv()` for override/restoration lifetimes. Use
   `pmssWithTrackedEnv()` when the callback changes additional keys. These helpers
