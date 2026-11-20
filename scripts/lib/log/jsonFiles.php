@@ -37,11 +37,13 @@ function pmssJsonLineFileEach(string $path, callable $handler): bool
             }
         }
         // A failed read before EOF must not report a complete scan.
-        return feof($handle);
+        $complete = feof($handle);
     } finally {
         // Release the reader even when a handler throws; preserve its exception.
-        fclose($handle);
+        $closed = fclose($handle);
     }
+    // EOF alone cannot certify a scan whose stream failed to close.
+    return $complete && $closed;
 }
 
 /** Read decodable JSON Lines entries from a file. */

@@ -437,6 +437,12 @@ Development tests must avoid network/system changes; production tests and the CL
 - `etc/skel/www` first-party files are editable normally. Bundled vendor/third-party trees remain read-only unless explicitly approved.
 
 ## Logs & Profile
+- JSON Lines traversal in `log/jsonFiles.php` reports completion only after EOF
+  and successful stream closure. Read, decoder and handler throwables still close
+  the reader; close throwables retain PHP's `finally` precedence. Record order,
+  skipped malformed lines and the collecting wrappers' partial results remain
+  unchanged. `LogReaderCompletionSafetyTest` covers these boundaries with memory
+  streams; execution belongs on the testing machine.
 - Diagnostic line compaction and suffixed byte excerpts share `log.php` helpers.
   Callers retain their control-byte policy, cutoff and truncation suffix: snapshot
   fields truncate silently, scheduled backups use `...`, and storage benchmark
