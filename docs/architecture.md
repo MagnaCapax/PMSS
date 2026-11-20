@@ -28,6 +28,13 @@ Keep the canonical installer/update details under `docs/install.md` and
    documented in [`docs/update.md`](./update.md#phase-2--scriptsutilupdate-step2php).
 
 ## Key Modules
+- **scripts/lib/runtime/filesystemHost.php** requires complete meminfo counter
+  rows: unsigned decimal digits, an optional `kB` unit, and whitespace. Decimal,
+  exponent, attached-unit and trailing-junk suffixes cannot certify a memory
+  reading or replace a valid duplicate. Valid counters, unitless counts, ordering
+  and missing-field fallbacks remain unchanged. `RuntimeMeminfoInputSafetyTest`
+  covers malformed suffixes and valid neighbouring rows using private fixtures;
+  execution stays on testing machines.
 - **scripts/lib/runtime/commandProcess.php** owns terminate-then-reap failure
   cleanup through `pmssProcessTerminateAndClose()`. Command capture, account
   commands, root-stage publication, web-root migration and stdout heartbeats

@@ -7,7 +7,8 @@ function pmssProcMeminfoFieldsRead(string $path = '/proc/meminfo'): array
     foreach (pmssReadRegularFileNonEmptyLines($path) as $line) {
         // A valid numeric prefix cannot make a NUL-corrupted counter trustworthy.
         if (strpos($line, "\0") !== false) continue;
-        if (preg_match('/^(\w+):\s+(\d+)/', $line, $matches) !== 1) continue;
+        // Require a complete kernel counter, not a numeric prefix of corrupt text.
+        if (preg_match('/\A(\w+):\s+(\d+)(?:\s+kB)?\s*\z/', $line, $matches) !== 1) continue;
         // An oversized sample cannot prove available memory; retain missing-field fallbacks.
         $value = pmssUnsignedDecimalIntParse($matches[2]);
         if ($value !== null) $fields[$matches[1]] = $value;

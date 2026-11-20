@@ -36,6 +36,28 @@ class RuntimeMeminfoInputSafetyTest extends TestCase
         }
     }
 
+    public function testMalformedNumericSuffixesCannotCertifyMemoryCounters(): void
+    {
+        $path = $this->pmssMakeTempFile('pmss-meminfo-suffix-');
+        foreach (['2048.5 kB', '2048e3 kB', '2048junk', '2048kB', '2048 MB',
+            '2048 KB', '2048 kB trailing', '2048 4096', '0x800', '2,048 kB'] as $value) {
+            foreach (['MemTotal', 'MemAvailable', 'HugePages_Total'] as $field) {
+                foreach ([
+                    [$field.': '.$value, []],
+                    [$field.": 1024 kB\n".$field.': '.$value, [$field => 1024]],
+                    [$field.': '.$value."\n".$field.': 4096 kB', [$field => 4096]],
+                ] as [$rows, $expected]) {
+                    // A rejected duplicate must neither replace earlier evidence nor hide later evidence.
+                    $this->pmssWriteFile($path, "MemFree: 512 kB\n".$rows."\n");
+                    $this->assertSame(['MemFree' => 512] + $expected,
+                        \pmssProcMeminfoFieldsRead($path), $field.': '.$value);
+                    $this->assertSame((int) (($expected['MemTotal'] ?? 0) / 1024),
+                        \pmssProcMeminfoTotalMiBRead($path), $field.': '.$value);
+                }
+            }
+        }
+    }
+
     public function testValidRowsKeepWhitespaceZeroesUnitsAndDuplicateOrdering(): void
     {
         $path = $this->pmssMakeTempFile('pmss-meminfo-valid-');
@@ -44,6 +66,7 @@ class RuntimeMeminfoInputSafetyTest extends TestCase
             ["MemFree: 0\nMemTotal: 2048\nMemTotal: 4096 kB\n", ['MemFree' => 0, 'MemTotal' => 4096], 4],
             ["MemTotal: 2048 kB\nMemTotal: ".PHP_INT_MAX."0 kB\n", ['MemTotal' => 2048], 2],
             ["MemTotal: 0 kB\nHugePages_Total: 0\n", ['MemTotal' => 0, 'HugePages_Total' => 0], 0],
+            ["MemTotal: 0002048 \t kB \t\r\nHugePages_Total: 0002 \t\n", ['MemTotal' => 2048, 'HugePages_Total' => 2], 2],
             ["invalid\nMemTotal: nope\nMemFree: 512 kB\n", ['MemFree' => 512], 0],
             ['', [], 0],
         ] as [$raw, $expected, $mib]) {
