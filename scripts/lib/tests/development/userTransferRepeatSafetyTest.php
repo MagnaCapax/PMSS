@@ -195,6 +195,6 @@ class UserTransferRepeatSafetyTest extends TestCase
         $this->pmssAssertRepoFileContainsOrderedStrings('scripts/lib/userTransfer.php',
             ['pmssUserTransferAssertSafeLocalHome', 'pmssUserTransferAssertNotRepeated', 'pmssUserTransferResolvePassword',
                 'pmssUserTransferAssertSourceNotOlder', "pmssUserTransferRunPasses('Pulling home data', \$scratchPaths['expect'], \$scratchPaths['mainScript'], \$cfg['mainPasses']",
-                'if ($lastMainRc !== 0 || $lastFinalRc !== 0)', 'pmssUserTransferRecordCompletion', "logMessage('[OK] User transfer complete')"]);
+                'if (!pmssUserTransferRsyncRcTransferred($lastMainRc) || !pmssUserTransferRsyncRcTransferred($lastFinalRc))', 'pmssUserTransferRecordCompletion', "logMessage('[OK] User transfer complete')"]);
     }
 }

@@ -222,7 +222,7 @@ function pmssUserTransferMain(array $argv): int
                 logMessage('[WARN] Remote password: '.$password);
             }
 
-            if ($lastMainRc !== 0 || $lastFinalRc !== 0) {
+            if (!pmssUserTransferRsyncRcTransferred($lastMainRc) || !pmssUserTransferRsyncRcTransferred($lastFinalRc)) {
                 logMessage(sprintf('[WARN] User transfer finished with errors (main rc=%d, final rc=%d)', $lastMainRc, $lastFinalRc));
                 return 1;
             }

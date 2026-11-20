@@ -53,6 +53,12 @@ function pmssUserTransferRunPasses(
     return $lastRc;
 }
 
+/** rsync 24: source files vanished during the pass. They no longer exist, so the copy matches the source (ADR 0316). */
+function pmssUserTransferRsyncRcTransferred(int $rc): bool
+{
+    return $rc === 0 || $rc === 24;
+}
+
 function pmssUserTransferResolvePassword(): string
 {
     $fromEnv = getenv('PMSS_USER_TRANSFER_PASSWORD');
