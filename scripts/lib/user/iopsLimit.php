@@ -65,8 +65,13 @@ function pmssReadUserMonthlyIopsUsage(string $path): int
         return 0;
     }
 
-    $read = pmssIopsLimitMonthlyUsageValue($data['io_read_ops']['raw']['month'] ?? null);
-    $write = pmssIopsLimitMonthlyUsageValue($data['io_write_ops']['raw']['month'] ?? null);
+    $usage = 0.0;
+    foreach (['io_read_ops', 'io_write_ops'] as $direction) {
+        // Decoding an array does not guarantee that its nested counters are arrays.
+        $counter = $data[$direction] ?? null;
+        $raw = is_array($counter) ? ($counter['raw'] ?? null) : null;
+        $usage += pmssIopsLimitMonthlyUsageValue(is_array($raw) ? ($raw['month'] ?? null) : null);
+    }
 
-    return (int) round($read + $write);
+    return (int) round($usage);
 }

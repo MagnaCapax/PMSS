@@ -1077,6 +1077,11 @@ iptables helpers:
   `pmssRuntimeDir()`. Limit settings and enforcement markers retain their
   `/etc/seedbox/runtime` default. `IopsLimitUsagePathTest` covers both defaults,
   runtime overrides and the enforcement threshold without host reads or writes.
+  `pmssReadUserMonthlyIopsUsage()` checks each counter and its `raw` container
+  before reading `month`; malformed containers contribute zero through the
+  existing invalid-value fallback while an independent valid counter survives.
+  Valid values, sentinel ceilings and rounding after addition stay unchanged.
+  `IopsLimitInputSafetyTest` covers these serialized-cache boundaries.
 
 - The host-pressure payload in `systemStats/hostPressure.php` rejects non-scalar
   PSI containers before string conversion. Arrays, objects and resources yield
