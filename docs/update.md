@@ -150,6 +150,14 @@ UIDs, with backups and one reload after the repair batch. See
 [ADR 0160](adr/0160-per-uid-slice-dropin-precedence-and-cleanup.md) and
 [cgroup policy](cgroup.md) for file names, safety checks and termination cleanup.
 
+The cgroup v1 memory+swap applier (ADR 0298) validates both live sysfs limits as
+complete, representable unsigned decimal readings before planning writes. NUL
+bytes, numeric suffixes and overflow retain the unreadable-limit error exit with
+zero as the unavailable value. Valid readings, surrounding whitespace, kernel
+unlimited values and write ordering remain unchanged. `UserSliceMemswInputSafetyTest`
+covers parsing and boundary wiring on the testing machine; devbox checks use
+changed-file PHP syntax validation only.
+
 Shared slice setup keeps host sizing, I/O directives, related drop-ins and live
 limit refresh in separate modules behind `systemdSlicesEnsure.php` (ADR 0192).
 The manager's descriptor and log-namespace files share one ordered publication

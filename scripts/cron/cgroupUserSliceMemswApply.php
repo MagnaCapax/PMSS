@@ -30,8 +30,8 @@ if (!is_file($cg.'/memory.memsw.limit_in_bytes')) {
 }
 
 $target = pmssUserSliceMemswTarget(pmssReadSystemdProperties('user.slice', ['MemoryMax'])['MemoryMax']);
-$memory = (int) trim((string) @file_get_contents($cg.'/memory.limit_in_bytes'));
-$memsw = (int) trim((string) @file_get_contents($cg.'/memory.memsw.limit_in_bytes'));
+$memory = pmssUserSliceMemswLimitParse((string) @file_get_contents($cg.'/memory.limit_in_bytes'));
+$memsw = pmssUserSliceMemswLimitParse((string) @file_get_contents($cg.'/memory.memsw.limit_in_bytes'));
 if ($target === null || $memory <= 0 || $memsw <= 0) {
     exit(pmssCliReturnWithStderr("ERROR: unreadable user.slice MemoryMax or limits (target=".var_export($target, true)." memory=$memory memsw=$memsw)\n", 1));
 }

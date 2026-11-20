@@ -29,6 +29,14 @@ function pmssUserSliceMemswTarget(string $systemdValue): ?int
     return preg_match('/^[0-9]{1,18}$/D', $value) === 1 && (int) $value > 0 ? (int) $value : null;
 }
 
+/** Parse a sysfs byte limit exactly, retaining zero as the caller's unreadable-limit fallback. */
+function pmssUserSliceMemswLimitParse(string $raw): int
+{
+    // Do not let trim() erase corruption or a cast certify only a numeric prefix.
+    if (strpos($raw, "\0") !== false) return 0;
+    return pmssUnsignedDecimalIntParse(trim($raw)) ?? 0;
+}
+
 /**
  * The ordered writes that bring the memory and memsw limits of user.slice to $target (bytes or -1), as
  * ['writes' => [[file, value], ...], 'note' => string|null]. The kernel refuses a memory limit above the
