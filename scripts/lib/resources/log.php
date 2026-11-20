@@ -107,6 +107,17 @@ function pmssResourceLogUpdateState(string $statePath, array $counters): array
         || ($result['previous_state']['io_scope'] ?? null) !== ($state['io_scope'] ?? null)) {
         foreach (array_slice(PMSS_RESOURCE_LOG_DELTA_FIELDS, 0, 4) as $field) { $result['delta'][$field] = 0; }
     }
+    // A same-source io_* counter below its stored baseline (a device left the summed set, or the slice
+    // restarted) has no knowable delta; counterState would book the whole cumulative value. Book 0 for all four.
+    if (isset($state['io_source'])) {
+        $ioFields = array_slice(PMSS_RESOURCE_LOG_DELTA_FIELDS, 0, 4);
+        foreach ($ioFields as $field) {
+            if (is_int($previous = $result['previous_state'][$field] ?? null) && $state[$field] < $previous) {
+                foreach ($ioFields as $zero) { $result['delta'][$zero] = 0; }
+                break;
+            }
+        }
+    }
 
     return ['delta' => $result['delta'], 'state' => $state];
 }
