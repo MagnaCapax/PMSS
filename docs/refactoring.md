@@ -947,6 +947,8 @@ for fixed operation results, with optional call-order recording. Literal results
 including false, null and empty arrays, stay in each test's operation map;
 argument-dependent, stateful and throwing callbacks remain explicit. This shares
 one callback factory without changing assertions or runtime service behavior.
+Media-stack launch captures and php-cgi drift probes share these existing callback helpers;
+boot and network watchdog fixtures batch checked writes and reuse acquired source text.
 Torrent configuration, port and transfer fixtures also use it for fixed mutation,
 account, PID, restart and RPC results. Child-process stubs stay self-contained;
 identity mutators and callbacks that validate arguments or record effects stay explicit.

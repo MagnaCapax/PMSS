@@ -69,9 +69,8 @@ class LighttpdPhpCgiDriftTest extends TestCase
             'binary' => $binary,
             'runtimeDir' => $this->runtime.'/state',
             'uid' => 1008,
-            'pids' => static function (string $user): array { return array(4242, 4243); },
             'isDeleted' => static function (int $pid, int $uid, string $prefix): bool { return $pid === 4243; },
-        );
+        ) + self::pmssMakeCallbacks(array('pids' => array(4242, 4243)));
 
         $this->assertTrue(\pmssLighttpdWatchdogPhpCgiBinaryReplaced('fixtacct', $options));
         $this->assertFalse(\pmssLighttpdWatchdogPhpCgiBinaryReplaced('fixtacct', $options), 'same binary must not restart again');
@@ -84,9 +83,7 @@ class LighttpdPhpCgiDriftTest extends TestCase
         $binary = $this->pmssWriteRelativeFile($this->runtime, 'bin/php-cgi8.2', 'x');
         $options = array(
             'binary' => $binary, 'runtimeDir' => $this->runtime.'/state', 'uid' => 1008,
-            'pids' => static function (string $user): array { return array(4242); },
-            'isDeleted' => static function (int $pid, int $uid, string $prefix): bool { return false; },
-        );
+        ) + self::pmssMakeCallbacks(array('pids' => array(4242), 'isDeleted' => false));
 
         $this->assertFalse(\pmssLighttpdWatchdogPhpCgiBinaryReplaced('fixtacct', $options));
         $this->assertFalse(is_file($this->runtime.'/state/checkLighttpdInstances-phpcgi-fixtacct.mtime'), 'no drift, no marker');

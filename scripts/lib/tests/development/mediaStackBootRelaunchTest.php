@@ -16,9 +16,8 @@ class MediaStackBootRelaunchTest extends TestCase
     {
         $homeRoot = $this->pmssMakeTempDir('pmss-media-boot-home-');
         $home = $homeRoot.'/fixtur01';
-        foreach (['.config/sonarr/config.xml', '.config/radarr/config.xml', '.config/jellyfin/config/network.xml', 'www/index.html'] as $file) {
-            $this->pmssWriteRelativeFile($home, $file, 'x');
-        }
+        $this->pmssWriteFiles($home, array_fill_keys(
+            ['.config/sonarr/config.xml', '.config/radarr/config.xml', '.config/jellyfin/config/network.xml', 'www/index.html'], 'x'));
         $apps = array();
         foreach ($states as $app => $state) {
             $apps[$app] = array('label' => $app, 'state' => $state, 'consecutiveFailures' => $state === 'failed' ? 5 : 0);
@@ -34,9 +33,7 @@ class MediaStackBootRelaunchTest extends TestCase
     /** One watchdog pass with every app absent (the restart took them down). */
     private function pmssPass(string $homeRoot, string $bootId, float $uptime, array &$launches, int $now = self::NOW): array
     {
-        $boot = array('bootId' => $bootId, 'uptime' => $uptime, 'now' => $now, 'launcher' => static function (string $command) use (&$launches): void {
-            $launches[] = $command;
-        });
+        $boot = array('bootId' => $bootId, 'uptime' => $uptime, 'now' => $now, 'launcher' => $this->pmssMakeArrayLogger($launches));
         ob_start();
         try {
             $status = \pmssMediaStackWatchdogRunUser('fixtur01', $homeRoot, self::pmssMakeCallbacks(['probe' => false])['probe'], $boot);
@@ -252,10 +249,8 @@ class MediaStackBootRelaunchTest extends TestCase
     public function testBootContextReadersAcceptOnlyWellFormedValues(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-media-boot-proc-');
-        $this->pmssWriteRelativeFile($dir, 'boot_id', "6f1e2a3c-0a4b-4c5d-8e9f-a1b2c3d4e5f6\n");
-        $this->pmssWriteRelativeFile($dir, 'bad_id', "not a boot id\n");
-        $this->pmssWriteRelativeFile($dir, 'uptime', "12345.67 98765.43\n");
-        $this->pmssWriteRelativeFile($dir, 'bad_uptime', "soon\n");
+        $this->pmssWriteFiles($dir, ['boot_id' => "6f1e2a3c-0a4b-4c5d-8e9f-a1b2c3d4e5f6\n", 'bad_id' => "not a boot id\n",
+            'uptime' => "12345.67 98765.43\n", 'bad_uptime' => "soon\n"]);
 
         $this->assertSame('6f1e2a3c-0a4b-4c5d-8e9f-a1b2c3d4e5f6', \pmssMediaStackBootIdRead($dir.'/boot_id'));
         $this->assertSame('', \pmssMediaStackBootIdRead($dir.'/bad_id'));

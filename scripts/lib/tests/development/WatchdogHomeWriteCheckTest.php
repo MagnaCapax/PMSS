@@ -219,14 +219,13 @@ class WatchdogHomeWriteCheckTest extends TestCase
 
     public function testInstallerShipsTheCheckAndRestartsOnlyWhenSomethingChanged(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/apps/watchdog.php', [
+        $source = $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/apps/watchdog.php', [
             "'/template.watchdog.home-write-check.sh'",
             "'/template.watchdog.home-write-check.php'",
             "'/home-write-check.sh'",
             "['Installing watchdog home write check', pmssBuildCommand('install', ['-m', '0755', \$homeCheckTemplate, \$homeCheckTarget])],",
             'function pmssWatchdogInstalledContents(array $paths): array',
         ]);
-        $source = $this->pmssReadRepoFile('scripts/lib/update/apps/watchdog.php');
         $this->assertOrderedStrings([
             "\$wasActive = pmssSystemdUnitState('is-active', 'watchdog.service') === 'active';",
             "\$installedBefore = pmssWatchdogInstalledContents(",

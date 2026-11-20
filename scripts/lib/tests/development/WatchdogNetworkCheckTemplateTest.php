@@ -188,7 +188,7 @@ class WatchdogNetworkCheckTemplateTest extends TestCase
             'uptime' => "100.00 0\n", 'ping-exit' => '1', 'stop-after' => '0',
         ]);
         $prefix = "#!/bin/sh\nroot=".escapeshellarg($root)."\n";
-        $this->pmssWriteExecutableFile($root.'/bin/ping', $prefix.<<<'SH'
+        $this->pmssWriteExecutableFiles($root.'/bin', ['ping' => $prefix.<<<'SH'
 read -r count <"$root/ping-calls"
 count=$((count + 1))
 echo "$count" >"$root/ping-calls"
@@ -197,13 +197,10 @@ if [ "$count" -eq "$stop_after" ]; then echo '120.00 0' >"$root/uptime"; fi
 read -r status <"$root/ping-exit"
 echo 'stub ping'
 exit "$status"
-SH
-        );
-        $this->pmssWriteExecutableFile($root.'/bin/ip', $prefix
-            ."echo ip >>\"\$root/ip-calls\"\necho 'default via 192.0.2.1 dev fixture0'\n");
-        $this->pmssWriteExecutableFile($root.'/bin/logger', "#!/bin/sh\nexit 0\n");
-        $this->pmssWriteExecutableFile($root.'/bin/date', $prefix
-            ."echo date >>\"\$root/date-calls\"\nexec /bin/date \"\$@\"\n");
+SH,
+            'ip' => $prefix."echo ip >>\"\$root/ip-calls\"\necho 'default via 192.0.2.1 dev fixture0'\n",
+            'logger' => "#!/bin/sh\nexit 0\n",
+            'date' => $prefix."echo date >>\"\$root/date-calls\"\nexec /bin/date \"\$@\"\n"]);
         return $root;
     }
 
