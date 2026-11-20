@@ -131,15 +131,16 @@ AMD iGPU support (Vega, RDNA) on Linux is less mature than Intel.
 
 ### What Works
 
-- **Video decode**: Generally works with Mesa VAAPI drivers
+- **Video decode**: H.264, HEVC 8-bit and HEVC 10-bit with the Mesa `radeonsi` VAAPI driver on Vega (Raven Ridge) and newer
+- **Hardware encode**: H.264 and HEVC 8-bit through `h264_vaapi` and `hevc_vaapi`. Measured on a Radeon Vega 11 iGPU (Ryzen 5 PRO 2400G, Mesa 26 `radeonsi`): full-hardware decode, scale and encode at roughly half the throughput of an Intel HD/UHD 630
 - **AV1 decode**: Works on RDNA2+ with recent Mesa
 
 ### What Does Not Work (or is limited)
 
-- **Hardware encode**: AMD GPUs on Linux have limited or no VAAPI encode support
-  - Vega iGPUs: No hardware encode via VAAPI
-  - RDNA1/2: Limited AMF support, not well integrated with FFmpeg VAAPI
-- **10-bit HEVC encode**: Not supported on most AMD Linux configurations
+- **10-bit HEVC encode**: not on Vega/Raven Ridge; the Jellyfin documentation lists Renoir (Ryzen 4000 APU) and Radeon RX 5000 as the first with it
+- **Encode quality**: the H.264 encoder has no B-frames; the Jellyfin documentation ranks Vega/Raven (VCN 1.0) lowest among AMD encoders and below Intel Quick Sync
+- **HDR tone mapping**: `tonemap_vaapi` is not available with `radeonsi`. Jellyfin tone-maps on AMD through Vulkan (libplacebo) or OpenCL; on the Vega 11 test the Vulkan zero-copy mapping failed, so tone mapping ran through copies or on the CPU, at about one 4K HDR to 1080p stream
+- **PMSS device access**: PMSS manages render-node access and `render` group membership on Intel iGPU hosts only
 
 ### AMD Driver Setup
 
@@ -154,9 +155,11 @@ LIBVA_DRIVER_NAME=radeonsi vainfo
 ### Practical Advice for AMD
 
 If you have an AMD iGPU and need transcoding:
-1. Use hardware decode only (reduces CPU load for playback)
-2. Fall back to software encode (x264/x265 CPU encoding)
-3. Consider Intel QuickSync if available as primary transcode target
+1. Use hardware decode and encode for SDR content (H.264 or HEVC 8-bit output)
+2. Expect HDR to SDR tone mapping to cost CPU time
+3. Prefer Intel Quick Sync when 10-bit HEVC output, hardware HDR tone mapping or encode quality matters
+
+The `jellyfin-ffmpeg` Debian package bundles its own Mesa user-mode drivers, including `radeonsi`.
 
 ## FFmpeg Configuration
 
@@ -460,8 +463,8 @@ dmesg | grep -i -E 'drm|i915|amdgpu|vaapi'
 | Component | Intel iGPU | AMD iGPU |
 |-----------|------------|----------|
 | Decode | Excellent | Good |
-| Encode | Excellent | Limited/None |
+| Encode | Excellent | H.264 and HEVC 8-bit; lower quality, about half the HD/UHD 630 throughput on Vega |
 | Driver | intel-media-va-driver | mesa-va-drivers |
-| Recommendation | Full HW transcode | Decode-only, CPU encode |
+| Recommendation | Full HW transcode | HW transcode for SDR; HDR tone mapping not in hardware |
 
-For PMSS shared hosting, Intel-based servers are preferred for hardware transcoding. AMD systems can use hardware decode to reduce CPU load during playback but will rely on CPU for encoding.
+For PMSS shared hosting, Intel-based servers are preferred for hardware transcoding. AMD Vega systems can decode and encode H.264 and HEVC 8-bit in hardware, at lower throughput and quality; HDR tone mapping has no zero-copy hardware path there and runs at about one 4K stream.
