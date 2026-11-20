@@ -91,7 +91,7 @@ if (!function_exists('pmssStatsLiveRender')) {
         $series = pmssStatsLiveSeries($all, 96);
         echo '<table class="live-table"><tr><th></th>';
         foreach ($windows as $label => $seconds) echo '<th>'.$label.'</th>';
-        echo '<th>24 h trend</th></tr>';
+        echo '<th>Last 24 h</th></tr>';
         foreach ($metrics as $name => $m) {
             // Use the latest sampled capacity for every window and the fixed trend scale.
             $max = $m[1] === '%' ? 100 : (float) ($latest[$m[0].'_capacity'] ?? 0);
@@ -103,7 +103,7 @@ if (!function_exists('pmssStatsLiveRender')) {
             echo '<td>'.pmssStatsLiveSvg($series[$m[0]], $max).'</td></tr>';
         }
         echo '</table><div class="memory-pressure-note"><span class="live-k-node">&#9632; node</span> = whole server &nbsp; '
-            .'<span class="live-k-you">&#9632; you</span> = your own usage. Averages of 5-minute samples; you only see the node total and your own numbers. Network bars and trends use the latest sampled capacity; hidden when unknown.</div></div>';
+            .'<span class="live-k-you">&#9632; you</span> = your own usage. Thin lines show the node total and your own usage for each row over the last 24 hours. Averages of 5-minute samples; you only see the node total and your own numbers. Network bars and trends use the latest sampled capacity; hidden when unknown.</div></div>';
     }
 }
 
