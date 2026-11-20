@@ -36,6 +36,7 @@ declare(strict_types=1);
 
 require_once __DIR__.'/../lib/cgroup/directApply.php';
 require_once __DIR__.'/../lib/cgroup/policy.php';
+require_once __DIR__.'/../lib/cgroup/schedulerDrift.php';
 
 // Constants — tunable top-of-file per AGENTS.md doctrine.
 $USERS_DIR  = '/etc/seedbox/config/users';
@@ -43,6 +44,21 @@ $DRY_RUN    = in_array('--dry-run', $argv ?? [], true);
 
 // Pre-flight — fail loud rather than silent no-op on misconfig.
 pmssCgroupDirectRequireRuntime('INFO: /sys/fs/cgroup/blkio absent (cgroup-v2 host); script does not apply here');
+
+// A disk under /home that left bfq at runtime (the boot-tuning unit writes it once, at boot) switches every account's
+// weight, bonus and paid I/O priority off. Re-run the sole writer of per-disk queue knobs (ADR 0064) and fail loud if
+// the drift survives; every other per-user control is re-applied by its own cron the same way.
+$drifted = pmssCgroupPolicyMountDriftedLeaves('/home');
+if ($drifted && !$DRY_RUN) {
+    openlog('pmss-bfq', LOG_PID, LOG_DAEMON);
+    syslog(LOG_WARNING, 'scheduler drift on /home disks '.implode(',', $drifted).'; re-running pmss-boot-tuning.service');
+    exec('systemctl restart pmss-boot-tuning.service 2>&1', $restartOut, $restartRc);
+    $still = pmssCgroupPolicyMountDriftedLeaves('/home');
+    if ($restartRc !== 0 || $still !== []) {
+        syslog(LOG_ERR, "scheduler drift not healed (restart rc=$restartRc, still: ".implode(',', (array) $still).')');
+        exit(pmssCliReturnWithStderr('FATAL: /home disks not on bfq after re-running pmss-boot-tuning: '.implode(',', (array) $still)."\n", 2));
+    }
+}
 
 // BFQ must be the active elevator on the device backing /home — that is the I/O the
 // per-user weights govern. Globbing sd* asked the wrong question: on a virtio-blk
