@@ -1735,6 +1735,36 @@ BASH
             'media_stack_app_id_valid "${START_APP:-$STOP_APP}"', 'media_stack_session_kill_owned "$STOP_APP"'], $this->script);
     }
 
+    public function testStartStoppedHonoursTheBootRelaunchAppList(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-media-app-list-');
+        $bin = $this->pmssMakeTempDir('pmss-media-app-list-bin-');
+        $this->pmssWriteExecutableFile($bin.'/tmux', <<<'BASH'
+#!/usr/bin/env bash
+if [[ "$1" == has-session || "$1" == list-panes ]]; then exit 1; fi
+printf '%s\n' "$*" >> "$HOME/actions"
+BASH
+        );
+        $this->pmssWriteFile($home.'/.bashrc.custom', "alias sonarr='tmux new-session -s sonarr'\nalias radarr='tmux new-session -s radarr'\n");
+        $function = $this->pmssExtractShellFunction($this->script, 'media_stack_session_owned')."\n"
+            .$this->pmssExtractShellFunction($this->script, 'media_stack_start_stopped');
+        $harness = implode("\n", array('#!/usr/bin/env bash', 'set -euo pipefail',
+            'HOME='.escapeshellarg($home), 'PATH='.escapeshellarg($bin).':$PATH',
+            'MEDIA_STACK_BASE_SESSIONS=(sonarr radarr)', 'START_APP=""', ': > "$HOME/actions"',
+            'log_ok() { :; }', 'log_warn() { :; }', 'log_err() { :; }', $function,
+            'PMSS_MEDIA_STACK_START_APPS=radarr media_stack_start_stopped',
+            'echo "listed:$(cat "$HOME/actions")"', ': > "$HOME/actions"',
+            'PMSS_MEDIA_STACK_START_APPS= media_stack_start_stopped',
+            'echo "empty:$(cat "$HOME/actions")"',
+            'media_stack_start_stopped',
+            'echo "unset:$(cat "$HOME/actions")"', ''));
+
+        $output = $this->pmssRunShellHarness($harness);
+
+        $this->assertStringContainsString("listed:new-session -s radarr\nempty:\nunset:new-session -s sonarr\nnew-session -s radarr", $output);
+        $this->assertStringNotContainsString('listed:new-session -s sonarr', $output);
+    }
+
     public function testAppStopFlagKillsOnlyValidatedSession(): void
     {
         $home = $this->pmssMakeTempDir('pmss-media-stop-');

@@ -154,6 +154,7 @@ Modes:
   --verify-only               Only verify URLs (alias: implies --dry-run) and exit
   --force                     Continue below the ${MEDIA_STACK_MIN_MEMORY_MIB} MiB memory guard
   --start-stopped             Start installed apps whose tmux sessions are absent
+                              (env PMSS_MEDIA_STACK_START_APPS=a,b limits it to those apps)
   --start-app=APP             Start one installed app whose session is absent
   --stop-app=APP              Stop only the named app's tmux session
   --secure-app=APP            Apply PMSS default auth to one installed app
@@ -413,6 +414,8 @@ media_stack_start_stopped() {
 	for app in jellyfin "${MEDIA_STACK_BASE_SESSIONS[@]}"; do
 		[[ -n "$START_APP" && "$app" != "$START_APP" ]] && continue
 		[[ -z "$START_APP" && (-e "$HOME/.${app}Disable" || -L "$HOME/.${app}Disable") ]] && continue
+		# The host's once-per-boot relaunch names the apps to bring back; a set but empty list names none.
+		[[ -z "$START_APP" && -n "${PMSS_MEDIA_STACK_START_APPS+x}" && ",${PMSS_MEDIA_STACK_START_APPS}," != *",${app},"* ]] && continue
 		if media_stack_session_owned "$app"; then
 			continue
 		fi

@@ -707,7 +707,7 @@ function pmssMediaStackPanelStateFromRuntimeBuild(?array $runtime, array $recove
         'Runtime status is not available yet; the host watchdog will publish it shortly.',
         'Use the app-level credentials in ~/.media-stack-credentials.txt; exposed apps can be secured from this panel.',
         'If you need a rerun or cleanup, use SSH because the installer becomes interactive once files already exist.',
-        $recoveryGate['ok'] ? 'Use Start all stopped for a one-time recovery after a host restart.' : $recoveryGate['message'],
+        $recoveryGate['ok'] ? 'Once the host watchdog is publishing status, a host restart starts your stopped apps once; use Start all stopped for any still down.' : $recoveryGate['message'],
     ) : array_merge(pmssMediaStackPanelRuntimeDetailsRead($runtime), array($recoveryGate['ok']
         ? 'Automatic crash-loop restart remains disabled; review the app log, then use Start all stopped for one recovery attempt.'
         : $recoveryGate['message']));

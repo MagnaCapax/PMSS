@@ -3,15 +3,16 @@
  * Media-stack runtime observation and per-account status publication.
  *
  * The cron consumer runs as root, while the panel only reads the published
- * customer-visible artifact. Automatic restarts are intentionally not part of
- * this helper: repeated failures must remain visible instead of becoming a
- * quiet restart loop.
+ * customer-visible artifact. Observation never restarts a failing app: repeated
+ * failures must remain visible instead of becoming a quiet restart loop. The one
+ * exception is a single relaunch on the first pass of each boot (ADR 0302, see
+ * mediaStackBootRelaunch.php), which a crashing app cannot repeat in the same boot.
  *
  * @license GPL-3.0-only
  */
 
 require_once __DIR__.'/runtime.php';
-pmssRequireRelativeFiles(__DIR__, ['lighttpd/userFileWrite.php', 'user/identity.php', 'user/log.php']);
+pmssRequireRelativeFiles(__DIR__, ['lighttpd/userFileWrite.php', 'user/identity.php', 'user/log.php', 'mediaStackBootRelaunch.php']);
 
 if (!defined('PMSS_MEDIA_STACK_WATCHDOG_FAILURE_CYCLES')) {
     define('PMSS_MEDIA_STACK_WATCHDOG_FAILURE_CYCLES', 3);
@@ -124,8 +125,12 @@ function pmssMediaStackWatchdogLogTransition(string $username, string $app, stri
     pmssUserWatchdogLogTransition($username, $message, array('event' => 'media_stack_watchdog', 'user' => $username, 'app' => $app, 'state' => $state, 'consecutive_failures' => $failures));
 }
 
-/** Observe one installed account and publish its current app states. */
-function pmssMediaStackWatchdogRunUser(string $username, string $homeRoot = '/home', ?callable $probe = null): ?array
+/**
+ * Observe one installed account and publish its current app states.
+ *
+ * $boot is the injectable boot context (bootId, uptime, now, launcher); null reads the host's.
+ */
+function pmssMediaStackWatchdogRunUser(string $username, string $homeRoot = '/home', ?callable $probe = null, ?array $boot = null): ?array
 {
     if (!pmssValidateUsername($username)) {
         return null;
@@ -142,6 +147,12 @@ function pmssMediaStackWatchdogRunUser(string $username, string $homeRoot = '/ho
 
     $previous = pmssJsonFileReadAssoc($path, true) ?? array();
     $status = pmssMediaStackWatchdogSnapshot($username, $apps, $previous, $probe, $home);
+    // Latch first: the relaunch record is published with the snapshot, and only a successful write may launch.
+    $boot = $boot ?? pmssMediaStackBootRelaunchContext();
+    $plan = pmssMediaStackBootRelaunchPlan($username, $homeRoot, $previous, $apps, $boot);
+    if ($plan['record'] !== null) {
+        $status['relaunch'] = $plan['record'];
+    }
     if (!pmssMediaStackWatchdogStatusWrite($home, $path, $status)) {
         echo pmssLogFormatTimestampedLine('Media stack watchdog: unable to publish status for '.$username, 'Y-m-d H:i:s', ' ');
         return $status;
@@ -155,6 +166,7 @@ function pmssMediaStackWatchdogRunUser(string $username, string $homeRoot = '/ho
             pmssMediaStackWatchdogLogTransition($username, $app, $state, (int) $appStatus['consecutiveFailures']);
         }
     }
+    pmssMediaStackBootRelaunchRun($username, $plan, $boot['launcher']);
 
     return $status;
 }

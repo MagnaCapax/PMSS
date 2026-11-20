@@ -210,7 +210,8 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
 
 9) Launch
 - Starts each app under a tmux session (skipped in `--dry-run`).
-- `--start-stopped` is a separate one-shot recovery path: it skips downloads and installation, preserves live sessions, and launches only missing sessions through the installer-managed aliases.
+- `--start-stopped` is a separate one-shot recovery path: it skips downloads and installation, preserves live sessions, and launches only missing sessions through the installer-managed aliases. With `PMSS_MEDIA_STACK_START_APPS=a,b` in its environment it starts only the named apps (a set but empty list starts none); the host's boot relaunch uses this.
+- Boot relaunch (ADR 0302): the root watchdog (`scripts/cron/mediaStackInstancesCheck.php`) runs `--start-stopped` once per boot for each observed, non-suspended, non-moved account, as that account inside its `user-<uid>.slice`, detached from the watchdog. It starts the apps that were not `failed` (and not turned off) in the account's last pre-restart status, after a per-account delay of up to 300 s. The record (`relaunch` in `~/.media-stack-status.json`) is written before the launch, so an app that crashes afterwards stays down and shows as failed. Deploying onto a running host relaunches nothing. A home installer copy without the `--start-stopped` mode is never run.
 - Session control verifies the sole tmux pane's launch command against the installed app directory. Existing installer sessions keep their names and remain manageable; an unrelated same-named customer session is neither reported as running nor stopped. Such a collision prevents starting that app until the customer frees the name.
 
 10) Logging
@@ -227,7 +228,7 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
 - The script preserves unrelated `~/.bin` contents on reruns and refreshes only PMSS-managed media-stack paths in place.
 - The full stack is not suitable for very small shared-hosting memory budgets. If the detected account cgroup limit is below 1000 MiB, the installer warns and aborts unless run interactively with confirmation or explicitly with `--force`. The welcome-page wrapper surfaces the same warning and does not force installs from the browser.
 - The script prompts before removing existing Jellyfin state because stale config can hang reruns and the deletion is destructive. Declining skips Jellyfin for that run, preserves its state, and continues installing the other apps and shared .NET runtime. Accepting keeps that state until the Jellyfin replacement has downloaded and extracted, then resets the config immediately before rebuilding it.
-- The welcome panel exposes the same one-shot `--start-stopped` recovery. It never enables automatic crash-loop restarts; review the app log before retrying a repeatedly failing app.
+- The welcome panel exposes the same one-shot `--start-stopped` recovery. A host restart relaunches the stopped apps once (see Launch); the panel control remains for apps that stay down. Automatic crash-loop restarts stay disabled: review the app log before retrying a repeatedly failing app.
 - Media-stack ports are still chosen locally from `10000-65000`; they are not yet registered with `scripts/util/portManager.php`.
 - All app binds are `127.0.0.1`. Exposure to the Internet is not supported without proper SSL/reverse proxy hardening.
 - Conflicts with global `/opt` installs may occur; this is a per‑user stack by design.

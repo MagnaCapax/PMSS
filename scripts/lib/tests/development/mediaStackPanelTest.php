@@ -101,7 +101,7 @@ class MediaStackPanelTest extends TestCase
                         'Runtime status is not available yet; the host watchdog will publish it shortly.',
                         'Use the app-level credentials in ~/.media-stack-credentials.txt; exposed apps can be secured from this panel.',
                         'If you need a rerun or cleanup, use SSH because the installer becomes interactive once files already exist.',
-                        $canRestart ? 'Use Start all stopped for a one-time recovery after a host restart.' : $denied,
+                        $canRestart ? 'Once the host watchdog is publishing status, a host restart starts your stopped apps once; use Start all stopped for any still down.' : $denied,
                     ];
                 } else {
                     $details[] = $canRestart

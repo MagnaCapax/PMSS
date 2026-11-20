@@ -4,7 +4,9 @@
  * Observe installed per-user media-stack tmux sessions, and kill any *ARR running as root.
  *
  * This task publishes runtime state and stops at reporting repeated failures;
- * it deliberately does not restart an app indefinitely without diagnosis.
+ * it deliberately does not restart an app indefinitely without diagnosis. The one
+ * exception is a single relaunch on the first pass of each boot (ADR 0302), started
+ * detached as the tenant in its slice, so it needs the watchdog lock-descriptor export.
  *
  * The root-*ARR kill rides here rather than in its own cron because this is already the
  * root-owned, fleet-wide, every-two-minutes media-stack task -- a second timer for the same
@@ -15,6 +17,7 @@
  */
 
 require_once __DIR__.'/../lib/mediaStackWatchdog.php';
+require_once __DIR__.'/../lib/user/watchdog.php';
 require_once __DIR__.'/../lib/userSystemdWatchdog.php';
 require_once __DIR__.'/../lib/user/selection.php';
 require_once __DIR__.'/../lib/arrRootGuard.php';
@@ -26,7 +29,7 @@ $rootGuardFindings = pmssRootGuardAuditAndKill('pmssCronLockSkipLog');
 $pmssMediaStackInstancesLock = pmssCronLockAcquire('mediaStackInstancesCheck', static function (string $message) use ($rootGuardFindings): int {
     pmssCronLockSkipLog($message);
     return $rootGuardFindings > 0 ? 1 : 0;
-});
+}, 'pmssUserWatchdogLockAcquire');
 
 $result = pmssListManagedUsersResult('/scripts/listUsers.php');
 if ((int) $result['exitCode'] !== 0) {
