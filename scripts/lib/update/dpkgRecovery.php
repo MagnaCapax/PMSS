@@ -42,6 +42,10 @@ function pmssDpkgReinstallRequiredPackages(): array
     $out = (string) shell_exec("dpkg-query -W -f='\${db:Status-Abbrev} \${Package}\\n' 2>/dev/null");
     $packages = [];
     foreach (explode("\n", $out) as $line) {
+        // trim() must not turn a corrupt observation into a package reinstall request.
+        if (strpos($line, "\0") !== false) {
+            continue;
+        }
         $parts = preg_split('/\s+/', trim($line));
         if (count($parts) === 2 && strlen($parts[0]) === 3 && $parts[0][2] === 'R' && preg_match('/^[a-z0-9][a-z0-9+.:-]*$/', $parts[1])) {
             $packages[] = $parts[1];

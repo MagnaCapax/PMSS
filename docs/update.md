@@ -225,6 +225,13 @@ is skipped rather than assuming `/tmp` is unmounted.
 
 ### Package Phase Ordering
 
+The reinstall-required package scanner rejects NUL-containing dpkg status rows
+before trimming, so corrupt edge bytes cannot become a package reinstall request.
+Intact neighbouring rows retain their order and package validation; reinstallation
+still precedes configuration. `DpkgRecoveryInputSafetyTest` intercepts package commands
+to cover these boundaries on the testing machine; devbox checks use changed-file
+PHP syntax validation only.
+
 Phase 2 keeps repository selection and its deferred diagnostic in the distro
 record built by `pmssUpdateStep2DistroContextBuild()`. After the existing
 MediaArea prelude, `scripts/lib/update/packagePhase.php` owns package convergence
