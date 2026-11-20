@@ -949,6 +949,27 @@ function setHeights() {
         for (var i = 0; i < panes.length; i++) panes[i].style.height = height;
 };
 
+// qBittorrent's WebUI reads its main-window APIs through parent even when the panel frames it.
+// Discover by content so both remote and local tab keys work; cross-origin siblings are skipped.
+function pmssQbtWindow() {
+ var frames = document.getElementsByTagName('iframe');
+ for (var i = 0; i < frames.length; i++) {
+  try {
+   var w = frames[i].contentWindow;
+   if (w && w !== window && w.qBittorrent && w.qBittorrent.ClientData) return w;
+  } catch (e) {}
+ }
+ return null;
+}
+// Forward the live namespace, including stored preferences and dialog callbacks, without inventing defaults.
+if (!('qBittorrent' in window)) Object.defineProperty(window, 'qBittorrent', {configurable: true,
+ get: function () { var w = pmssQbtWindow(); return w ? w.qBittorrent : undefined; }});
+window.updateMainData = window.updateMainData || function () {
+ var w = pmssQbtWindow(); if (w && w.updateMainData) w.updateMainData(); };
+window.getCoordinates = window.getCoordinates || function () {
+ return {top: 0, left: 0, width: window.innerWidth, height: window.innerHeight,
+  right: window.innerWidth, bottom: window.innerHeight}; };
+
 // Run the height cascade BEFORE invoking the tabs plugin. setHeights()
 // needs neither jQuery nor the tabs plugin, so iframes get
 // sized correctly even when either script failed to load.

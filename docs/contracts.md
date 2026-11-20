@@ -1873,6 +1873,14 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 ## Customer Panel Frame Source – `etc/skel/www/index.php` and `welcome.php`
 
+- Before tab initialization, the outer panel exposes qBittorrent's live framed
+  namespace and `updateMainData` callback through guarded parent-window APIs.
+  Frame discovery uses `qBittorrent.ClientData`, independent of tab-key casing,
+  skips cross-origin siblings and returns no namespace when no matching frame exists.
+  A guarded viewport `getCoordinates` supplies Mocha's drag/resize underlay.
+  This preserves in-page navigation (ADR 0021) and the frame's stored preferences.
+  Options Save can still reload the outer panel; real-browser acceptance must
+  verify tab restoration, preferences, layout and dialog closure after delivery.
 - The outer panel owns the browser title on both frame paths: `<short hostname> <vendor name> Dashboard`. It reads the system hostname without shelling, falls back to `php_uname('n')`, escapes the title as HTML, and defaults missing or invalid vendor names to `Pulsed Media`. Frame-source title elements are omitted so only the outer title remains.
 - Remote `guiFrames` remains the default and primary on-load frame-definition source; bundled definitions remain its failover.
 - Before remote loading, exclusive one-byte write probes in home and `www` must succeed and flush; each probe is removed. Failed probes (including hard quota exhaustion) select local frames without running the remote heal. Remote output is buffered and discarded; output, a non-array result, or a thrown error selects local frames and cancels any heal reload, retaining the file-manager tab (#891).
