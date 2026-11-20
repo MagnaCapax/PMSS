@@ -10,6 +10,7 @@
  */
 
 require_once __DIR__.'/../runtime.php';
+require_once __DIR__.'/../update/systemPrep/renderNodeAccess.php';
 
 /**
  * Extract the rTorrent PID from a session lock file.
@@ -130,7 +131,7 @@ function pmssUserConfigNamedModeUser(array $user, array $existing, array $explic
     $user['quota'] = (int) $existing['quota'];
     return array_merge($user, pmssUserConfigCliPersistedStoredResources($existing), $explicitResourceOverrides);
 }
-function pmssUserConfigPayloadBuild($store, array $existing, array $user, array $presence, ?bool $dockerEnabled): array
+function pmssUserConfigPayloadBuild($store, array $existing, array $user, array $presence, ?bool $dockerEnabled, ?bool $gpuEnabled = null): array
 {
     $payload = array_merge($existing, ['ramMiB' => $user['memory'], 'rtorrentPort' => (int) ($existing['rtorrentPort'] ?? 0), 'quota' => $user['quota'], 'quotaBurst' => (int) round(((float) $user['quota']) * 1.25), 'trafficLimit' => 0]);
     $payload = pmssUserConfigCliApplyPersistedResources($payload, $user, $presence);
@@ -140,7 +141,22 @@ function pmssUserConfigPayloadBuild($store, array $existing, array $user, array 
         $payload = $store->applyFallbacks($user['name'], $payload);
     }
     if ($dockerEnabled !== null) $payload['dockerEnabled'] = $dockerEnabled;
+    if ($gpuEnabled !== null) $payload['gpuEnabled'] = $gpuEnabled;
     return $payload;
+}
+
+/** Reconcile a changed, successfully persisted GPU policy on Intel hosts only. */
+function pmssUserConfigApplyGpuPolicy(string $username, array $existing, array $payload, ?callable $intelProbe = null, ?callable $denyConverge = null, ?callable $groupMember = null): void
+{
+    if (!pmssValidateUsername($username)
+        || pmssUserConfigNormaliseToggleValue($existing, 'gpuEnabled') === pmssUserConfigNormaliseToggleValue($payload, 'gpuEnabled')) return;
+    $intelProbe = $intelProbe ?: 'pmssHostHasIntelDisplayPciDevice';
+    if (!$intelProbe()) return;
+    $denyConverge = $denyConverge ?: 'pmssEnsureIntelRenderNodeDenies';
+    $groupMember = $groupMember ?: 'pmssEnsureIntelRenderGroupMember';
+    $denyConverge();
+    // Named-user denies override old render membership; never remove existing members.
+    if (pmssUserConfigNormaliseToggleValue($payload, 'gpuEnabled')) $groupMember($username);
 }
 function pmssUserConfigApplyCgroupAndDocker(array $user, $store): void
 {

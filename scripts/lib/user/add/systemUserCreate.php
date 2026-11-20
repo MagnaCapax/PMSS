@@ -31,7 +31,10 @@ function pmssAddUserSystemUserCreate(array $user, string $homePath): void
     if (function_exists('pmssAddUserFailureRollbackMarkSystemUserCreated')) {
         pmssAddUserFailureRollbackMarkSystemUserCreated();
     }
-    pmssEnsureIntelRenderGroupMember($user['name'], 'logProvisionMessage');
+    // Creation precedes the store write, so use the parsed policy here.
+    if (pmssUserConfigNormaliseToggleValue($user, 'gpuEnabled')) {
+        pmssEnsureIntelRenderGroupMember($user['name'], 'logProvisionMessage');
+    }
 
     $pwEntry = pmssUserAccountLookup($user['name']);
     if (!is_dir($homePath)) {

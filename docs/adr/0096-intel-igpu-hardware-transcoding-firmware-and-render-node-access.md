@@ -145,3 +145,57 @@ Rejected: `i915.disable_display=1` (on 6.1 it only stops hotplug polling and
 keeps DMC and the DC mask), `mce=` tolerances (they hide the report while the
 CPUs stay hung), and blacklisting i915 or `nomodeset` (they remove the render
 node this ADR provides).
+
+## Amendment 2026-11-20: per-account render-node deny
+
+A product sold without iGPU access needs an operator-provisioned per-account
+policy on a shared host. `gpuEnabled` defaults to true for existing accounts;
+`addUser.php` and `userConfig.php` accept `--gpu-enabled=true|false`. Only the
+root-owned user config store supplies this policy. There is no customer toggle.
+
+Keep the existing 70- rule and mode 0666. Mode 0660 with render-group membership
+would break entitled accounts in rootless Docker: the runtime resets
+supplementary groups and the host render GID is not mapped into the container.
+Instead, on Intel display hosts generate the managed, mode-0644 file
+`/etc/udev/rules.d/74-pmss-render-node-deny.rules`, with one line per disabled,
+validated account still present in passwd:
+
+```
+SUBSYSTEM=="drm", KERNEL=="renderD*", DRIVERS=="i915|xe", RUN+="/usr/bin/setfacl -m u:<name>:--- $devnode"
+```
+
+Named-user ACL entries take precedence over group membership and other-mode
+permissions. Skip adding disabled accounts to render, but retain existing
+memberships. Debian's `acl` tools are in every baseline (Debian 13 already
+selected them; Debian 12 now does too). Remove the deny rule when no disabled
+accounts remain.
+Creation applies the first stored policy before services start; reconfiguration,
+termination and normal updates also converge the rule. Updates retrigger even
+unchanged deny rules, wait for udev, and read back each disabled account's numeric
+ACL entry on every Intel render node, warning on missing entries and reporting
+one account-count summary. Command failures remain visible in the update log.
+
+In systemd v252, the uaccess builtin flushes named-user ACL entries even without
+an active seat session. A one-off setfacl would disappear at the next device
+event. The late 74- RUN follows 73-seat-late.rules and its uaccess builtin in
+udev's ordered RUN list, restoring denies after that flush. A console login on
+seat0 also lets logind flush user ACLs outside udev; access then fails open until
+the next udev event or update. The update's read-back reports the observed state,
+not a guarantee against a later seat change.
+
+Permissions are checked at open: file descriptors already open stay usable
+until the process ends. The deny list is visible to local accounts through
+getfacl (and the readable rule). This is an access entitlement, not a GPU
+resource quota or a replacement for kernel security updates. Historical i915
+local privilege-escalation vectors include CVE-2023-28410 and CVE-2010-2962,
+referenced above; enabled accounts retain that ioctl attack surface. No primary
+or service credentials are introduced, read or logged, and no listening port,
+public name or web endpoint is added. Native and rootless-container denial,
+re-enablement and device-event behavior require acceptance on real Intel hardware;
+unit fixtures alone do not establish enforcement.
+
+Implementation references: systemd v252
+[uaccess](https://github.com/systemd/systemd/blob/v252/src/udev/udev-builtin-uaccess.c),
+[ACL flushing](https://github.com/systemd/systemd/blob/v252/src/shared/devnode-acl.c),
+[ordered RUN execution](https://github.com/systemd/systemd/blob/v252/src/udev/udev-event.c)
+and [seat ACL changes](https://github.com/systemd/systemd/blob/v252/src/login/logind-seat.c).

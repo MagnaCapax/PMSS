@@ -101,7 +101,9 @@ function pmssUserTransferMain(array $argv): int
         }
 
         // Transfers require an existing local account; converge its GPU group now.
-        pmssEnsureIntelRenderGroupMember($cfg['localUser'], 'logMessage');
+        if (pmssUserGpuEnabled($cfg['localUser'], $transferStore)) {
+            pmssEnsureIntelRenderGroupMember($cfg['localUser'], 'logMessage');
+        }
 
         $password = pmssUserTransferResolvePassword();
         putenv('PMSS_USER_TRANSFER_PASSWORD='.$password);

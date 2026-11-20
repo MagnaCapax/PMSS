@@ -11,7 +11,7 @@ class userConfigCommandContractsTest extends TestCase
             "require_once __DIR__.'/../lib/user/userConfigRuntime.php';",
             'pmssUserConfigInvocationMode($args, $welcomeMessage !== null, $namedConfigChange)',
             'pmssUserConfigWelcomeOnlyPersist($store, $user[\'name\'], $expectedHome, $welcomeMessage, $existing)',
-            'pmssUserConfigPayloadBuild($store, $existing, $user, $presence, $dockerEnabled)',
+            'pmssUserConfigPayloadBuild($store, $existing, $user, $presence, $dockerEnabled, $gpuEnabled)',
             "pmssPortManagerAssignServicePort(\$user['name'], 'rclone')",
             "pmssWriteUserFile(\$qbittorrentConfigFile, \$qbittorrentConfig, \$user['name'], 0600)",
             "elseif (!pmssQbittorrentThrottleSeedRecord(\$user['name'], \$expectedHome, \$throttle ?? 0))",

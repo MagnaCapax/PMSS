@@ -7,6 +7,19 @@ require_once dirname(__DIR__, 2).'/update/dpkgSelections.php';
 /** Hardware-gated firmware selection and read-only PCI detection. */
 class IntelGpuFirmwareSelectionTest extends TestCase
 {
+    public function testBothShippedBaselinesSelectAclOnEveryHost(): void
+    {
+        // setfacl applies the per-account render-node deny; Debian 13 always shipped acl, Debian 12 now matches.
+        foreach ([12, 13] as $version) {
+            $lines = file(dirname(__DIR__, 2).'/update/dpkg/selections-debian'.$version.'.txt', FILE_IGNORE_NEW_LINES);
+            foreach ([false, true] as $intel) {
+                $plan = \pmssDpkgSelectionsSanitise($lines, $version, ...self::pmssMakeCallbacks([true, $intel]));
+                $this->assertTrue(in_array("acl\tinstall", $plan['sanitised'], true));
+                $this->assertSame([], array_values(array_intersect(['acl'], $plan['dropped_hardware'])));
+            }
+        }
+    }
+
     public function testFirmwareIsDroppedWithoutIntelDisplayButOtherPackagesRemain(): void
     {
         $plan = \pmssDpkgSelectionsSanitise(['alpha install', 'firmware-misc-nonfree install', 'beta hold'], 12, ...self::pmssMakeCallbacks([true, false]));

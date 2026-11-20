@@ -25,6 +25,7 @@ require_once __DIR__.'/lib/user/pikkumiesPreinstallState.php';
 require_once __DIR__.'/lib/user/billingIds.php';
 require_once __DIR__.'/lib/user/userCgroupSliceCleanup.php';
 require_once __DIR__.'/lib/nginxUserHosts.php';
+require_once __DIR__.'/lib/update/systemPrep/renderNodeAccess.php';
 
 pmssStdoutHeartbeatStartForStdout();
 
@@ -329,6 +330,7 @@ if (pmssUserAccountLookup($username) !== null) {
     ));
 } else {
     $db->removeUser($username);
+    pmssEnsureIntelRenderNodeDenies('logMessage');
     pmssUserLifecycleContextLog('terminate', 'remove_user_db', $username, array(
         'status'  => 'OK',
         'dry_run' => $dryRun,

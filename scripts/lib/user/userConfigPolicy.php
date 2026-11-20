@@ -69,6 +69,12 @@ function pmssUserDockerEnabled(string $username, ?UserConfigStore $store = null)
     return $effectiveRamMiB <= 0 || $effectiveRamMiB >= pmssUserDockerMinRamMiB();
 }
 
+/** Check the operator-provisioned Intel render-node policy; legacy accounts default on. */
+function pmssUserGpuEnabled(string $username, ?UserConfigStore $store = null): bool
+{
+    return pmssUserConfigFeatureEnabled($username, 'gpuEnabled', $store);
+}
+
 /** Check whether persistent per-user services were explicitly requested. */
 function pmssUserLingerEnabled(string $username, ?UserConfigStore $store = null): bool
 {

@@ -9,6 +9,7 @@
 require_once __DIR__.'/../qbittorrent.php';
 require_once __DIR__.'/../userConfigCli.php';
 require_once __DIR__.'/../appSwitch.php';
+require_once dirname(__DIR__, 2).'/update/systemPrep/renderNodeAccess.php';
 /**
  * Build the canonical userConfig command for addUser provisioning.
  */
@@ -30,6 +31,9 @@ function pmssAddUserBuildUserConfigCommand(array $user): string
     }
     if (isset($user['dockerEnabled']) && $user['dockerEnabled'] !== '') {
         $command[] = '--docker-enabled='.(string) $user['dockerEnabled'];
+    }
+    if (array_key_exists('gpuEnabled', $user)) {
+        $command[] = '--gpu-enabled='.(pmssUserConfigNormaliseToggleValue($user, 'gpuEnabled') ? 'true' : 'false');
     }
     return pmssCommandArgvShellQuote($command);
 }
@@ -60,7 +64,12 @@ function pmssAddUserUserConfigApply(users $userDb, array $user, string $homePath
     if (isset($user['dockerEnabled']) && $user['dockerEnabled'] !== '') {
         $payload['dockerEnabled'] = $user['dockerEnabled'];
     }
+    if (array_key_exists('gpuEnabled', $user)) {
+        $payload['gpuEnabled'] = $user['gpuEnabled'];
+    }
     $userDb->addUser($user['name'], $payload);
+    // Enforce the first stored policy before starting account services.
+    pmssEnsureIntelRenderNodeDenies('logProvisionMessage');
 
     // Assign HTTP server port
     runProvisionStep(

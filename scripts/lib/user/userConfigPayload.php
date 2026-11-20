@@ -36,7 +36,7 @@ function pmssUserConfigPayloadNormalise(array $payload): array
     // Invalid dates must never reach nginx's static response or its config syntax.
     if (!pmssUserMovedDateIsValid($payload['movedUntil'] ?? null)) unset($payload['movedUntil']);
 
-    foreach (['dockerEnabled' => true, 'lighttpdEnabled' => true, 'panelSessionLogin' => false, 'scheduledConfigBackup' => false] as $key => $default) {
+    foreach (['dockerEnabled' => true, 'gpuEnabled' => true, 'lighttpdEnabled' => true, 'panelSessionLogin' => false, 'scheduledConfigBackup' => false] as $key => $default) {
         $payload[$key] = pmssUserConfigNormaliseToggleValue($payload, $key, $default);
     }
 

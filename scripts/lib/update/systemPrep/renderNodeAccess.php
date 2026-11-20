@@ -5,6 +5,7 @@ require_once __DIR__.'/../managedPath.php';
 require_once __DIR__.'/../runtime/commands.php';
 require_once __DIR__.'/../dpkgSelections.php';
 require_once dirname(__DIR__, 2).'/user/selection.php';
+require_once __DIR__.'/renderNodeDeny.php';
 
 /** Install the Intel-only udev rule and apply it to existing DRM devices. */
 function pmssEnsureIntelRenderNodeAccess(?callable $logger = null, ?string $target = null, ?callable $commandRunner = null, ?callable $commandPath = null): void
@@ -34,7 +35,7 @@ function pmssEnsureIntelRenderNodeAccess(?callable $logger = null, ?string $targ
 }
 
 /** Add one validated account to render when Intel hardware and the group exist. */
-function pmssEnsureIntelRenderGroupMember(string $user, ?callable $logger = null, ?callable $intelProbe = null, ?callable $groupLookup = null, ?callable $commandRunner = null, ?callable $commandPath = null): string
+function pmssEnsureIntelRenderGroupMember(string $user, ?callable $logger = null, ?callable $intelProbe = null, ?callable $groupLookup = null, ?callable $commandRunner = null, ?callable $commandPath = null, ?callable $gpuEnabled = null): string
 {
     $log = $logger ?: 'logMessage';
     $intelProbe = $intelProbe ?: 'pmssHostHasIntelDisplayPciDevice';
@@ -48,6 +49,8 @@ function pmssEnsureIntelRenderGroupMember(string $user, ?callable $logger = null
         $log('[WARN] Invalid account name skipped for render group');
         return 'skipped';
     }
+    $gpuEnabled = $gpuEnabled ?: 'pmssUserGpuEnabled';
+    if (!$gpuEnabled($user)) return 'skipped';
     if (in_array($user, $group['members'], true)) return 'member';
 
     $gpasswd = $commandPath('gpasswd');
@@ -67,7 +70,7 @@ function pmssEnsureIntelRenderGroupMember(string $user, ?callable $logger = null
 }
 
 /** Converge all PMSS accounts independently of per-user refresh resume markers. */
-function pmssEnsureIntelRenderGroupMembers(?callable $logger = null, ?callable $intelProbe = null, ?callable $groupLookup = null, ?callable $userLister = null, ?callable $commandRunner = null, ?callable $commandPath = null): void
+function pmssEnsureIntelRenderGroupMembers(?callable $logger = null, ?callable $intelProbe = null, ?callable $groupLookup = null, ?callable $userLister = null, ?callable $commandRunner = null, ?callable $commandPath = null, ?callable $gpuEnabled = null): void
 {
     $log = $logger ?: 'logMessage';
     $intelProbe = $intelProbe ?: 'pmssHostHasIntelDisplayPciDevice';
@@ -81,7 +84,7 @@ function pmssEnsureIntelRenderGroupMembers(?callable $logger = null, ?callable $
     foreach ($userLister() as $user) {
         // Keep successful additions in the snapshot for duplicate list entries.
         $lookup = static function (string $name) use (&$group): array { return $group; };
-        $status = pmssEnsureIntelRenderGroupMember((string) $user, $log, static function (): bool { return true; }, $lookup, $commandRunner, $commandPath);
+        $status = pmssEnsureIntelRenderGroupMember((string) $user, $log, static function (): bool { return true; }, $lookup, $commandRunner, $commandPath, $gpuEnabled);
         if ($status === 'added') {
             $added++;
             $group['members'][] = $user;

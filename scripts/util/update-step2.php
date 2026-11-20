@@ -317,6 +317,7 @@ pmssRunProfiledCallableBatch([
 runStep('Bounding user.slice memory plus swap', '/scripts/cron/cgroupUserSliceMemswApply.php');
 pmssRunProfiledCallable('Ensuring Intel render-node access', 'pmssEnsureIntelRenderNodeAccess', ['logmsg'], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);
 pmssRunProfiledCallable('Ensuring Intel render-group membership', 'pmssEnsureIntelRenderGroupMembers', ['logmsg'], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);
+pmssRunProfiledCallable('Ensuring Intel render-node denies', 'pmssEnsureIntelRenderNodeDenies', ['logmsg'], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);
 pmssRunProfiledCallable('Keeping i915 display power states off', 'pmssEnsureI915DisplayPowerStatesOff', ['logmsg'], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);
 pmssRunProfiledCallable('Pinning Realtek NIC ASPM off', 'pmssEnsureRealtekNicAspmOff', ['logmsg'], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);
 // Directories get traversal; files are only ever tightened here, never widened. A blanket

@@ -1,3 +1,4 @@
+acl	install
 adduser	install
 adwaita-icon-theme	install
 alsa-topology-conf	install

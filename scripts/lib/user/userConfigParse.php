@@ -44,6 +44,21 @@ function pmssUserConfigParseDockerEnabledOption($rawOption): ?bool
     throw new InvalidArgumentException('Invalid --docker-enabled value');
 }
 
+/** Parse the optional GPU toggle using the same accepted values as Docker. */
+function pmssUserConfigParseGpuEnabledOption($rawOption): ?bool
+{
+    // Reject malformed bytes/types before the shared parser trims CLI text.
+    if ($rawOption !== null && $rawOption !== true
+        && (!is_string($rawOption) || strpos($rawOption, "\0") !== false)) {
+        throw new InvalidArgumentException('Invalid --gpu-enabled value');
+    }
+    try {
+        return pmssUserConfigParseDockerEnabledOption($rawOption);
+    } catch (InvalidArgumentException $exception) {
+        throw new InvalidArgumentException(str_replace('--docker-enabled', '--gpu-enabled', $exception->getMessage()));
+    }
+}
+
 /** Parse the optional torrent throttle while ignoring legacy empty flags. */
 function pmssUserConfigCliParseUploadThrottleOption($rawOption, string $negativeMessage = 'Upload throttle must be >= 0'): ?int
 {

@@ -74,11 +74,11 @@ class RenderNodeAccessTest extends TestCase
             return 0;
         };
         $path = static function (string $binary): string { return $binary === 'gpasswd' ? '/usr/bin/gpasswd' : ''; };
-        \pmssEnsureIntelRenderGroupMembers($logger, $ops['intel'], $group, $ops['users'], $runner, $path);
+        \pmssEnsureIntelRenderGroupMembers($logger, $ops['intel'], $group, $ops['users'], $runner, $path, $ops['intel']);
         $this->assertSame(["'/usr/bin/gpasswd' -a 'bob' render", "'/usr/bin/gpasswd' -a 'carol' render"], $commands);
         $this->assertTrue(in_array('Intel render group: 2 added, 1 already members', $messages, true));
         $commands = [];
-        \pmssEnsureIntelRenderGroupMembers($logger, $ops['intel'], $group, $ops['users'], $runner, $path);
+        \pmssEnsureIntelRenderGroupMembers($logger, $ops['intel'], $group, $ops['users'], $runner, $path, $ops['intel']);
         $this->assertSame([], $commands);
         $this->assertTrue(in_array('Intel render group: 0 added, 3 already members', $messages, true));
     }
@@ -88,10 +88,10 @@ class RenderNodeAccessTest extends TestCase
         $commands = [];
         $runner = static function ($label, $command) use (&$commands): int { $commands[] = $command; return 0; };
         $ops = self::pmssMakeCallbacks(['path' => '/usr/bin/gpasswd', 'present' => true, 'absent' => false, 'group' => ['members' => []]]);
-        $this->assertSame('skipped', \pmssEnsureIntelRenderGroupMember('bob', null, $ops['absent'], $ops['group'], $runner, $ops['path']));
-        $this->assertSame('skipped', \pmssEnsureIntelRenderGroupMember('bob', null, $ops['present'], $ops['absent'], $runner, $ops['path']));
+        $this->assertSame('skipped', \pmssEnsureIntelRenderGroupMember('bob', null, $ops['absent'], $ops['group'], $runner, $ops['path'], $ops['present']));
+        $this->assertSame('skipped', \pmssEnsureIntelRenderGroupMember('bob', null, $ops['present'], $ops['absent'], $runner, $ops['path'], $ops['present']));
         $this->assertSame([], $commands);
-        $this->assertSame('added', \pmssEnsureIntelRenderGroupMember('bob', null, $ops['present'], $ops['group'], $runner, $ops['path']));
+        $this->assertSame('added', \pmssEnsureIntelRenderGroupMember('bob', null, $ops['present'], $ops['group'], $runner, $ops['path'], $ops['present']));
         $this->assertSame(["'/usr/bin/gpasswd' -a 'bob' render"], $commands);
         $this->pmssAssertRepoFileContainsOrderedStrings('scripts/lib/user/add/systemUserCreate.php', [
             "'Create system user'", 'pmssEnsureIntelRenderGroupMember($user[\'name\']',
@@ -109,7 +109,7 @@ class RenderNodeAccessTest extends TestCase
         $runner = static function ($label, $command) use (&$commands): int { $commands[] = $command; return 1; };
         $path = static function (string $binary): string { return $binary === 'usermod' ? '/usr/sbin/usermod' : ''; };
         $ops = self::pmssMakeCallbacks(['intel' => true, 'group' => ['members' => []]]);
-        $status = \pmssEnsureIntelRenderGroupMember('bob', $logger, $ops['intel'], $ops['group'], $runner, $path);
+        $status = \pmssEnsureIntelRenderGroupMember('bob', $logger, $ops['intel'], $ops['group'], $runner, $path, $ops['intel']);
         $this->assertSame('failed', $status);
         $this->assertSame(["'/usr/sbin/usermod' -aG render 'bob'"], $commands);
         $this->assertTrue(strpos(implode('\n', $messages), '[WARN] Unable to add account to render group') !== false);

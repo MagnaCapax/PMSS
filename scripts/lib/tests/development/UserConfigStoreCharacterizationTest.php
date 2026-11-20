@@ -10,7 +10,7 @@ class UserConfigStoreCharacterizationTest extends TestCase
     /** Expected empty-record projection, in the historical SORT_STRING order. */
     private function defaults(): array
     {
-        return ['billingClientId' => 0, 'billingServiceId' => 0, 'dockerEnabled' => true,
+        return ['billingClientId' => 0, 'billingServiceId' => 0, 'dockerEnabled' => true, 'gpuEnabled' => true,
             'lighttpdEnabled' => true, 'panelSessionLogin' => false, 'scheduledConfigBackup' => false,
             'suspended' => false, 'trafficLimit' => 0];
     }
@@ -28,7 +28,7 @@ class UserConfigStoreCharacterizationTest extends TestCase
         $this->assertSame($this->defaults(), $this->readPayload([]));
         $this->assertSame([
             'IOWeight' => 'invalid', 'billingClientId' => 0, 'billingServiceId' => 12,
-            'dockerEnabled' => false, 'lighttpdEnabled' => true, 'panelSessionLogin' => false,
+            'dockerEnabled' => false, 'gpuEnabled' => true, 'lighttpdEnabled' => true, 'panelSessionLogin' => false,
             'quota' => 1, 'ramMiB' => 244, 'rtorrentRam' => '244', 'scheduledConfigBackup' => false,
             'suspended' => true, 'trafficLimit' => 0, 'unknown' => ['keep' => true],
         ], $this->readPayload(['rtorrentRam' => '244', 'billingId' => '0012', 'billingClientId' => false,
@@ -39,7 +39,7 @@ class UserConfigStoreCharacterizationTest extends TestCase
     public function testFeatureDefaultsAndExplicitValuesRetainTheirDifferentPolicies(): void
     {
         foreach ([null, '', 'FALSE', '0', ' No ', 'off', 0, false, [], 'yes', 1, ['x']] as $value) {
-            $expected = array_fill_keys(['dockerEnabled', 'lighttpdEnabled', 'panelSessionLogin', 'scheduledConfigBackup'],
+            $expected = array_fill_keys(['dockerEnabled', 'gpuEnabled', 'lighttpdEnabled', 'panelSessionLogin', 'scheduledConfigBackup'],
                 in_array($value, ['yes', 1, ['x']], true));
             $payload = $this->readPayload(array_fill_keys(array_keys($expected), $value));
             $this->pmssAssertArraySubsetSame($expected, $payload, json_encode($value).' ');

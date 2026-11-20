@@ -32,9 +32,9 @@ require_once __DIR__.'/../lib/torrentClients/identity.php';
 /**
  * Main entry point for user configuration changes.
  */
-$usage = pmssUserConfigCliUsage();
+$usage = pmssUserConfigCliUsage()."\nIntel iGPU access:\n  --gpu-enabled=true|false  Persist Intel iGPU access (default: true).\n";
 $resourceOptions = pmssUserConfigCliResourceOptionNames();
-$parsed = pmssParseCliTokens(pmssCliArgv($argv ?? null), array_merge(['upload-throttle-kib', 'welcome-message', 'docker-enabled', 'bonus-quota-gib'], $resourceOptions));
+$parsed = pmssParseCliTokens(pmssCliArgv($argv ?? null), array_merge(['upload-throttle-kib', 'welcome-message', 'docker-enabled', 'bonus-quota-gib', 'gpu-enabled'], $resourceOptions));
 $helpRequested = pmssCliOption($parsed, 'help', 'h', false) !== false;
 $args = array_merge([''], $parsed['arguments']);
 if ($helpRequested) {
@@ -46,6 +46,7 @@ $welcomeMessage = ($welcomeMessage === true || $welcomeMessage === null) ? null 
 try {
     $uploadThrottleKib = pmssUserConfigCliParseUploadThrottleOption(pmssCliOption($parsed, 'upload-throttle-kib'));
     $dockerEnabled = pmssUserConfigParseDockerEnabledOption(pmssCliOption($parsed, 'docker-enabled'));
+    $gpuEnabled = pmssUserConfigParseGpuEnabledOption(pmssCliOption($parsed, 'gpu-enabled'));
 } catch (InvalidArgumentException $exception) {
     die($exception->getMessage()."\n");
 }
@@ -57,6 +58,7 @@ try {
 $explicitResourceOverrides = pmssUserConfigCliResources($parsed, $args, 'userConfigIndex', 'explicit');
 $namedConfigChange = $uploadThrottleKib !== null
     || $dockerEnabled !== null
+    || $gpuEnabled !== null
     || $bonusQuotaGiB !== null
     || count($explicitResourceOverrides) > 0;
 $configMode = pmssUserConfigInvocationMode($args, $welcomeMessage !== null, $namedConfigChange);
@@ -116,7 +118,7 @@ if ($configMode === 'named') {
 
 $presence = array_fill_keys(array_keys($explicitResourceOverrides), true);
 
-$payload = pmssUserConfigPayloadBuild($store, $existing, $user, $presence, $dockerEnabled);
+$payload = pmssUserConfigPayloadBuild($store, $existing, $user, $presence, $dockerEnabled, $gpuEnabled);
 if ($welcomeMessage !== null) {
     if (!pmssWelcomeUserMessageSet($user['name'], $expectedHome, $welcomeMessage)) {
         fwrite(STDERR, "Warning: failed to persist welcome message for {$user['name']}\n");
@@ -133,6 +135,7 @@ if (!$store->persist($user['name'], $payload)) {
     if (function_exists('pmssUserLog')) pmssUserLog($user['name'], 'userConfig: user store write failed; no settings applied');
     pmssCliExitWithStderr("Error: failed to persist user config for {$user['name']}\n", 1);
 }
+pmssUserConfigApplyGpuPolicy($user['name'], $existing, $payload);
 // Display copy of the upload cap for the account's panel and tools.
 if ($uploadThrottleKib !== null) {
     if (!pmssWriteTorrentThrottle($user['name'], $uploadThrottleKib)) {

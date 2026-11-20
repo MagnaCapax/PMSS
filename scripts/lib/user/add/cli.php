@@ -46,6 +46,7 @@ function pmssAddUserCliUsage(): string
             pmssCliHelpLine('--upload-throttle-kib=KIB', 'Persist torrent upload throttle in KiB/s; 0 removes it.'),
         ], pmssUserConfigCliResourceHelpLines('addUserAdvancedOptions', 'usage', ['CPUWeight' => $derivedDefault, 'IOWeight' => $derivedDefault]), [
             pmssCliHelpLine('--docker-enabled=true|false', 'Persist the initial rootless Docker policy.'),
+            pmssCliHelpLine('--gpu-enabled=true|false', 'Persist Intel iGPU access (default: true).'),
             pmssCliHelpLine('--app-profile=PROFILE', 'Initial apps: '.implode(', ', array_keys(pmssUserAppProfiles())).'; omitted selects the seedbox profile.'),
             pmssCliHelpLine('-h, --help', 'Show this help and exit.'),
         ]),
@@ -69,7 +70,7 @@ function pmssAddUserCliUsage(): string
  */
 function pmssAddUserParseCli(array $argv): array
 {
-    $longOptions = array_merge(['user', 'password', 'ram-mib', 'disk-quota-gib', 'bonus-quota-gib', 'upload-throttle-kib', 'docker-enabled', 'app-profile'], pmssUserConfigCliResourceOptionNames());
+    $longOptions = array_merge(['user', 'password', 'ram-mib', 'disk-quota-gib', 'bonus-quota-gib', 'upload-throttle-kib', 'docker-enabled', 'app-profile', 'gpu-enabled'], pmssUserConfigCliResourceOptionNames());
     $parsed = pmssParseCliTokens($argv, $longOptions);
     if (pmssCliHelpRequested($parsed)) return ['help' => true, 'usage' => pmssAddUserCliUsage()];
 
@@ -102,6 +103,10 @@ function pmssAddUserParseCli(array $argv): array
     $dockerEnabled = pmssUserConfigParseDockerEnabledOption(pmssCliOption($parsed, 'docker-enabled', null, null));
     if ($dockerEnabled !== null) {
         $user['dockerEnabled'] = $dockerEnabled ? 'true' : 'false';
+    }
+    $gpuEnabled = pmssUserConfigParseGpuEnabledOption(pmssCliOption($parsed, 'gpu-enabled', null, null));
+    if ($gpuEnabled !== null) {
+        $user['gpuEnabled'] = $gpuEnabled;
     }
 
     if ($user['password'] === 'rand') {
