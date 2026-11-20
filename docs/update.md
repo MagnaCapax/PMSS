@@ -158,6 +158,12 @@ unlimited values and write ordering remain unchanged. `UserSliceMemswInputSafety
 covers parsing and boundary wiring on the testing machine; devbox checks use
 changed-file PHP syntax validation only.
 
+The target parser independently rejects NUL-containing `MemoryMax` values before
+trimming, retaining its null fallback and the applier's unreadable-limit exit
+before usage reads or writes. This supplements the shared systemd reader's raw
+capture guard; valid decimal bounds, whitespace and `infinity` remain unchanged.
+The same input-safety fixture covers direct parsing and isolated applier refusal.
+
 Shared slice setup keeps host sizing, I/O directives, related drop-ins and live
 limit refresh in separate modules behind `systemdSlicesEnsure.php` (ADR 0192).
 The manager's descriptor and log-namespace files share one ordered publication

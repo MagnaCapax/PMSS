@@ -991,6 +991,13 @@ Sub-handlers:
 
 - pmssCgroupPolicyLoad(?string $configDir=null): array → loads the shipped `cgroup.policy.php` only; a non-array return yields `[]`. No host-local file is read (ADR 0233). Existing consumer validation still applies.
 
+- pmssUserSliceMemswTarget(string $systemdValue): ?int → rejects NUL bytes before
+  trimming, returning the existing null unavailable-target result. Valid positive
+  decimal bounds retain the 18-digit limit and surrounding-whitespace handling;
+  `infinity` remains -1. This guard also applies to direct callers independently
+  of the shared systemd capture validation. `UserSliceMemswInputSafetyTest` covers
+  raw values and applier refusal before usage reads or writes on the testing machine.
+
 - pmssUserSliceMemswAnonPlusSwap(string $memoryStat): int → sums the cgroup v1
   anonymous, shared-memory and swap counters, saturating at `PHP_INT_MAX` before
   addition can overflow. Oversized usage retains ADR 0298's existing refusal to

@@ -22,6 +22,8 @@ const PMSS_USER_SLICE_MEMSW_UNLIMITED = 4611686018427387904;
 /** Systemd's MemoryMax text as a byte limit: -1 for infinity, null when unreadable or zero. */
 function pmssUserSliceMemswTarget(string $systemdValue): ?int
 {
+    // A corrupt direct observation must not become a limit or infinity after trimming.
+    if (strpos($systemdValue, "\0") !== false) return null;
     $value = trim($systemdValue);
     if ($value === 'infinity') {
         return -1;
