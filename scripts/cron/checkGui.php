@@ -7,6 +7,7 @@ pmssRequireRelativeFiles(__DIR__.'/../lib', [
     'logger.php', 'lighttpd/userFileWrite.php', 'user/selection.php',
     'gui/watchdogPaths.php', 'gui/watchdogRepair.php',
     'update/users/filesystem.php', 'update/users/context.php', 'update/users/webRootReconcile.php',
+    'update/users/rootStageDelivery.php',
 ]);
 
 /**

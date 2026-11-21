@@ -89,6 +89,38 @@ PHP
         $this->assertSame([[2, 1], [0, 1], [0, 0], [0, 0]], $result);
     }
 
+    public function testSharedFallbackReturnsAttemptResultsAndCountsDeliveries(): void
+    {
+        $result = $this->runFixture(<<<'PHP'
+$results = [];
+foreach ([[null, true], ['root reserve low', true], ['over quota', true], ['home full', false]] as [$reason, $stageOk]) {
+    $events = []; $logs = [];
+    $ops = [
+        'eligible' => function (...$args) use (&$events, $reason) { $events[] = $args; return $reason; },
+        'deliver' => function ($user, $target, $content, &$failure) use (&$events, $stageOk) {
+            $events[] = [$user, $target, $content]; $failure = 'stage=publish rc=23'; return $stageOk;
+        },
+        'log' => function ($line) use (&$logs) { $logs[] = $line; },
+    ];
+    $ok = pmssUpdateUserRootStageFallback('1001', '/fixture/1001', '/fixture/1001/file', 'panel', $ops);
+    $results[] = [$ok, $events, $logs, pmssUpdateUserRootStageCounts('1001')];
+}
+echo json_encode($results);
+PHP
+        );
+        foreach ($result as $index => [$ok, $events, $logs, $counts]) {
+            $this->assertSame([null, null, true, false][$index], $ok);
+            $this->assertSame(['1001', '/fixture/1001', 5], $events[0]);
+            $this->assertSame($index < 2 ? 1 : 2, count($events));
+            if ($index >= 2) $this->assertSame(['1001', '/fixture/1001/file', 'panel'], $events[1]);
+            $this->assertSame([[0, 0], [0, 0], [1, 0], [0, 1]][$index], $counts);
+        }
+        $this->assertSame([], $result[0][2]);
+        $this->assertSame(['[user:1001] Root-stage delivery of /fixture/1001/file skipped: root reserve low'], $result[1][2]);
+        $this->assertSame(['[user:1001] Delivered /fixture/1001/file through the root stage (over quota)'], $result[2][2]);
+        $this->assertSame(['[user:1001] Root-stage delivery of /fixture/1001/file failed: stage=publish rc=23'], $result[3][2]);
+    }
+
     public function testCopyRoutesOnlyFailedEligibleWritesAndCountsResults(): void
     {
         $root = $this->pmssMakeTrackedHomeRoot('pmss-root-delivery-');

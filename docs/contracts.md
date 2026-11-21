@@ -1658,6 +1658,9 @@ Automation often invokes these utilities; below are expected inputs and effects.
     retaining the existing core-file and directory repairs. Managed panel
     files with content differing from the skeleton are restored, even when
     the existing copy is larger; a missing skeleton leaves a non-empty copy intact.
+    When the account cannot write, a missing, empty, unparseable or truncated core
+    panel file is delivered through the root stage (ADR 0318); a complete file
+    that parses is left alone on that path.
   - Safety: Revalidates user paths and skeleton sources, and replaces repaired
     files atomically so a failed write does not truncate the prior copy; the
     shared reconciler keeps its per-user lock and symlink/path-safety guards.

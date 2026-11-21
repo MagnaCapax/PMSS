@@ -246,20 +246,8 @@ function copyToUserSpace($sourceFile, $targetFile, $user, array $ops = []) {
             ? $ops['accountWrite']((string) $user, $homeDir, $targetFile, $content, 0755, true)
             : pmssReplaceAccountFile((string) $user, $homeDir, $targetFile, $content, 0755, true);
         if ($written) return true;
-        $eligible = $ops['eligible'] ?? 'pmssUpdateUserRootStageEligible';
-        $reason = $eligible((string) $user, $homeDir, strlen($content));
-        if ($reason === 'root reserve low') {
-            $log("[user:{$user}] Root-stage delivery of {$targetFile} skipped: root reserve low");
-        } elseif ($reason !== null) {
-            $deliver = $ops['deliver'] ?? 'pmssUpdateUserRootStageDeliver';
-            $failure = null;
-            $delivered = $deliver((string) $user, $targetFile, $content, $failure);
-            pmssUpdateUserRootStageCounts((string) $user, $delivered);
-            $log($delivered
-                ? "[user:{$user}] Delivered {$targetFile} through the root stage ({$reason})"
-                : "[user:{$user}] Root-stage delivery of {$targetFile} failed: {$failure}");
-            return $delivered;
-        }
+        $delivered = pmssUpdateUserRootStageFallback((string) $user, $homeDir, $targetFile, $content, ['log' => $log] + $ops);
+        if ($delivered !== null) return $delivered;
     }
     $log("[user:{$user}] Failed to copy {$sourceFile} to {$targetFile}");
     return false;

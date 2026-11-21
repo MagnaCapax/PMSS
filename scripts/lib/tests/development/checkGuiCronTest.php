@@ -20,10 +20,25 @@ class CheckGuiCronTest extends TestCase
         $this->pmssAssertRepoFileContainsString('etc/seedbox/config/root.cron', '/scripts/cron/checkGui.php', 'root.cron should schedule checkGui.php');
     }
 
+    public function testRootCronAppendsCheckGuiOutputToItsLog(): void
+    {
+        $cron = $this->pmssReadRepoFile('etc/seedbox/config/root.cron');
+        $lines = array_values(array_filter(explode("\n", $cron), static function (string $line): bool {
+            return strpos($line, '/scripts/cron/checkGui.php') !== false;
+        }));
+        $this->assertSame(['*/10 * * * *   root /scripts/cron/checkGui.php >> /var/log/pmss/checkGui.log 2>&1'], $lines);
+    }
+
     public function testStandaloneWatchdogLoadsRequiredSymbols(): void
     {
         $script = <<<'PHP'
-$requiredSymbols = ['Logger' => 'class', 'pmssSkeletonBase' => 'function', 'runUserStep' => 'function'];
+$requiredSymbols = ['Logger' => 'class', 'pmssSkeletonBase' => 'function', 'runUserStep' => 'function',
+    'pmssUpdateUserRootStageEligible' => 'function', 'pmssCheckGuiRestoreTargetIsDamaged' => 'function',
+    // Everything the real (unstubbed) root-stage fallback calls must be loaded by the cron include alone.
+    'pmssUpdateUserRootStageFallback' => 'function', 'pmssUpdateUserRootStageDeliver' => 'function',
+    'pmssUpdateUserRootStageCounts' => 'function', 'pmssRootStageFileWrite' => 'function',
+    'pmssRootUsableDiskMeasure' => 'function', 'pmssCommandCapture' => 'function', 'pmssCommandPath' => 'function',
+    'pmssQuotaSnapshotParseRepquotaUserRows' => 'function', 'pmssReadRegularFileContentsVerified' => 'function'];
 foreach ($requiredSymbols as $symbol => $type) {
     $loaded = $type === 'class' ? class_exists($symbol, false) : function_exists($symbol);
     if (!$loaded) {
@@ -386,6 +401,157 @@ PHP;
             $this->pmssMakeArrayLogger($messages), $homeDir
         ));
         $this->assertSame($sourceContent, file_get_contents($targetFile));
+    }
+
+    public function testRootStageRestoresPanelPartTruncatedAtBlockBoundary(): void
+    {
+        $content = $this->pmssReadRepoFile('etc/skel/www/scriptsIncAppProcess.php');
+        $this->assertTrue(strlen($content) > 4096);
+        // This account has no ownership to confirm after the simulated publication.
+        $fixture = $this->pmssRootStageRestoreFixture($content, substr($content, 0, 4096), [], 'missing-panel-account');
+        $this->assertTrue($fixture['restored']);
+        $this->assertSame(['accountWrite', 'eligible', 'deliver'], $fixture['events']);
+        $this->assertSame([[$fixture['user'], $fixture['targetFile'], $content]], $fixture['deliveries']);
+        $this->pmssAssertMessagesContain($fixture['messages'], 'through the root stage (over quota)');
+    }
+
+    public function testRootStageRestoresPrefixThatParsesAsInlineHtml(): void
+    {
+        $prefix = "<?php echo 'panel'; ?>\n<div>partial";
+        token_get_all($prefix, TOKEN_PARSE);
+        $fixture = $this->pmssRootStageRestoreFixture($prefix.'</div>', $prefix);
+        $this->assertTrue(\pmssCheckGuiRestoreTargetIsDamaged($fixture['targetFile'], $prefix.'</div>'));
+        $this->assertTrue($fixture['restored']);
+        $this->assertSame(1, count($fixture['deliveries']));
+    }
+
+    public function testRootStageRestoresRealIndexPrefixThatStillParses(): void
+    {
+        $content = $this->pmssReadRepoFile('etc/skel/www/index.php');
+        $this->assertTrue(strlen($content) > 32768);
+        $prefix = substr($content, 0, 32768);
+        token_get_all($prefix, TOKEN_PARSE);
+        $fixture = $this->pmssRootStageRestoreFixture($content, $prefix);
+        $this->assertTrue(\pmssCheckGuiRestoreTargetIsDamaged($fixture['targetFile'], $content));
+        $this->assertTrue($fixture['restored']);
+        $this->assertSame([[$fixture['user'], $fixture['targetFile'], $content]], $fixture['deliveries']);
+    }
+
+    public function testRootStageRestoresMissingAndEmptyPanelFiles(): void
+    {
+        foreach ([null, ''] as $bytes) {
+            $fixture = $this->pmssRootStageRestoreFixture("<?php echo 'panel';\n", $bytes);
+            $this->assertTrue($fixture['restored']);
+            $this->assertSame(['accountWrite', 'eligible', 'deliver'], $fixture['events']);
+            $this->assertSame(1, count($fixture['deliveries']));
+        }
+    }
+
+    public function testRootStageLeavesCompleteNewerPanelFileAlone(): void
+    {
+        $content = "<?php echo 'skeleton panel';\n";
+        $newer = "<?php echo 'newer panel';\n";
+        $fixture = $this->pmssRootStageRestoreFixture($content, $newer);
+        $this->assertFalse($fixture['restored']);
+        $this->assertSame(['accountWrite'], $fixture['events']);
+        $this->assertSame([], $fixture['deliveries']);
+        $this->assertSame($newer, file_get_contents($fixture['targetFile']));
+        $this->pmssAssertMessagesContain($fixture['messages'], 'unable to atomically replace');
+    }
+
+    public function testRootStageDoesNotExamineLargerUnparseableCopy(): void
+    {
+        $content = "<?php echo 'panel';\n";
+        $larger = "<?php function panel() { echo 'incomplete";
+        $fixture = $this->pmssRootStageRestoreFixture($content, $larger);
+        $this->assertFalse(\pmssCheckGuiRestoreTargetIsDamaged($fixture['targetFile'], $content));
+        $this->assertFalse($fixture['restored']);
+        $this->assertSame([], $fixture['deliveries']);
+        $this->assertSame($larger, file_get_contents($fixture['targetFile']));
+    }
+
+    public function testRootStageRestoresUnparseableNonPrefixCopy(): void
+    {
+        $fixture = $this->pmssRootStageRestoreFixture("<?php echo 'complete panel';\n", '<?php broken(');
+        $this->assertTrue($fixture['restored']);
+        $this->assertSame(1, count($fixture['deliveries']));
+    }
+
+    public function testRootStageRefusesSymlinkTargetBeforeAccountWrite(): void
+    {
+        $homeDir = $this->pmssEnsureUserWebHome($this->tempDir, 'dummy');
+        $source = $this->pmssWriteFile($this->tempDir.'/skeleton.php', "<?php echo 'panel';\n");
+        $outside = $this->pmssWriteFile($this->tempDir.'/outside.php', '');
+        $target = $homeDir.'/www/index.php';
+        symlink($outside, $target);
+        $messages = []; $events = [];
+        $this->assertFalse(\pmssCheckGuiRestoreTargetIsDamaged($target, file_get_contents($source)));
+        $this->assertFalse(\pmssCheckGuiRestoreUserFile($target, $source, $this->pmssCurrentOwner(), 'index.php',
+            $this->pmssMakeArrayLogger($messages), $homeDir,
+            $this->pmssMakeCallbacks(['accountWrite' => false, 'eligible' => 'over quota', 'deliver' => true], $events)));
+        $this->assertSame([], $events);
+        $this->assertSame('', file_get_contents($outside));
+        $this->pmssAssertMessagesContain($messages, 'unsafe index.php target');
+    }
+
+    public function testRootStageFailedDeliveryKeepsOldBytesWithoutRetry(): void
+    {
+        $old = '<?php broken(';
+        $fixture = $this->pmssRootStageRestoreFixture("<?php echo 'complete panel';\n", $old, [
+            'deliver' => static function ($user, $target, $content, &$failure): bool {
+                $failure = 'stage=publish rc=23';
+                return false;
+            },
+        ]);
+        $this->assertFalse($fixture['restored']);
+        $this->assertSame(['accountWrite', 'eligible', 'deliver'], $fixture['events']);
+        $this->assertSame($old, file_get_contents($fixture['targetFile']));
+        $this->pmssAssertMessagesContain($fixture['messages'], 'failed: stage=publish rc=23');
+        $this->pmssAssertMessagesContain($fixture['messages'], 'unable to atomically replace');
+    }
+
+    public function testRootStageSkipsLowReserveAndIneligibleAccounts(): void
+    {
+        foreach (['root reserve low', null] as $reason) {
+            $fixture = $this->pmssRootStageRestoreFixture("<?php echo 'panel';\n", '',
+                $this->pmssMakeCallbacks(['eligible' => $reason]));
+            $this->assertFalse($fixture['restored']);
+            $this->assertSame([], $fixture['deliveries']);
+            if ($reason !== null) $this->pmssAssertMessagesContain($fixture['messages'], 'skipped: root reserve low');
+            $this->pmssAssertMessagesContain($fixture['messages'], 'unable to atomically replace');
+        }
+    }
+
+    public function testSuccessfulAccountWriteDoesNotReachRootStageEligibility(): void
+    {
+        $fixture = $this->pmssRootStageRestoreFixture("<?php echo 'panel';\n", '<?php broken(', [
+            'accountWrite' => static function (): bool { return true; },
+            'eligible' => static function () { throw new \RuntimeException('Unexpected eligibility check'); },
+        ]);
+        $this->assertTrue($fixture['restored']);
+        $this->assertSame([], $fixture['deliveries']);
+    }
+
+    /** Simulate writer outcomes; never run quota observations or root publication. */
+    private function pmssRootStageRestoreFixture(string $content, ?string $old, array $ops = [], string $user = ''): array
+    {
+        $homeDir = $this->pmssEnsureUserWebHome($this->pmssMakeTempDir('pmss-check-gui-stage-'), 'dummy');
+        $sourceFile = $this->pmssWriteFile($homeDir.'/skeleton.php', $content);
+        $targetFile = $homeDir.'/www/scriptsInc.php';
+        if ($old !== null) $this->pmssWriteFile($targetFile, $old);
+        $user = $user === '' ? $this->pmssCurrentOwner() : $user;
+        $messages = []; $events = []; $deliveries = [];
+        $ops += $this->pmssMakeCallbacks(['accountWrite' => false, 'eligible' => 'over quota'], $events);
+        $deliver = $ops['deliver'] ?? static function (): bool { return true; };
+        $ops['deliver'] = static function ($user, $target, $bytes, &$failure) use ($deliver, &$events, &$deliveries): bool {
+            $events[] = 'deliver';
+            $deliveries[] = [$user, $target, $bytes];
+            return $deliver($user, $target, $bytes, $failure);
+        };
+        $restored = \pmssCheckGuiRestoreUserFile($targetFile, $sourceFile, $user, 'scriptsInc.php',
+            $this->pmssMakeArrayLogger($messages), $homeDir, $ops);
+        \pmssUpdateUserRootStageCounts($user);
+        return compact('restored', 'targetFile', 'user', 'messages', 'events', 'deliveries');
     }
 
     public function testRestoreMissingCatalogMakesDeliveredAppProcessUsable(): void

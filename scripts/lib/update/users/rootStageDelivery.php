@@ -7,6 +7,31 @@ require_once dirname(__DIR__).'/diskSpace.php';
 require_once dirname(__DIR__, 2).'/runtime/environment.php';
 
 /**
+ * Try root-stage delivery after an account write fails; null means no attempt.
+ * @param array<string,callable> $ops Optional eligible, deliver and log seams.
+ */
+function pmssUpdateUserRootStageFallback(string $user, string $home, string $target, string $content, array $ops = []): ?bool
+{
+    $log = $ops['log'] ?? (function_exists('logMessage') ? 'logMessage' : 'error_log');
+    $eligible = $ops['eligible'] ?? 'pmssUpdateUserRootStageEligible';
+    $reason = $eligible($user, $home, strlen($content));
+    if ($reason === 'root reserve low') {
+        $log("[user:{$user}] Root-stage delivery of {$target} skipped: root reserve low");
+        return null;
+    }
+    if ($reason === null) return null;
+
+    $deliver = $ops['deliver'] ?? 'pmssUpdateUserRootStageDeliver';
+    $failure = null;
+    $delivered = $deliver($user, $target, $content, $failure);
+    pmssUpdateUserRootStageCounts($user, $delivered);
+    $log($delivered
+        ? "[user:{$user}] Delivered {$target} through the root stage ({$reason})"
+        : "[user:{$user}] Root-stage delivery of {$target} failed: {$failure}");
+    return $delivered;
+}
+
+/**
  * Return a root-measured delivery reason, null, or the non-deliverable 'root reserve low'.
  * Operations accept the measured path; repquota returns stdout lines or null.
  * Failed quota observations are cached too: never rerun repquota for each file.

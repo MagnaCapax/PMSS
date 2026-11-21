@@ -35,9 +35,35 @@ function pmssCheckGuiEnsureUserDirectory(string $directory, string $user, string
 }
 
 /**
- * Restore a managed user panel file when it is missing or differs from the skeleton.
+ * Identify damaged panel copies without writes or examining more than the skeleton size.
+ * A truncation of a newer served version is not detected when the host skeleton is
+ * behind; a copy larger than the skeleton is not examined.
  */
-function pmssCheckGuiRestoreUserFile(string $targetFile, string $sourceFile, string $user, string $label, callable $log, string $homeDir = ''): bool
+function pmssCheckGuiRestoreTargetIsDamaged(string $targetFile, string $skeletonBytes): bool
+{
+    clearstatcache(true, $targetFile);
+    if (!file_exists($targetFile) && !is_link($targetFile)) return true;
+    $bytes = pmssReadRegularFileContentsVerified($targetFile, null, strlen($skeletonBytes));
+    if ($bytes === null) return false;
+    if ($bytes === '') return true;
+    if (!function_exists('token_get_all') || !defined('TOKEN_PARSE')) return false;
+    try {
+        token_get_all($bytes, TOKEN_PARSE);
+    } catch (\ParseError $error) {
+        return true;
+    } catch (\Throwable $error) {
+        return false;
+    }
+    // Inline HTML can still parse after truncation; require an exact shorter prefix.
+    return strlen($bytes) < strlen($skeletonBytes)
+        && strncmp($bytes, $skeletonBytes, strlen($bytes)) === 0;
+}
+
+/**
+ * Restore a managed user panel file when it is missing or differs from the skeleton.
+ * @param array<string,callable> $ops Optional accountWrite, eligible and deliver seams.
+ */
+function pmssCheckGuiRestoreUserFile(string $targetFile, string $sourceFile, string $user, string $label, callable $log, string $homeDir = '', array $ops = []): bool
 {
     $homeDir = $homeDir === '' ? dirname(dirname($targetFile)) : rtrim($homeDir, '/');
     if (!pmssCheckGuiUserPathIsSafe($targetFile, $homeDir, false)) {
@@ -84,7 +110,15 @@ function pmssCheckGuiRestoreUserFile(string $targetFile, string $sourceFile, str
     $log("Restoring {$label} for user {$user}");
     $existing = @lstat($targetFile);
     $mode = is_array($existing) ? ((int) $existing['mode'] & 0777) : 0644;
-    if (!pmssReplaceAccountFile($user, $homeDir, $targetFile, $content, $mode, true)) {
+    $written = isset($ops['accountWrite'])
+        ? $ops['accountWrite']($user, $homeDir, $targetFile, $content, $mode, true)
+        : pmssReplaceAccountFile($user, $homeDir, $targetFile, $content, $mode, true);
+    if (!$written) {
+        // A divergent copy may be newer than this host's skeleton (ADR 0318).
+        if (pmssCheckGuiRestoreTargetIsDamaged($targetFile, $content)
+            && pmssUpdateUserRootStageFallback($user, $homeDir, $targetFile, $content, ['log' => $log] + $ops) === true) {
+            return true;
+        }
         $log("Skipping {$user}: unable to atomically replace {$label} at {$targetFile}");
         return false;
     }
