@@ -69,6 +69,8 @@ function pmssUserSliceMemswPlan(int $target, int $memory, int $memsw, int $anonP
 /** Anonymous memory, shared memory and swap held under the slice, from its memory.stat text. */
 function pmssUserSliceMemswAnonPlusSwap(string $memoryStat): int
 {
+    // A corrupt row must not disappear as zero usage and authorize reclaiming writes.
+    if (strpos($memoryStat, "\0") !== false) return PHP_INT_MAX;
     $sum = 0;
     foreach (['total_rss', 'total_shmem', 'total_swap'] as $key) {
         $value = preg_match('/^'.$key.' ([0-9]+)$/m', $memoryStat, $m) === 1 ? (int) $m[1] : 0;

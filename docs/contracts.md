@@ -1011,6 +1011,11 @@ Sub-handlers:
   addition can overflow. Oversized usage retains ADR 0298's existing refusal to
   lower memsw below usage; representable sums, missing-field defaults, diagnostics
   and write ordering remain unchanged. `UserSliceMemswTest` covers the boundaries.
+  NUL-containing observations use the same saturation value before row matching,
+  so corrupt counters cannot disappear as missing fields and authorize lowering.
+  Raising, infinity rollback and already-converged limits retain their existing
+  plans. `UserSliceMemswUsageInputSafetyTest` covers parsing and isolated cron
+  refusal, including dry runs, on the testing machine.
 
 - pmssUserSliceMemswWrite(string $file, string $value): bool → after a thrown
   reap, terminates and reaps the child only while its handle remains open, using

@@ -164,6 +164,12 @@ before usage reads or writes. This supplements the shared systemd reader's raw
 capture guard; valid decimal bounds, whitespace and `infinity` remain unchanged.
 The same input-safety fixture covers direct parsing and isolated applier refusal.
 
+NUL-containing `memory.stat` usage observations saturate at `PHP_INT_MAX`, reusing
+the existing refusal to lower memsw below observed usage. Valid usage and
+missing-field defaults retain their current interpretation; raising and infinity
+rollback remain available (ADR 0298). `UserSliceMemswUsageInputSafetyTest` isolates
+all host I/O while checking the cron's live and dry-run refusal paths.
+
 Shared slice setup keeps host sizing, I/O directives, related drop-ins and live
 limit refresh in separate modules behind `systemdSlicesEnsure.php` (ADR 0192).
 The manager's descriptor and log-namespace files share one ordered publication
