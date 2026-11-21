@@ -72,17 +72,25 @@ function pmssUserMigrateWebRootPath(
         return;
     }
 
-    $after = pmssUserWebRootMigrationSnapshot($target, true);
-    $verified = $after !== null && $before === $after;
-    if ($verified && !pmssPathExistsOrLink($source) && pmssUserWebRootMigrationRun($user, $home, [$source],
-        'ln -sT -- '.escapeshellarg($linkTarget).' '.escapeshellarg($source))) {
+    $linked = false;
+    try {
+        $after = pmssUserWebRootMigrationSnapshot($target, true);
+        $verified = $after !== null && $before === $after;
+        $linked = $verified && !pmssPathExistsOrLink($source) && pmssUserWebRootMigrationRun($user, $home, [$source],
+            'ln -sT -- '.escapeshellarg($linkTarget).' '.escapeshellarg($source));
+    } finally {
+        // A moved tree needs rollback even when verification or linking throws.
+        // Concurrent source entries still win; account and inode guards stay in the mover.
+        if (!$linked) {
+            $restored = !pmssPathExistsOrLink($source)
+                && pmssUserWebRootMigrationRenameAsAccount($user, $home, $target, $source);
+        }
+    }
+    if ($linked) {
         pmssUserWebRootMigrationLog($user, $logger, 'Migrated '.$sourceRelative.' to durable storage');
         return;
     }
 
-    // Verification and link refusals share rollback; concurrent entries still win.
-    $restored = !pmssPathExistsOrLink($source)
-        && pmssUserWebRootMigrationRenameAsAccount($user, $home, $target, $source);
     pmssUserWebRootMigrationLog($user, $logger, $verified
         ? ($restored
             ? 'Unable to link '.$sourceRelative.'; restored original path'

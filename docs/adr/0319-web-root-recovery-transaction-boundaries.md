@@ -68,6 +68,28 @@ throwables. No credential is introduced, read or stored by this refactor;
 primary/service credential separation, payload-free logs, modes, listeners and
 customer-tree delivery stay unchanged.
 
+## Durable-move rollback safety follow-up
+
+After a successful durable move, verification and symlink creation now share
+the existing rollback in `finally`. Exceptions and errors attempt restoration
+before propagating. An occupied source still prevents rollback, including when
+link creation succeeds before its caller throws. Successful linking ends rollback
+ownership before result logging. Ordinary probe order, diagnostics and return
+behavior stay unchanged; cleanup faults retain PHP's `finally` precedence.
+
+`WebRootMigrationRollbackSafetyTest` intercepts all filesystem and account
+operations to cover pre-move faults, verification/link faults, concurrent source
+entries, failed/thrown rollback, and logger faults with both throwable families.
+The existing flow characterization retains normal trace coverage. Execution
+belongs on the testing machine; devbox validation is changed-file PHP syntax only.
+No live migration or dry run was executed on the devbox.
+
+The security review above also applies to rollback: the account runner and
+existing parent, symlink and inode checks remain the mutation boundary. A
+substituted path could otherwise affect account data, so recovery never bypasses
+those checks. No primary or service credential is handled; logging remains
+payload-free, and secret permissions, listeners and web exposure are unchanged.
+
 ## References
 - [Web-root convergence](0041-user-web-root-managed-vs-customer-owned-boundary-and-recovery-convergence.md)
 - [Inspection boundaries and cleanup contracts](0172-web-root-inspection-boundaries.md)
