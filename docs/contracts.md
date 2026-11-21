@@ -434,6 +434,14 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ## Logging & JSON Events
 
+- `pmssLogStreamIsFile()` rejects empty or NUL-containing destination paths
+  before metadata probes. It requires non-null device and inode fields in both
+  observations before identifying the console stream with the log file, so an
+  incomplete snapshot cannot suppress console mirroring. Valid observations
+  retain strict comparison, the zero-inode refusal and existing deduplication.
+  `LogStdoutDuplicateTest` covers these boundaries with isolated metadata probes;
+  execution remains on testing machines.
+
 - Storage-health device parsers share ordered metric matching and threshold
   evaluation. SMART processes each line in order, including overlapping matches;
   NVMe searches the complete output once per field. Thresholds select one flag

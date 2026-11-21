@@ -108,9 +108,13 @@ function pmssLogWriteMessage(string $primary, string $fallback, string $message,
 /** True when the named standard stream is open on the file at $path (same device and inode). */
 function pmssLogStreamIsFile(string $stream, string $path): bool
 {
+    // Unusable destinations cannot establish an identity or reach PHP's stat boundary.
+    if ($path === '' || pmssFilesystemPathHasNulByte($path)) return false;
     // Closed standard streams and non-stream constants cannot supply inode metadata.
     if (!defined($stream) || !pmssStreamHandleIsOpen($handle = constant($stream))) return false;
     $open = @fstat($handle);
     $file = @stat($path);
-    return is_array($open) && is_array($file) && $file['ino'] !== 0 && pmssFilesystemStatSameInode($open, $file);
+    // Missing fields must never compare equal and suppress the only console copy.
+    return is_array($open) && is_array($file) && isset($open['dev'], $open['ino'], $file['dev'], $file['ino'])
+        && $file['ino'] !== 0 && pmssFilesystemStatSameInode($open, $file);
 }
