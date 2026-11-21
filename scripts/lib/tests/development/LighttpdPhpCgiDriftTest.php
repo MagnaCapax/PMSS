@@ -11,10 +11,7 @@ class LighttpdPhpCgiDriftTest extends TestCase
 {
     private $runtime;
 
-    protected function setUp(): void
-    {
-        $this->pmssAssignTempDirProperty('runtime', 'pmss-phpcgi-drift-', 0700);
-    }
+    protected function pmssTempDirFixtureArguments(): array { return ['runtime', 'pmss-phpcgi-drift-', 0700]; }
 
     /** Fake /proc: links per path, owner per /proc/<pid> path. */
     private function exeDeleted(array $links, array $owners, int $pid = 4242, int $uid = 1008): bool

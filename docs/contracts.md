@@ -2379,6 +2379,8 @@ second include. Selection, substitutions and strict mode stay with callers.
   at their callers.
   Standalone catalog payloads use `pmssWriteTempFile()` without a directory-only
   fixture root; related-file fixtures retain their directory and filename layout.
+- Single-root fixtures declare `pmssTempDirFixtureArguments()` for inherited setup;
+  custom `setUp()` methods call `parent::setUp()` before using that directory.
 - Test environment scopes use `TestCase::pmssWithEnv()` and
   `pmssWithPathPrefixedEnv()` for override/restoration lifetimes. Use
   `pmssWithTrackedEnv()` when the callback changes additional keys. These helpers

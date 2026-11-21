@@ -8,9 +8,11 @@ class SupportConfigRelayHostSafetyTest extends TestCase
 {
     private $configDir;
 
+    protected function pmssTempDirFixtureArguments(): array { return ['configDir', 'pmss-support-config-']; }
+
     protected function setUp(): void
     {
-        $this->pmssAssignTempDirProperty('configDir', 'pmss-support-config-');
+        parent::setUp();
         $this->pmssTrackEnvOverrides([
             'PMSS_CONFIG_DIR' => $this->configDir,
             'PMSS_SUPPORT_CONFIG_PATH' => null,

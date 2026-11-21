@@ -6,10 +6,7 @@ require_once dirname(__DIR__, 2).'/rtorrent/watchdog.php';
 
 class rtorrentWatchdogDecisionTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        $this->pmssAssignTempDirProperty('tempDir', 'pmss-rtorrent-watchdog-');
-    }
+    protected function pmssTempDirFixtureArguments(): array { return ['tempDir', 'pmss-rtorrent-watchdog-']; }
 
     public function testCronLogHonorsForceAndDebugFlags(): void
     {

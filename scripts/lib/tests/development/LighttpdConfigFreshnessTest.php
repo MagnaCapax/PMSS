@@ -8,9 +8,11 @@ class LighttpdConfigFreshnessTest extends TestCase
 {
     private $home;
 
+    protected function pmssTempDirFixtureArguments(): array { return ['home', 'pmss-lighttpd-freshness-', 0700]; }
+
     protected function setUp(): void
     {
-        $this->pmssAssignTempDirProperty('home', 'pmss-lighttpd-freshness-', 0700);
+        parent::setUp();
         $this->pmssEnsureDir($this->home.'/.lighttpd/custom.d');
     }
 

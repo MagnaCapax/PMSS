@@ -9,10 +9,7 @@ class PortManagerStoredPortValidationTest extends TestCase
     /** @var string */
     private $portDir;
 
-    public function setUp(): void
-    {
-        $this->portDir = $this->pmssMakeTempDir('pmss-port-manager-');
-    }
+    protected function pmssTempDirFixtureArguments(): array { return ['portDir', 'pmss-port-manager-']; }
 
     private function assignmentPath(?string $payload = null): string
     {
