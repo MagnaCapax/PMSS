@@ -7,7 +7,7 @@ class UpdateBootstrapShimTest extends TestCase
 {
     public function testEntryPointSetsItsOwnUmaskBeforeRunning(): void
     {
-        $source = (string) file_get_contents(dirname(__DIR__, 3).'/update.php');
+        $source = $this->pmssReadRepoFile('scripts/update.php');
         $entry = strrpos($source, 'bootstrapMain($argv);');
         $this->assertTrue($entry !== false, 'update.php should call bootstrapMain');
         $umask = strrpos(substr($source, 0, (int) $entry), 'umask(0022);');

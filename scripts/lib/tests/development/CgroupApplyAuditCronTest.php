@@ -62,13 +62,12 @@ register_shutdown_function(static function () {
 });
 PHP;
         // The real writer lives in the library; run it in this namespace so its I/O stays in the fixture.
-        $library = file_get_contents($this->pmssRepoPath('scripts/lib/cgroup/directApply.php'));
+        $library = $this->pmssReadRepoFile('scripts/lib/cgroup/directApply.php');
         $script .= 'eval('.var_export('namespace CgroupAuditCronFixture;'.substr($library, (int) strpos($library, 'function pmssIopsWriteThrottle')), true).');';
-        $path = $this->pmssRepoPath('scripts/cron/'.$cron.'.php');
-        $source = file_get_contents($path);
+        $source = $this->pmssReadRepoFile('scripts/cron/'.$cron.'.php');
         // Preserve the cron body and exit paths; eval needs the file prologue removed.
         $source = substr($source, strpos($source, '<?php') + 5);
-        $source = str_replace(['declare(strict_types=1);', '__DIR__'], ['', var_export(dirname($path), true)], $source);
+        $source = str_replace(['declare(strict_types=1);', '__DIR__'], ['', var_export($this->pmssRepoPath('scripts/cron'), true)], $source);
         $script .= 'eval('.var_export('namespace CgroupAuditCronFixture;'.$source, true).');';
         $result = $this->pmssExecInlinePhp($script, ['PMSS_TEST_AUDIT_MODE' => $mode,
             'PMSS_TEST_AUDIT_ARGS' => json_encode($args), 'PMSS_DRY_RUN' => '0'], '2>/dev/null');

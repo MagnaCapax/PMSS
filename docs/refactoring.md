@@ -861,6 +861,8 @@ fragment bytes and ordering diagnostics remain at their callers.
 Ioping, dist-upgrade, watchdog locks, Pikkumies documentation and customer helper
 inventory checks use the same readers, preserving file-type guards, section
 boundaries, substring counts and diagnostic messages.
+Bootstrap, cron-audit, rotation and moved-state source fixtures reuse the checked
+repository reader; prologue stripping, section parsing and child execution stay local.
 First-occurrence ordering checks use `assertOrderedStrings()` or
 `pmssAssertRepoFileContainsOrderedStrings()` instead of local position variables.
 Keep offset searches and last-occurrence checks explicit; they have different semantics.

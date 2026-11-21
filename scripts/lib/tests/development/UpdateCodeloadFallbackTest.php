@@ -36,8 +36,7 @@ class UpdateCodeloadFallbackTest extends TestCase
             }
 
             // Load the real bootstrap with logs redirected inside the fixture.
-            $source = file_get_contents($this->pmssRepoPath('scripts/update.php'));
-            $source = preg_replace('/^#![^\n]*\n/', '', $source);
+            $source = preg_replace('/^#![^\n]*\n/', '', $this->pmssReadRepoFile('scripts/update.php'));
             $source = str_replace("const JSON_LOG              = '/var/log/pmss-update.jsonl';",
                 'const JSON_LOG = '.var_export($root.'/events.jsonl', true).';', $source);
             $this->pmssWriteFile($root.'/bootstrap.php', $source);
