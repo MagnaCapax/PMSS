@@ -62,9 +62,7 @@ class ResourceLogWriteFallbackTest extends TestCase
                 'blkio.bfq.io_serviced_recursive' => "8:0 Read 90\n8:0 Write {$ops}\n",
             ]);
             $sample = \pmssResourceLogReadCountersV1(1000, $root);
-            $this->assertSame('bfq', $sample['io_source']);
-            $this->assertSame($bytes, $sample['io_write']);
-            $this->assertSame($ops, $sample['io_write_ops']);
+            $this->pmssAssertArraySubsetSame(['io_source' => 'bfq', 'io_write' => $bytes, 'io_write_ops' => $ops], $sample);
         }
     }
 
@@ -86,23 +84,18 @@ class ResourceLogWriteFallbackTest extends TestCase
             'blkio.throttle.io_serviced' => "9:0 Write 9000\n",
         ]);
         $sample = \pmssResourceLogReadCountersV1(1000, $root);
-        $this->assertSame(10000, $sample['io_write']);
-        $this->assertSame(100, $sample['io_write_ops']);
-        $this->assertSame(9000, $sample['io_read']);
+        $this->pmssAssertArraySubsetSame(['io_write' => 10000, 'io_write_ops' => 100, 'io_read' => 9000], $sample);
     }
 
     public function testZeroThrottleBytesKeepBfqAndZeroThrottleOpsRemainValid(): void
     {
         $root = $this->root(['blkio.throttle.io_service_bytes_recursive' => "9:0 Read 123\n9:0 Write 0\n"]);
         $sample = \pmssResourceLogReadCountersV1(1000, $root);
-        $this->assertSame('bfq', $sample['io_source']);
-        $this->assertSame(0, $sample['io_write']);
+        $this->pmssAssertArraySubsetSame(['io_source' => 'bfq', 'io_write' => 0], $sample);
         // A valid zero operation count is different from an unreadable operations file.
         $root = $this->root(['blkio.throttle.io_serviced_recursive' => "9:0 Read 456\n9:0 Write 0\n"]);
         $sample = \pmssResourceLogReadCountersV1(1000, $root);
-        $this->assertSame('bfq-read-throttle-write', $sample['io_source']);
-        $this->assertSame(8000, $sample['io_write']);
-        $this->assertSame(0, $sample['io_write_ops']);
+        $this->pmssAssertArraySubsetSame(['io_source' => 'bfq-read-throttle-write', 'io_write' => 8000, 'io_write_ops' => 0], $sample);
     }
 
     public function testSourceTransitionsReseedAndStableFallbackBooksOnlyGrowth(): void

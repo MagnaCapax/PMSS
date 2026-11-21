@@ -27,9 +27,8 @@ final class TorrentClientsEnhancedEditionTest extends TestCase
             'sha256' => '4b291578e28663c7d1c88bf41993a832c0eb68b3f9bd345716524c3f37d0565a', 'kind' => 'static',
             'compatFamily' => 'lt1.2',
             'note' => 'Community build of 5.2.4. Its authors ask that it not be used on private trackers.',
+            'disabled' => false, 'isDefault' => false,
         ], $entry);
-        $this->assertFalse($entry['disabled']);
-        $this->assertFalse($entry['isDefault']);
     }
 
     public function testLabelKeepsThePrivateTrackerWarning(): void

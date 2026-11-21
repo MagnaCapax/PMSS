@@ -21,8 +21,7 @@ final class AddUserFailedProvisionRecoveryTest extends TestCase
         $this->pmssWithEnv(array('PMSS_ADDUSER_LOG_PATH' => $logPath), function (): void {
             $summary = pmssAddUserLatestProvisionSummary('fixtur01');
             $this->assertTrue(is_array($summary), 'Expected latest addUser summary for fixtur01');
-            $this->assertSame('FAIL', $summary['status']);
-            $this->assertSame('password_failed', $summary['message']);
+            $this->pmssAssertArraySubsetSame(['status' => 'FAIL', 'message' => 'password_failed'], $summary);
             $this->assertTrue((int) $summary['timestamp'] > 0, 'Expected parsed summary timestamp');
         });
     }

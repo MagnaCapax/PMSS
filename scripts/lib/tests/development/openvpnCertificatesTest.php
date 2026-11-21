@@ -10,9 +10,7 @@ class OpenvpnCertificatesTest extends TestCase
     {
         $plan = \pmssOpenvpnServerCertificateRenewalPlan($this->pmssMakeTempPath('pmss-openvpn-missing-'));
 
-        $this->assertFalse($plan['renew']);
-        $this->assertSame('missing', $plan['reason']);
-        $this->assertSame(null, $plan['not_after']);
+        $this->pmssAssertArraySubsetSame(['renew' => false, 'reason' => 'missing', 'not_after' => null], $plan);
     }
 
     public function testInvalidCertificateDoesNotRequestRenewal(): void
@@ -20,8 +18,7 @@ class OpenvpnCertificatesTest extends TestCase
         $path = $this->pmssWriteFile($this->pmssMakeTempPath('pmss-openvpn-invalid-', '.crt'), "not a certificate\n");
         $plan = \pmssOpenvpnServerCertificateRenewalPlan($path);
 
-        $this->assertFalse($plan['renew']);
-        $this->assertSame('invalid', $plan['reason']);
+        $this->pmssAssertArraySubsetSame(['renew' => false, 'reason' => 'invalid'], $plan);
     }
 
     public function testValidCertificateOutsideWindowKeepsFastPathEligible(): void
@@ -31,8 +28,7 @@ class OpenvpnCertificatesTest extends TestCase
         $this->assertTrue(is_int($notAfter), 'fixture certificate must expose notAfter');
 
         $plan = \pmssOpenvpnServerCertificateRenewalPlan($path, $notAfter - 90000, 86400);
-        $this->assertFalse($plan['renew']);
-        $this->assertSame('valid', $plan['reason']);
+        $this->pmssAssertArraySubsetSame(['renew' => false, 'reason' => 'valid'], $plan);
     }
 
     public function testCertificateInsideWindowRequestsRenewal(): void
@@ -42,8 +38,7 @@ class OpenvpnCertificatesTest extends TestCase
         $this->assertTrue(is_int($notAfter), 'fixture certificate must expose notAfter');
 
         $plan = \pmssOpenvpnServerCertificateRenewalPlan($path, $notAfter - 3600, 86400);
-        $this->assertTrue($plan['renew']);
-        $this->assertSame('expiring', $plan['reason']);
+        $this->pmssAssertArraySubsetSame(['renew' => true, 'reason' => 'expiring'], $plan);
     }
 
     public function testExpiredCertificateRequestsRenewal(): void
@@ -53,8 +48,7 @@ class OpenvpnCertificatesTest extends TestCase
         $this->assertTrue(is_int($notAfter), 'fixture certificate must expose notAfter');
 
         $plan = \pmssOpenvpnServerCertificateRenewalPlan($path, $notAfter + 1, 86400);
-        $this->assertTrue($plan['renew']);
-        $this->assertSame('expired', $plan['reason']);
+        $this->pmssAssertArraySubsetSame(['renew' => true, 'reason' => 'expired'], $plan);
     }
 
     public function testRenewalCommandsStayScopedToEasyRsaPki(): void

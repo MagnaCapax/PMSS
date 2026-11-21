@@ -44,10 +44,8 @@ final class TorrentClientsCuratedDelugeTest extends TestCase
             foreach ($entry['wheels'] as $wheel) {
                 $this->assertMatches('/\A[a-f0-9]{64}\z/', $wheel['sha256']);
             }
-            $this->assertSame('bookworm-cp311', $entry['compatWindow']);
-            $this->assertFalse($entry['isDefault']);
-            $this->assertFalse($entry['disabled']);
-            $this->pmssAssertArraySubsetSame(['url' => [], 'sha256' => ''], $entry);
+            $this->pmssAssertArraySubsetSame(['compatWindow' => 'bookworm-cp311', 'isDefault' => false,
+                'disabled' => false, 'url' => [], 'sha256' => ''], $entry);
         }
     }
 
