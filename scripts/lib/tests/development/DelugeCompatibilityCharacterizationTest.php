@@ -150,13 +150,9 @@ class DelugeCompatibilityCharacterizationTest extends DelugeAppTestCase
         $root = $this->tempDir.'/store';
         $this->pmssWithEnv(['PMSS_TORRENT_CLIENTS_STORE_ROOT' => $root], function () use ($root): void {
             self::$results = [true, false, true, false];
-            ob_start();
-            try {
+            [, $output] = $this->pmssCaptureStdout(function (): void {
                 \PmssDelugeCompatibilityFixture\pmssDelugePatchAll(true, $this->logger);
-                $output = (string) ob_get_contents();
-            } finally {
-                ob_end_clean();
-            }
+            });
             $expected = [];
             foreach (['core/core.py', 'log.py', 'i18n/util.py', 'ui/web/server.py'] as $index => $file) {
                 $patterns = ['/usr/lib/python3/dist-packages/deluge/'.$file,

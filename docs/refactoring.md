@@ -809,6 +809,11 @@ callers retain file guards, schema checks, and missing/malformed-data fallbacks.
 
 ## Helper Extraction Rules
 
+In-process stdout fixtures use `TestCase::pmssCaptureStdout()` for buffer setup,
+capture and exceptional cleanup. Deluge patch catalogs, boot relaunch passes,
+Pikkumies pages/status and RAID tables retain their calls and assertions at the
+scenarios; isolated child scripts keep their self-contained capture lifetimes.
+
 Warning-free input fixtures share `pmssAssertNoPhpWarnings()` for PHP error-handler
 installation, capture and restoration. Keep malformed inputs and expected values
 at the callers. Every captured warning fails the shared empty-capture assertion;

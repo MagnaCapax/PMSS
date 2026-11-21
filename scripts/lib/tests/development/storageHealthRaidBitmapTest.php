@@ -115,12 +115,9 @@ final class StorageHealthRaidBitmapTest extends TestCase
     public function testOperatorTableExplainsTheRecoveryRisk(): void
     {
         $entry = \pmssStorageHealthRaidBitmapApply(['array' => 'md1', 'flags' => []], false);
-        ob_start();
-        try {
+        [, $output] = $this->pmssCaptureStdout(static function () use ($entry): void {
             \pmssStorageHealthPrintTable([], [$entry], 'fixture', '/fixture/snapshot.jsonl');
-            $this->assertStringContainsString($entry['message'], ob_get_contents());
-        } finally {
-            ob_end_clean();
-        }
+        });
+        $this->assertStringContainsString($entry['message'], $output);
     }
 }

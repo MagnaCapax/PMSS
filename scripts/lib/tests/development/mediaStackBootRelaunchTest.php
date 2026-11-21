@@ -34,12 +34,9 @@ class MediaStackBootRelaunchTest extends TestCase
     private function pmssPass(string $homeRoot, string $bootId, float $uptime, array &$launches, int $now = self::NOW): array
     {
         $boot = array('bootId' => $bootId, 'uptime' => $uptime, 'now' => $now, 'launcher' => $this->pmssMakeArrayLogger($launches));
-        ob_start();
-        try {
-            $status = \pmssMediaStackWatchdogRunUser('fixtur01', $homeRoot, self::pmssMakeCallbacks(['probe' => false])['probe'], $boot);
-        } finally {
-            ob_end_clean();
-        }
+        [$status] = $this->pmssCaptureStdout(static function () use ($homeRoot, $boot) {
+            return \pmssMediaStackWatchdogRunUser('fixtur01', $homeRoot, self::pmssMakeCallbacks(['probe' => false])['probe'], $boot);
+        });
         return is_array($status) ? $status : array();
     }
 
