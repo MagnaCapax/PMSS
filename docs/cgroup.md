@@ -226,6 +226,12 @@ writes continue to audit independently.
 Per-account metrics retain v1 counters and optionally read numeric some/full
 I/O PSI avg300/totals from a UID-built hybrid unified path when present. This
 does not add v2 enforcement or change billing. Missing interfaces omit keys.
+Shared cgroup-v1 blkio and key/value counter readers skip NUL-containing rows
+before trimming, retaining valid neighboring rows and later valid duplicates.
+Zero counters, sentinel/overflow rejection, first numeric field precedence and
+BFQ/throttle source selection remain unchanged for valid input.
+`ResourceV1CounterInputSafetyTest` covers raw counter boundaries and both
+collector projections with private fixtures; execution belongs on the testing VM.
 Host iostat adds CPU and kernel contention observations after the legacy `time`
 key, and never contains per-account rows.
 

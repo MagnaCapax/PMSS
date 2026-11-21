@@ -26,8 +26,10 @@ function pmssResourceLogReadSysfsCounter(string $path): ?int
 function pmssResourceLogReadBlkioReadWrite(string $path): ?array
 {
     $totals = null;
-    foreach (pmssConfigTextLines(pmssReadRegularFileContents($path) ?? '', []) as $line) {
-        if (preg_match('/^\S+\s+(Read|Write)\s+([0-9]+)$/', $line, $m) !== 1) continue;
+    foreach (pmssTextLines(pmssReadRegularFileContents($path) ?? '') as $line) {
+        // Reject corrupt rows before trim() can turn edge NULs into valid counters.
+        if (pmssFilesystemPathHasNulByte($line)
+            || preg_match('/^\S+\s+(Read|Write)\s+([0-9]+)$/', trim($line), $m) !== 1) continue;
         $value = pmssUnsignedDecimalIntParse($m[2]);
         if ($value === null || $value >= PMSS_RESOURCE_COUNTER_SENTINEL) continue;
         $direction = $m[1] === 'Read' ? 'read' : 'write';
@@ -68,7 +70,10 @@ function pmssResourceLogReadBlkioBytesWithSource(string $blkioSliceDir, string $
 function pmssResourceLogReadMemoryStatFields(string $path, array $fields): array
 {
     $wanted = array_fill_keys($fields, true); $values = [];
-    foreach (pmssConfigTextRows(pmssReadRegularFileContents($path) ?? '', 2, [], 2) as [$name, $value]) {
+    foreach (pmssTextLines(pmssReadRegularFileContents($path) ?? '') as $line) {
+        // Keep malformed rows from claiming a field ahead of a later valid duplicate.
+        if (pmssFilesystemPathHasNulByte($line) || ($columns = pmssConfigLineColumns($line, 2, [], 2)) === []) continue;
+        [$name, $value] = $columns;
         if (!isset($wanted[$name]) || !ctype_digit((string) $value)) continue;
         // Even an overflowing first numeric row claims the field; later duplicates stay ignored.
         unset($wanted[$name]); $parsed = pmssUnsignedDecimalIntParse($value);
