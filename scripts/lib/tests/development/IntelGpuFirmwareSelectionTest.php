@@ -88,8 +88,7 @@ class IntelGpuFirmwareSelectionTest extends TestCase
         ] as $case) {
             $present = function (string $vendor) use ($case): bool { return $vendor === $case[0]; };
             $plan = \pmssDpkgSelectionsSanitise($lines, 12, ...array_merge(self::pmssMakeCallbacks([true]), [$present]));
-            $this->assertSame($case[1], $plan['sanitised']);
-            $this->assertSame($case[2], $plan['dropped_hardware']);
+            $this->pmssAssertArraySubsetSame(['sanitised' => $case[1], 'dropped_hardware' => $case[2]], $plan);
         }
     }
 

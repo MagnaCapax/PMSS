@@ -57,9 +57,9 @@ PHP;
             ['/etc/seedbox/runtime', '/etc/seedbox/runtime', '/etc/seedbox/runtime'],
         ] as [$runtime, $resourceRoot, $settingRoot]) {
             $result = $this->observe($runtime, 2000);
-            $this->assertSame($resourceRoot.'/resourceStats/fixtur01', $result['usage']);
-            $this->assertSame($settingRoot.'/iopsLimits/fixtur01', $result['limit']);
-            $this->assertSame($settingRoot.'/iopsLimitEnforced/fixtur01', $result['marker']);
+            $this->pmssAssertArraySubsetSame(['usage' => $resourceRoot.'/resourceStats/fixtur01',
+                'limit' => $settingRoot.'/iopsLimits/fixtur01',
+                'marker' => $settingRoot.'/iopsLimitEnforced/fixtur01'], $result);
             $this->assertSame(1, count($result['commands']));
             $this->assertSame(0, $result['rc']);
         }

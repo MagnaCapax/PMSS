@@ -85,8 +85,7 @@ class BootDefaultsEnsureTest extends TestCase
         // Prefix removal remains generic; existing callers can omit it entirely.
         $lines = ['tmpfs /tmp tmpfs defaults,size=1G,size=2G,nosuid 0 0'];
         $plan = \pmssFstabMountOptionsEnsure($lines, '/tmp', [], [], false, null, [], true, ['size=']);
-        $this->assertSame(['defaults', 'nosuid'], $plan['options']);
-        $this->assertSame(['size=1G', 'size=2G'], $plan['removed']);
+        $this->pmssAssertArraySubsetSame(['options' => ['defaults', 'nosuid'], 'removed' => ['size=1G', 'size=2G']], $plan);
     }
 
     public function testBootDefaultsNormalizesExtraGrubInputs(): void

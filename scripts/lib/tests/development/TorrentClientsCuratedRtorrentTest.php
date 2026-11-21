@@ -133,9 +133,8 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
             $this->pmssAssertArraySubsetSame([
                 'kind' => 'static', 'compatFamily' => '0.16',
                 'url' => ['https://pulsedmedia.com/remote/pkg/rtorrent-'.$version.'-static-amd64-r1'],
-                'sha256' => $sha256, 'isDefault' => $version === '0.16.25',
+                'sha256' => $sha256, 'isDefault' => $version === '0.16.25', 'disabled' => false, 'cve' => [],
             ], $entry);
-            $this->pmssAssertArraySubsetSame(['disabled' => false, 'cve' => []], $entry);
         }
         $root = $this->pmssMakeTempDir('pmss-rtorrent-016-');
         $store = $root.'/clients';
@@ -178,8 +177,8 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
         $this->assertStringContainsString('branch = ((equal, ((system.client_version)), ((cat, "0.9.8")))), '
             .'((encoding.add, utf8)), ((cat))', $rc);
         // ADR 0114: every build binds IPv4; the IPv6 block is catch-wrapped because 0.9.8 has no such command.
-        $this->assertSame(1, preg_match('/^network\.bind_address\.set = 0\.0\.0\.0$/m', $rc));
-        $this->assertSame(1, preg_match('/^catch = \{"network\.block\.ipv6\.set=yes"\}$/m', $rc));
+        $this->assertMatches('/^network\.bind_address\.set = 0\.0\.0\.0$/m', $rc);
+        $this->assertMatches('/^catch = \{"network\.block\.ipv6\.set=yes"\}$/m', $rc);
         $this->assertSame(0, preg_match('/^encoding\.add/m', $rc));
         $this->assertMatches('/^rtorrent([ -]main)?$/', 'rtorrent-main');
         $this->assertMatches('/^rtorrent([ -]main)?$/', 'rtorrent main');

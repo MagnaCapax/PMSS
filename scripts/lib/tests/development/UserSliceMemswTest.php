@@ -112,8 +112,8 @@ class UserSliceMemswTest extends TestCase
     {
         $held = \pmssUserSliceMemswAnonPlusSwap('total_rss '.PHP_INT_MAX."\ntotal_swap 1\n");
         $plan = $this->memsw(self::L, self::L, self::UNLIMITED, $held);
-        $this->assertSame([], $plan['writes']);
-        $this->assertSame('tenants hold '.PHP_INT_MAX.' bytes of anonymous memory plus swap, above the bound '.self::L.': memsw limit not written', $plan['note']);
+        $this->pmssAssertArraySubsetSame(['writes' => [], 'note' => 'tenants hold '.PHP_INT_MAX
+            .' bytes of anonymous memory plus swap, above the bound '.self::L.': memsw limit not written'], $plan);
         $this->assertSame($this->memsw(-1, self::L, self::L), $this->memsw(-1, self::L, self::L, $held));
         $this->assertSame($this->memsw(2 * self::L, self::L, self::L), $this->memsw(2 * self::L, self::L, self::L, $held));
     }
@@ -127,7 +127,7 @@ class UserSliceMemswTest extends TestCase
             "runStep('Bounding user.slice memory plus swap', '/scripts/cron/cgroupUserSliceMemswApply.php');");
         // Both boot and the five-minute self-heal run it.
         $cron = $this->pmssReadRepoFile('etc/seedbox/config/root.cron');
-        $this->assertSame(1, preg_match('#^@reboot root +sleep [0-9]+; /scripts/cron/cgroupUserSliceMemswApply\.php#m', $cron));
-        $this->assertSame(1, preg_match('#^\*/5 \* \* \* \* +root +sleep [0-9]+; /scripts/cron/cgroupUserSliceMemswApply\.php#m', $cron));
+        $this->assertMatches('#^@reboot root +sleep [0-9]+; /scripts/cron/cgroupUserSliceMemswApply\.php#m', $cron);
+        $this->assertMatches('#^\*/5 \* \* \* \* +root +sleep [0-9]+; /scripts/cron/cgroupUserSliceMemswApply\.php#m', $cron);
     }
 }
