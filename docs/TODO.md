@@ -39,6 +39,11 @@ Active work items are tracked in GitHub issues to avoid duplication between this
   retrieval allowlist and coordinate dependency ordering under
   [ADR 0022](adr/0022-guiv-delivered-customer-files-must-be-self-contained.md).
   The local skeleton manifest alone cannot verify that external prerequisite.
+  This also blocks splitting `scriptsIncActionJs.php`: [ADR 0099](adr/0099-scriptsinc-split-into-guiv-delivered-parts.md)
+  requires new part names in both the external allowlist and sync list before
+  loader dependencies change. `pmssUserPanelHelperFiles()` cannot prove either.
+  `CustomerActionScriptCharacterizationTest` freezes the generated browser body
+  for a future coordinated extraction; request maps remain covered separately.
 - [ ] Before sharing child-process cleanup across `etc/skel/bin/dockerLsioSeedHttp.php`,
   `etc/skel/bin/pmssAccountAgent.php` and `etc/skel/www/toggleAppRuntime.php`,
   verify a common helper's delivery to both account trees. Preserve each caller's
