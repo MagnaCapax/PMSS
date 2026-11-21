@@ -94,7 +94,15 @@ function pmssUserSliceMemswWrite(string $file, string $value): bool
         try {
             $closed = fclose($pipes[0]);
         } finally {
-            $rc = proc_close($p);
+            try {
+                $rc = proc_close($p);
+            } catch (\Throwable $error) {
+                // A failed reap still owns the child; an already-reaped child is left alone.
+                if (is_resource($p)) {
+                    pmssProcessTerminateAndClose($p);
+                }
+                throw $error;
+            }
         }
     }
     return $written && $closed && $rc === 0;

@@ -1012,6 +1012,14 @@ Sub-handlers:
   lower memsw below usage; representable sums, missing-field defaults, diagnostics
   and write ordering remain unchanged. `UserSliceMemswTest` covers the boundaries.
 
+- pmssUserSliceMemswWrite(string $file, string $value): bool → after a thrown
+  reap, terminates and reaps the child only while its handle remains open, using
+  the shared process cleanup helper. An already-reaped child is left alone.
+  Normal command bytes, writes, stdin closure, results and timeout stay unchanged;
+  combined cleanup faults retain PHP's `finally` precedence.
+  `UserSliceMemswProcessCleanupSafetyTest` covers exceptions and errors with memory
+  streams on the testing machine; no live sysfs writes run on the devbox.
+
 - pmssEnsureSystemdSlices(?callable $logger=null): void → writes user slice override template to `/etc/systemd/system/user-.slice.d/15-pmss.conf` (never vendor paths), resolves the `/home` backing device for optional `IODeviceLatencyTargetSec` rendering from `cgroup.policy.php` on cgroup v2 hosts, optionally installs user manager `LimitNOFILE` drop-in at `/etc/systemd/system/user@.service.d/20-pmss-limits.conf` from `cgroup.policy.php` (`limitNoFileSoft`/`limitNoFileHard`), installs per-user log namespace drop-in at `/etc/systemd/system/user@.service.d/30-pmss-log-namespace.conf` (`LogNamespace=user-%i`), then runs `daemon-reload`. A failed template read warns and leaves the existing slice drop-in untouched.
 
 - pmssConfigureTempMountNoexec(?callable $logger=null): void → when `PMSS_HARDEN_TMP_NOEXEC` is enabled, ensures `/tmp` and `/dev/shm` fstab entries include `noexec,nosuid,nodev`, and remounts when mounted; warns on missing mounts, unreadable fstab, or unsafe override paths.
