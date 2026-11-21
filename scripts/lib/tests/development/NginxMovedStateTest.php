@@ -19,8 +19,8 @@ class NginxMovedStateTest extends TestCase
         $templates = \pmssNginxUserSubdomainTemplates();
         return ['homeBase' => $this->tempDir.'/home', 'nginxUsersDir' => $this->tempDir.'/users',
             'subdomainConfigDir' => $this->tempDir.'/conf.d', 'subdomainEnabled' => true, 'subdomainBase' => 'old.example.test',
-            'userConfigStore' => $store, 'movedTemplate' => file_get_contents($this->pmssRepoPath('etc/seedbox/config/template.nginx-user-moved')),
-            'movedNoticeTemplate' => file_get_contents($this->pmssRepoPath('etc/seedbox/config/template.moved.notice.html')),
+            'userConfigStore' => $store, 'movedTemplate' => $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-user-moved'),
+            'movedNoticeTemplate' => $this->pmssReadRepoFile('etc/seedbox/config/template.moved.notice.html'),
             'suspendedTemplate' => 'suspended ##username', 'userTemplate' => 'active ##username ##serverPort',
             'publicSubdomainTemplate' => $templates['public'], 'publicSuspendedTemplate' => $templates['publicSuspended'],
             'publicMovedTemplate' => $templates['publicMoved']];

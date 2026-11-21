@@ -69,8 +69,7 @@ class AiToolsCodexLauncherTest extends AiToolsLauncherTestCase
         $this->assertTrue(\pmssAiCodexState($env)['keyFileValid']);
         $this->pmssWriteFile($this->tempDir.'/.codex/auth.json', '{}', 0777);
         $this->assertTrue(\pmssAiCodexState($env)['authExists']);
-        $source = file_get_contents(__DIR__.'/../../update/apps/templates/pmss-ai-launch.php');
-        $this->assertStringContainsString('@fileowner($file) !== $uid', $source);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/apps/templates/pmss-ai-launch.php', '@fileowner($file) !== $uid');
     }
 
     public function testOldLayoutConvergesAndStubContent(): void
@@ -84,7 +83,8 @@ class AiToolsCodexLauncherTest extends AiToolsLauncherTestCase
         $this->pmssWriteExecutableFile($binary, 'pinned binary fixture');
         $uid = posix_geteuid();
         $gid = posix_getegid();
-        $this->assertTrue(\pmssAiToolsCodexAtomicWrite($launcher, file_get_contents($source), 0644, $uid, $gid));
+        $this->assertTrue(\pmssAiToolsCodexAtomicWrite($launcher,
+            $this->pmssReadRepoFile('scripts/lib/update/apps/templates/pmss-ai-launch.php'), 0644, $uid, $gid));
         $this->assertTrue(\pmssAiToolsCodexAtomicWrite($stub, \pmssAiToolsCodexStub(), 0755, $uid, $gid));
         $expectedStub = "#!/bin/sh\nif [ -x /usr/bin/php ] && [ -r /opt/pmss/ai-tools/pmss-ai-launch.php ]; then\n"
             ."    exec /usr/bin/php /opt/pmss/ai-tools/pmss-ai-launch.php codex \"\$@\"\n"
@@ -96,8 +96,7 @@ class AiToolsCodexLauncherTest extends AiToolsLauncherTestCase
         $this->assertSame($uid, fileowner($launcher));
         $this->assertSame($uid, fileowner($binary));
         $this->assertSame($gid, filegroup($stub));
-        $installer = file_get_contents(__DIR__.'/../../update/apps/aiTools/codexInstall.php');
-        $this->assertStringContainsString("['-o', 'root', '-g', 'root', '-m', '0755'", $installer);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/apps/aiTools/codexInstall.php', "['-o', 'root', '-g', 'root', '-m', '0755'");
         $this->assertFalse(\pmssAiToolsCodexInstallNeeded($binary, $launcher, $stub, $source, false));
         $this->assertTrue(\pmssAiToolsCodexInstallNeeded($binary, $launcher, $stub, $source, true));
         $this->pmssWriteFile($launcher, 'stale');

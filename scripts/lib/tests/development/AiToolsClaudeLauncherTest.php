@@ -94,8 +94,7 @@ class AiToolsClaudeLauncherTest extends AiToolsLauncherTestCase
         $this->pmssWriteFile($custom.'/.claude.json', '{"oauthAccount":{}}', 0777);
         $this->assertTrue(\pmssAiClaudeState($env)['configChoice']);
         $this->assertFalse(file_exists($custom.'/settings.json'));
-        $source = file_get_contents(__DIR__.'/../../update/apps/templates/pmss-ai-launch.php');
-        $this->assertStringContainsString('@fileowner($file) !== $uid', $source);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/apps/templates/pmss-ai-launch.php', '@fileowner($file) !== $uid');
     }
 
     public function testOldSymlinkLayoutConverges(): void
@@ -107,7 +106,8 @@ class AiToolsClaudeLauncherTest extends AiToolsLauncherTestCase
         $this->assertTrue(\pmssAiToolsClaudeInstallNeeded($launcher, $stub, $source));
         $uid = posix_geteuid();
         $gid = posix_getegid();
-        $this->assertTrue(\pmssAiToolsCodexAtomicWrite($launcher, file_get_contents($source), 0644, $uid, $gid));
+        $this->assertTrue(\pmssAiToolsCodexAtomicWrite($launcher,
+            $this->pmssReadRepoFile('scripts/lib/update/apps/templates/pmss-ai-launch.php'), 0644, $uid, $gid));
         $this->assertTrue(\pmssAiToolsCodexAtomicWrite($stub, \pmssAiToolsClaudeStub(), 0755, $uid, $gid));
         $this->assertFalse(is_link($stub));
         $this->assertSame(0755, fileperms($stub) & 0777);
