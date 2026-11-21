@@ -27,9 +27,9 @@ function pmssResourceLogReadBlkioReadWrite(string $path): ?array
 {
     $totals = null;
     foreach (pmssTextLines(pmssReadRegularFileContents($path) ?? '') as $line) {
-        // Reject corrupt rows before trim() can turn edge NULs into valid counters.
+        // Require major:minor devices; reject NULs before trim() can hide corruption.
         if (pmssFilesystemPathHasNulByte($line)
-            || preg_match('/^\S+\s+(Read|Write)\s+([0-9]+)$/', trim($line), $m) !== 1) continue;
+            || preg_match('/^[0-9]+:[0-9]+\s+(Read|Write)\s+([0-9]+)$/', trim($line), $m) !== 1) continue;
         $value = pmssUnsignedDecimalIntParse($m[2]);
         if ($value === null || $value >= PMSS_RESOURCE_COUNTER_SENTINEL) continue;
         $direction = $m[1] === 'Read' ? 'read' : 'write';

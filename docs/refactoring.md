@@ -1,5 +1,13 @@
 # Refactoring Guidelines
 
+Cgroup-v1 blkio readers require unsigned decimal `major:minor` device fields
+before adding Read/Write counters. Malformed device rows use the existing
+omission result and cannot select BFQ ahead of a usable throttle source.
+Valid device rows, whitespace, zero counters and overflow handling stay unchanged
+(ADR 0161). `ResourceV1CounterInputSafetyTest` covers rejected device forms,
+valid neighboring rows and both collector projections using private fixtures.
+Execution stays on testing machines; devbox checks changed-file PHP syntax only.
+
 Web-root recovery retains both legacy includes and all public helpers while
 separating account execution, inode-checked mutations, durable migration,
 misfile-copy publication and full restoration (ADR 0319). Each staged transaction
