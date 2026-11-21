@@ -36,16 +36,18 @@ function hash_file($algorithm, $path) {
         (MODE === 'unreadableCurrent' && $read > 1)) return false;
     return \hash_file($algorithm, $path);
 }
-function passthru($command, &$rc) {
+function proc_open($command, $descriptors, &$pipes) {
     $probe = fopen('.rtorrentExecute.lock', 'c');
     $GLOBALS['childLocks'][] = !flock($probe, LOCK_EX | LOCK_NB);
     fclose($probe);
-    $rc = 0;
     if (++$GLOBALS['children'] === 2) throw new \RuntimeException('fixture complete');
     if (in_array(MODE, ['changed', 'unreadableInitial', 'unreadableCurrent'], true)) {
         file_put_contents(__FILE__, "\n// Updated launcher.\n", FILE_APPEND);
     }
+    return fopen('php://memory', 'w+');
 }
+function proc_get_status($process) { return ['running' => false, 'signaled' => false, 'exitcode' => 0]; }
+function proc_close($process) { fclose($process); return -1; }
 if (MODE === 'locked') {
     $heldLock = fopen('.rtorrentExecute.lock', 'c');
     flock($heldLock, LOCK_EX | LOCK_NB);

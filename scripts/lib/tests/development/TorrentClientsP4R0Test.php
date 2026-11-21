@@ -21,7 +21,7 @@ final class TorrentClientsP4R0Test extends TestCase
         $this->assertSame('/usr/local/bin/rtorrent',
             \pmssRtorrentExecutorCommand($home, $projection, $store));
         $this->pmssAssertRepoFileContainsAllStrings('etc/skel/.rtorrentExecute.php', [
-            "\$rtorrentCommand = '/usr/local/bin/rtorrent';", 'passthru($rtorrentCommand, $rtorrentRc);']);
+            "\$rtorrentCommand = '/usr/local/bin/rtorrent';", "proc_open('exec '.\$rtorrentCommand, [], \$rtorrentPipes);"]);
     }
 
     public function testPublishedStoreSelectionResolvesBinary(): void

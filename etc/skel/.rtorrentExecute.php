@@ -65,9 +65,28 @@ while (true) {
   system('rm -rf ~/session/rtorrent.*');
 
   writeLog('starting rtorrent: '.$rtorrentCommand);
-  $rtorrentRc = 0;
+  $rtorrentRc = -1;
+  $rtorrentSignal = null;
   $rtorrentStartedAt = microtime(true);
-  passthru($rtorrentCommand, $rtorrentRc);
+  // exec exposes rTorrent's wait status instead of a shell's encoded exit code.
+  // Inherit fds 0-2 unchanged: keep the screen terminal and do not capture customer output.
+  $rtorrentProcess = proc_open('exec '.$rtorrentCommand, [], $rtorrentPipes);
+  if (is_resource($rtorrentProcess)) {
+    try {
+      do {
+        $rtorrentStatus = proc_get_status($rtorrentProcess);
+        if (!is_array($rtorrentStatus) || !$rtorrentStatus['running']) break;
+        usleep(100000);
+      } while (true);
+    } finally {
+      $rtorrentRc = proc_close($rtorrentProcess);
+    }
+    if (is_array($rtorrentStatus)) {
+      $rtorrentSignal = $rtorrentStatus['signaled'] ? (int) $rtorrentStatus['termsig'] : 0;
+      // PHP 7.3 consumes exitcode on the first terminal status read; proc_close may return -1.
+      $rtorrentRc = $rtorrentSignal > 0 ? 128 + $rtorrentSignal : (int) $rtorrentStatus['exitcode'];
+    }
+  }
   // System fallback runs must not erase the failed selection's count.
   if ($rtorrentCommand !== '/usr/local/bin/rtorrent') {
     $rtorrentFastExits = pmssRtorrentExecutorFastExits($rtorrentCommand, $rtorrentFailedCommand,
@@ -78,7 +97,7 @@ while (true) {
     if (function_exists('pmssRtorrentExecutorFallbackMark') && ($rtorrentFastExits === 3 || $rtorrentFastExits === 0))
       pmssRtorrentExecutorFallbackMark(__DIR__, $rtorrentFastExits === 3 ? $rtorrentCommand : null);
   }
-  writeLog('rtorrent exited (rc='.$rtorrentRc.'); sleeping 5 seconds then restarting');
+  writeLog('rtorrent exited (rc='.$rtorrentRc.($rtorrentRc !== 0 ? '; signal='.($rtorrentSignal ?? 'unknown') : '').'); sleeping 5 seconds then restarting');
   sleep(5); // avoid overloading the server
 }
 

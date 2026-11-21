@@ -120,7 +120,7 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
             "flock(\$executorLock, LOCK_EX | LOCK_NB)", '$lastRun == 0 or $executorIdle or']);
         // Stop in Apps must hold: the executor leaves instead of relaunching while the stop marker exists.
         $this->pmssAssertRepoFileContainsOrderedStrings('etc/skel/.rtorrentExecute.php', [
-            "if (file_exists('.rtorrentDisable'))", 'passthru($rtorrentCommand',
+            "if (file_exists('.rtorrentDisable'))", "proc_open('exec '.\$rtorrentCommand",
         ]);
     }
     public function testRtorrent016EntriesArePinnedAndLaunchWithDeprecatedRedirects(): void
