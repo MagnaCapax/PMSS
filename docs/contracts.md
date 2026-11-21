@@ -2366,7 +2366,8 @@ This supersedes the OpenClaw provisioning bullet's Pikkumies exclusion above
 ## Notes for Agentic Coding
 
 Reflected characterization fixtures share `pmssTestingFunctionExport()` in
-`scripts/lib/testing/filesystem.php`; selection, substitutions and strict mode stay with callers.
+`scripts/lib/testing/filesystem.php`, loaded by `TestCase.php`; fixtures need no
+second include. Selection, substitutions and strict mode stay with callers.
 
 - Exception type and message-fragment checks use `TestCase::assertThrows()` or
   `assertThrowsRuntime()`, including account CLI, moved-state, torrent config and

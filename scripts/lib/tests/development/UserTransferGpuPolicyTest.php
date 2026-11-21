@@ -3,7 +3,6 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once dirname(__DIR__, 2).'/testing/filesystem.php';
 require_once dirname(__DIR__, 2).'/userTransfer/postSetup.php';
 
 class UserTransferGpuPolicyTest extends TestCase

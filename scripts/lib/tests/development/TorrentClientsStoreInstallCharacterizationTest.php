@@ -32,7 +32,6 @@ function hash_file($algorithm, $path): string
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once __DIR__.'/../../testing/filesystem.php';
 require_once __DIR__.'/../../torrentClients/storeInstall.php';
 
 /** Freeze the former store.php callback's dispatch, mirror order and pin behavior. */

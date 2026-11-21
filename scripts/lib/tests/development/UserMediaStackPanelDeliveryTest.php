@@ -4,7 +4,6 @@ namespace PMSS\Tests;
 require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 2).'/update.php';
 require_once dirname(__DIR__, 2).'/update/users.php';
-require_once dirname(__DIR__, 2).'/testing/filesystem.php';
 
 /** Readback regressions for the coupled account panel files (Refs #953). */
 class UserMediaStackPanelDeliveryTest extends TestCase

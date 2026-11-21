@@ -3,7 +3,6 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 2).'/rtorrent/process.php';
-require_once dirname(__DIR__, 2).'/testing/filesystem.php';
 
 /** Lock processInspection.php and processRows.php without executing ps or sending signals. */
 final class RtorrentProcessInspectionCharacterizationTest extends TestCase

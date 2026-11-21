@@ -3,7 +3,6 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 2).'/userTransfer/rtorrentRestart.php';
-require_once dirname(__DIR__, 2).'/testing/filesystem.php';
 
 /** GH#869: restart requests honour opt-out before marker writes or execution. */
 class UserTransferRtorrentOptOutTest extends TestCase

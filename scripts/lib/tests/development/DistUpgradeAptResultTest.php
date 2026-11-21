@@ -73,9 +73,7 @@ class DistUpgradeAptResultTest extends TestCase
             .'function pmssDistUpgradeWaitForLocksOrLog($message) { return true; }'
             .'function runCommand($command, $verbose, $logger, $tty) { $GLOBALS["seen"] = (string) getenv("PMSS_COMMAND_TIMEOUT"); if ($GLOBALS["throw"]) { throw new \RuntimeException("x"); } return 0; }';
         foreach (['pmssDistUpgradeAptTimeoutSeconds', 'pmssDistUpgradeRunLockedCommand'] as $name) {
-            $function = new \ReflectionFunction($name);
-            $source = implode('', array_slice(file($function->getFileName()), $function->getStartLine() - 1, $function->getEndLine() - $function->getStartLine() + 1));
-            $script .= 'eval('.var_export('namespace DistUpgradeAptDeadline; '.$source, true).');';
+            $script .= \pmssTestingFunctionExport($name, 'DistUpgradeAptDeadline');
         }
         $script .= 'try { $rc = pmssDistUpgradeRunLockedCommand("apt-get full-upgrade", "lock"); } catch (\RuntimeException $e) { $rc = "threw"; }'
             .'$after = getenv("PMSS_COMMAND_TIMEOUT");'
@@ -96,9 +94,7 @@ class DistUpgradeAptResultTest extends TestCase
             .'  if (!empty($GLOBALS["rcs"][$command])) { return array_shift($GLOBALS["rcs"][$command]); }'
             .'  return 0; }';
         foreach (['pmssExecuteUpgrade', 'pmssRunUpgradeWithRecovery'] as $name) {
-            $function = new \ReflectionFunction($name);
-            $source = implode('', array_slice(file($function->getFileName()), $function->getStartLine() - 1, $function->getEndLine() - $function->getStartLine() + 1));
-            $script .= 'eval('.var_export('namespace DistUpgradeAptResult; '.$source, true).');';
+            $script .= \pmssTestingFunctionExport($name, 'DistUpgradeAptResult');
         }
         $script .= 'echo json_encode(["result" => pmssExecuteUpgrade(), "commands" => $GLOBALS["commands"], "logs" => $GLOBALS["logs"]]);';
         return $this->pmssRunInlinePhpJson($script);

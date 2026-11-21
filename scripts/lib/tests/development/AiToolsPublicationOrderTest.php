@@ -18,7 +18,6 @@ function logmsg(string $message): void
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once __DIR__.'/../../testing/filesystem.php';
 require_once __DIR__.'/../../update/apps/aiTools/publication.php';
 
 class AiToolsPublicationOrderTest extends TestCase

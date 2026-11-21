@@ -3,7 +3,6 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 3).'/cron/checkGui.php';
-require_once dirname(__DIR__, 2).'/testing/filesystem.php';
 
 /** Lock the filesystem.php facade and checkGui.php sequences without touching account files. */
 class UserSkeletonDeliveryCharacterizationTest extends TestCase
