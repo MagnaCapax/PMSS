@@ -8,9 +8,8 @@ final class TorrentClientsP3ProxyTest extends TestCase
 {
     private function render(bool $selected): string
     {
-        $template = (string) file_get_contents(dirname(__DIR__, 4).'/etc/seedbox/config/template.lighttpd');
-        return \pmssLighttpdRenderUserConfig($template, 'fixtur01', 30000, 0, 0,
-            ['maxProcs' => 2, 'children' => 2], [], $selected);
+        return \pmssLighttpdRenderUserConfig($this->pmssReadRepoFile('etc/seedbox/config/template.lighttpd'),
+            'fixtur01', 30000, 0, 0, ['maxProcs' => 2, 'children' => 2], [], $selected);
     }
 
     public function testUnselectedRouteRendersEmpty(): void

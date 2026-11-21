@@ -65,13 +65,10 @@ class RtorrentThrottleInitTest extends TestCase
 
     public function testSkeletonSchedulesAndDistributesStartupHelper(): void
     {
-        $hook = 'schedule2 = throttle_init,5,0,"execute.nothrow=sh,-c,php ~/.rtorrentThrottleInit.php& exit 0"';
-        $customConfig = $this->pmssReadRepoFile('etc/skel/.rtorrent.rc.custom');
-        $filesystemSource = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
-
-        $this->assertSame(1, substr_count($customConfig, $hook));
-        $this->assertStringNotContainsString('initplugins.php', $customConfig);
-        $this->assertStringContainsString("'.rtorrentThrottleInit.php',", $filesystemSource);
+        $customConfig = $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/.rtorrent.rc.custom', [], ['initplugins.php']);
+        $this->assertSame(1, substr_count($customConfig,
+            'schedule2 = throttle_init,5,0,"execute.nothrow=sh,-c,php ~/.rtorrentThrottleInit.php& exit 0"'));
+        $this->pmssAssertRepoFileContainsString('scripts/lib/update/users/filesystem.php', "'.rtorrentThrottleInit.php',");
     }
 
     /** Build a customer-home fixture with a narrow throttle plugin stub. */

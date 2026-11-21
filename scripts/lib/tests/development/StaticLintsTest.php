@@ -9,16 +9,15 @@ class StaticLintsTest extends TestCase
     /** Script names static-lints.sh runs, read from its check list. */
     private function listed(): array
     {
-        $text = (string) file_get_contents($this->pmssRepoPath('scripts/testing/static-lints.sh'));
-        preg_match('/^for check in ([^;]+);/m', $text, $m);
+        preg_match('/^for check in ([^;]+);/m', $this->pmssReadRepoFile('scripts/testing/static-lints.sh'), $m);
         return preg_split('/\s+/', trim($m[1] ?? ''), -1, PREG_SPLIT_NO_EMPTY);
     }
 
     /** scripts/testing/*.sh that CI's build job runs in a blocking (not advisory) step. */
     private function blockingBuildChecks(): array
     {
-        $yml = (string) file_get_contents($this->pmssRepoPath('.github/workflows/ci.yml'));
-        $build = preg_match('/^  build:\n(.*?)(?=^  [a-z0-9_-]+:\n|\z)/ms', $yml, $m) === 1 ? $m[1] : '';
+        $build = preg_match('/^  build:\n(.*?)(?=^  [a-z0-9_-]+:\n|\z)/ms',
+            $this->pmssReadRepoFile('.github/workflows/ci.yml'), $m) === 1 ? $m[1] : '';
         $checks = [];
         foreach (preg_split('/^      - name: /m', $build) as $step) {
             $name = strtok($step, "\n");
@@ -39,8 +38,9 @@ class StaticLintsTest extends TestCase
     {
         $blocking = $this->blockingBuildChecks();
         $this->assertTrue(count($blocking) >= 5, 'blocking build checks found in ci.yml: '.implode(', ', $blocking));
+        $listed = $this->listed();
         foreach ($blocking as $check) {
-            $this->assertTrue(in_array($check, $this->listed(), true), "ci.yml build step $check is missing from static-lints.sh");
+            $this->assertTrue(in_array($check, $listed, true), "ci.yml build step $check is missing from static-lints.sh");
         }
     }
 
@@ -56,6 +56,6 @@ class StaticLintsTest extends TestCase
         $this->pmssAssertRepoFileContainsOrderedStrings('scripts/testing/test-php.sh', [
             'PMSS_TESTING_SKIP_DEV_TESTS', 'scripts/lib/tests/development/Runner.php',
         ], '', 'test-php.sh skips Runner.php when asked: ');
-        $this->assertStringContainsString('PMSS_TESTING_SKIP_DEV_TESTS=1', (string) file_get_contents($this->pmssRepoPath('scripts/testing/static-lints.sh')));
+        $this->pmssAssertRepoFileContainsString('scripts/testing/static-lints.sh', 'PMSS_TESTING_SKIP_DEV_TESTS=1');
     }
 }

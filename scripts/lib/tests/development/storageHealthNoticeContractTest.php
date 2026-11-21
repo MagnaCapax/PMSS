@@ -57,7 +57,7 @@ HTML;
             foreach (array_merge($modules, ['storageHealthNotice']) as $module) {
                 if ($module === $missing) continue;
                 $this->pmssWriteRelativeFile($directory, $module.'.php',
-                    file_get_contents($this->pmssRepoPath('etc/skel/www/'.$module.'.php')));
+                    $this->pmssReadRepoFile('etc/skel/www/'.$module.'.php'));
             }
             $result = $this->pmssRunRepoPhpScriptCommand('scripts/lib/tests/fixtures/storageHealthNoticeContract.php',
                 ['partial', $directory.'/storageHealthNotice.php']);
@@ -68,8 +68,8 @@ HTML;
     public function testOperatorBridgeRefusesMissingOrSymlinkedSkeletonHelper(): void
     {
         $directory = $this->pmssMakeTempDir('pmss-storage-bridge-');
-        $source = file_get_contents($this->pmssRepoPath('scripts/lib/storageHealth/raid.php'));
-        $source = str_replace("__DIR__.'/common.php'", var_export($this->pmssRepoPath('scripts/lib/storageHealth/common.php'), true), $source);
+        $source = str_replace("__DIR__.'/common.php'", var_export($this->pmssRepoPath('scripts/lib/storageHealth/common.php'), true),
+            $this->pmssReadRepoFile('scripts/lib/storageHealth/raid.php'));
         $script = $this->pmssWriteRelativeFile($directory, 'scripts/lib/storageHealth/raid.php', $source);
         $helper = $directory.'/etc/skel/www/storageHealthRaidDisplay.php';
         foreach ([false, true] as $symlink) {

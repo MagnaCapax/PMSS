@@ -108,7 +108,7 @@ class I915DisplayPowerTest extends TestCase
 
     public function testUpdateStep2RunsTheStepAfterRenderAccess(): void
     {
-        $source = (string) file_get_contents(dirname(__DIR__, 3).'/util/update-step2.php');
-        $this->assertOrderedStrings(["'pmssEnsureIntelRenderGroupMembers'", "'pmssEnsureI915DisplayPowerStatesOff'"], $source);
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/util/update-step2.php',
+            ["'pmssEnsureIntelRenderGroupMembers'", "'pmssEnsureI915DisplayPowerStatesOff'"]);
     }
 }
