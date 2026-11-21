@@ -1,5 +1,16 @@
 # Refactoring Guidelines
 
+Web-root recovery retains both legacy includes and all public helpers while
+separating account execution, inode-checked mutations, durable migration,
+misfile-copy publication and full restoration (ADR 0319). Each staged transaction
+uses its publication result for one `finally` cleanup; ordinary refusals and
+throwables no longer have separate removal paths. Durable migration shares one
+rollback after verification or symlink failure, and full/partial reconciliation
+uses one dispatch expression. Existing cleanup-fault fixtures retain their exact
+traces. Added characterization locks streamed command/payload bytes, accounting,
+facade loading, migration probe order, rollback and diagnostic text. Execution
+stays on testing machines; devbox checks changed-file PHP syntax only.
+
 Scheduler drift inspection rejects NUL-containing explicit sources before basename
 selection and NUL-containing mount paths before implicit source lookup. Empty,
 whitespace-only or NUL-containing scheduler observations retain the existing unknown

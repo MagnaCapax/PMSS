@@ -245,11 +245,16 @@ Keep the canonical installer/update details under `docs/install.md` and
   `filesystemPatch.php` and `panelCompatibility.php`. `panelFiles.php` supplies
   the twelve panel-helper names to both updater delivery and the GUI watchdog;
   each caller retains its existing surrounding order (ADR 0244).
-  Web-root migration keeps account mutations in `webRoot.php`; `webRootInspection.php`
-  owns one read-only traversal with snapshot, link and ownership policies,
+  Web-root migration keeps `webRoot.php` as its stable include and state dispatcher.
+  `webRootAccount.php` owns account execution, `webRootMutation.php` owns inode-checked
+  moves, and `webRootMigration.php` and `webRootMisfile.php` own durable moves and
+  verified misfile copies. `webRootInspection.php` owns one read-only traversal
+  with snapshot, link and ownership policies,
   `webRootPaths.php` owns destination conflicts, and `webRootReconcileCopy.php`
   owns skeleton traversal. The locked reconciler retains full/partial recovery
-  orchestration (ADR 0172).
+  orchestration; `webRootReconcileRestore.php` owns streamed installation and full
+  publication. Staging cleanup and migration rollback each have one failure path
+  (ADRs 0172 and 0319).
 - **scripts/lib/user/qbittorrentBuildProbe.php** and its customer-tree copy reject
   failed stdout reads through the existing `null` result before further polling,
   then run the existing child, pipe and private-profile cleanup. Empty nonblocking

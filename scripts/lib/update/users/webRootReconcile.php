@@ -13,87 +13,7 @@ require_once dirname(__DIR__).'/runtime/commands.php';
 require_once dirname(__DIR__, 2).'/runtime/locks.php';
 require_once dirname(__DIR__, 2).'/rutorrent/config.php';
 require_once __DIR__.'/webRootReconcileCopy.php';
-
-/** Install a copied file without replacing an entry created concurrently. */
-function pmssUserWebRootReconcileInstallFile(
-    string $source,
-    string $target,
-    int $mode,
-    bool $noReplace,
-    ?array &$stats = null,
-    ?string $user = null,
-    string $home = ''
-): bool
-{
-    if ($user === null) return false;
-    // The account cannot read the root-only skeleton; send trusted bytes over stdin.
-    $content = pmssReadRegularFileContents($source);
-    if ($content === null) return false;
-    $template = dirname($target).'/.pmss-web-root-XXXXXXXX';
-    $targetArg = escapeshellarg($target);
-    $command = 'tmp=$(mktemp -- '.escapeshellarg($template).') || exit 1; '
-        .'trap \'rm -f -- "$tmp"\' EXIT; '
-        .'cat > "$tmp" && test "$(wc -c < "$tmp")" -eq '.strlen($content)
-        .' && chmod '.sprintf('%04o', $mode).' -- "$tmp"'
-        .' && test ! -L '.$targetArg
-        .' && '.($noReplace ? 'ln -- "$tmp" '.$targetArg : 'mv -T -- "$tmp" '.$targetArg);
-    $installed = pmssUserWebRootMigrationRun($user, $home, [$target], $command, $content);
-    if ($installed && $stats !== null) {
-        $stats['files_restored'] = (int) ($stats['files_restored'] ?? 0) + 1;
-    }
-    return $installed;
-}
-
-/** Restore a complete tree only when the current root contains no entries. */
-function pmssUserWebRootReconcileFull(
-    string $www,
-    string $skeleton,
-    string $home,
-    string $user,
-    ?callable $logger,
-    ?array &$stats = null
-): bool
-{
-    try {
-        $stage = $home.'/.pmss-web-root-reconcile-'.bin2hex(random_bytes(6));
-    } catch (\Throwable $exception) {
-        pmssUserWebRootMigrationLog($user, $logger, 'Unable to create web-root staging name');
-        return false;
-    }
-    if (!pmssPathAbsoluteStringIsSafe($stage, ['allowRoot' => false])
-        || !pmssUserWebRootMigrationRun($user, $home, [$stage],
-            'mkdir -m 0700 -- '.escapeshellarg($stage))) {
-        return false;
-    }
-
-    $cleanupNeeded = true;
-    try {
-        $success = pmssUserWebRootReconcileTreeIsSafe($skeleton, $home, false)
-            && pmssUserWebRootReconcileCopyEntry($skeleton, $stage, $home, '', $stats, $user)
-            && pmssUserWebRootReconcileTreeIsSafe($stage, $home)
-            && pmssUserWebRootReconcileApplyOwnership($stage, $user);
-        if ($success) {
-            $entries = pmssDirectoryEntriesRead($www);
-            $currentRootIsSafe = !pmssPathExistsOrLink($www) || (!is_link($www) && $entries === []);
-            $success = $currentRootIsSafe
-                && pmssUserWebRootMigrationRenameAsAccount($user, $home, $stage, $www);
-        }
-        if (!$success) {
-            // Preserve cleanup-before-log order without retrying a throwing cleanup.
-            $cleanupNeeded = false;
-            pmssUserWebRootMigrationRemoveCopy($user, $home, $stage);
-            pmssUserWebRootMigrationLog($user, $logger, 'Full web-root restore refused or failed');
-            return false;
-        }
-
-        $cleanupNeeded = false;
-        pmssUserWebRootMigrationLog($user, $logger, 'Restored complete web root from skeleton');
-        return true;
-    } finally {
-        // Until publication succeeds, thrown faults still own the account-created stage.
-        if ($cleanupNeeded) pmssUserWebRootMigrationRemoveCopy($user, $home, $stage);
-    }
-}
+require_once __DIR__.'/webRootReconcileRestore.php';
 
 /** Emit one structured run summary before the reconciler releases its lock. */
 function pmssUserWebRootReconcileLogSummary(
@@ -176,10 +96,7 @@ function pmssUserReconcileWebRoot(array $ctx, ?callable $logger = null): bool
         $reason = $fullRestore ? 'missing-or-empty-web-root' : 'managed-entry-check';
         $result = $fullRestore
             ? pmssUserWebRootReconcileFull($www, $skeleton, $home, $user, $runLogger, $stats)
-            : true;
-        if (!$fullRestore) {
-            $result = pmssUserWebRootReconcileCopyEntry($skeleton, $www, $home, '', $stats, $user, $runLogger, true);
-        }
+            : pmssUserWebRootReconcileCopyEntry($skeleton, $www, $home, '', $stats, $user, $runLogger, true);
         if (!$result) {
             $reason = 'restore-failed';
             return false;

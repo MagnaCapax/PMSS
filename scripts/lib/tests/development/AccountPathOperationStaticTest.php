@@ -143,18 +143,17 @@ final class AccountPathOperationStaticTest extends TestCase
 
     public function testWebRootDirectoryMovesRunUnderAccount(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/webRoot.php', [
-            'pmssPathTargetIsSafe($source, true, true)',
-            'pmssPathTargetIsSafe($target, true, true)',
-            'pmssAccountPathRun($user, $home, $paths, $command, $input)',
-            'if ($input !== null) return false;',
-            'pmssUserWebRootMigrationRenameAsAccount($user, $home, $temporary, $target)',
-            'pmssUserWebRootMigrationRenameAsAccount($user, $home, $source, $target)',
-            'pmssUserWebRootMigrationRenameAsAccount($user, $home, $target, $source)',
-            "pmssUserWebRootMigrationRun(\$user, \$home, [\$source],",
-            '&& @rename($source, $target)',
-        ]);
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/users/webRootReconcile.php', [
+        foreach ([
+            'webRootAccount.php' => ['pmssAccountPathRun($user, $home, $paths, $command, $input)',
+                'if ($input !== null) return false;'],
+            'webRootMutation.php' => ['pmssPathTargetIsSafe($source, true, true)',
+                'pmssPathTargetIsSafe($target, true, true)', '&& @rename($source, $target)'],
+            'webRootMisfile.php' => ['pmssUserWebRootMigrationRenameAsAccount($user, $home, $temporary, $target)'],
+            'webRootMigration.php' => ['pmssUserWebRootMigrationRenameAsAccount($user, $home, $source, $target)',
+                'pmssUserWebRootMigrationRenameAsAccount($user, $home, $target, $source)',
+                "pmssUserWebRootMigrationRun(\$user, \$home, [\$source],"],
+        ] as $file => $required) $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/'.$file, $required);
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/users/webRootReconcileRestore.php', [
             'pmssUserWebRootMigrationRenameAsAccount($user, $home, $stage, $www)',
             'pmssUserWebRootMigrationRun($user, $home, [$target]',
             'pmssReadRegularFileContents($source)',
