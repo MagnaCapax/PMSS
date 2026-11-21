@@ -495,6 +495,14 @@ decisions, failed/short reads and pre-open refusals retain their existing result
 quota recount selection remains unchanged (ADR 0159). `QuotaFixGuardTest` covers
 the stream lifetime with isolated read faults on the testing machine.
 
+Quota recovery also rejects NUL bytes anywhere in the combined `quotaon -p`
+observation before header inspection or recount planning. A matching off line
+cannot certify corrupted stdout or stderr; the existing empty-command refusal
+applies (ADR 0159). Valid state text, per-type ordering and the successful
+`quotaoff` path retain their contracts. `QuotaRecoveryStateInputSafetyTest`
+intercepts command and header probes; execution stays on testing machines,
+with changed-file PHP syntax checks on the devbox.
+
 Watchdog state projections share socket-failure results and escalation timestamp
 normalization, select recent-restart grace once, and consume single-use fields
 directly (ADRs 0209 and 0212). Marker guards, complete writes, thresholds, payload

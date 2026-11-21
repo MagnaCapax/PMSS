@@ -60,6 +60,8 @@ function pmssQuotaFixCheckCommands(bool $quotaOffOk, ?callable $runner = null, ?
     }
 
     $state = pmssQuotaCommandRun('quotaon -p /home', $runner);
+    // A valid off line cannot certify a corrupted observation for a destructive recount.
+    if (strpos($state['output'], "\0") !== false) return [];
     $commands = [];
     foreach ($types as $type) {
         // quotaon -p exits with the number of types on and prints "<type> quota on /home (<dev>) is off".
