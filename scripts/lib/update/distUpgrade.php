@@ -70,7 +70,9 @@ function pmssRunDistUpgrade(?string $maxTarget = null): int
     if (!$aptOk || $reached !== $next) {
         // A partly applied upgrade may have installed a kernel; keep it bootable before stopping.
         pmssEnsureInitrdAfterDistUpgrade();
-        logMessage(sprintf('dist-upgrade aborted: apt phase did not complete (host reports Debian %s, expected %s)', $reached, $next));
+        logMessage($aptOk
+            ? sprintf('dist-upgrade aborted: apt finished but the host reports Debian %s, expected %s', $reached, $next)
+            : sprintf('dist-upgrade aborted: apt full-upgrade did not complete (host reports Debian %s; packages may be half-configured)', $reached));
         return 1;
     }
 
