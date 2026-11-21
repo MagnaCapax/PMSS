@@ -61,18 +61,22 @@ function pmssExecuteUpgrade(): bool
         return false;
     }
 
+    // A failed upgrade can still be resolved by full-upgrade, so only the full-upgrade result decides.
     pmssRunUpgradeWithRecovery(
         pmssDistUpgradeAptCommand($env, 'upgrade'),
         $env,
         'dist-upgrade: upgrade failed, attempting recovery (dpkg --configure -a, apt-get -f install)',
         $hasTty
     );
-    pmssRunUpgradeWithRecovery(
+    if (!pmssRunUpgradeWithRecovery(
         pmssDistUpgradeAptCommand($env, 'full-upgrade'),
         $env,
         'dist-upgrade: full-upgrade failed, attempting recovery',
         $hasTty
-    );
+    )) {
+        logMessage('[ERROR] dist-upgrade: full-upgrade still failing after recovery');
+        return false;
+    }
 
     foreach ([["$env apt-get autoremove -y", '[ERROR] dist-upgrade: dpkg lock did not clear; aborting apt autoremove'], ["$env dpkg --configure -a", '[ERROR] dist-upgrade: dpkg lock did not clear; skipping dpkg --configure -a']] as [$command, $lockMessage]) {
         if (pmssDistUpgradeRunLockedCommand($command, $lockMessage, $hasTty) === null) {
@@ -82,10 +86,13 @@ function pmssExecuteUpgrade(): bool
     return true;
 }
 
-function pmssRunUpgradeWithRecovery(string $command, string $env, string $recoveryMessage, bool $inheritTty = false): void
+/**
+ * Run an apt action; on failure repair dpkg and retry it once. True only when the action succeeded.
+ */
+function pmssRunUpgradeWithRecovery(string $command, string $env, string $recoveryMessage, bool $inheritTty = false): bool
 {
     if (($rc = pmssDistUpgradeRunLockedCommand($command, '[ERROR] dist-upgrade: dpkg lock did not clear; skipping apt action', $inheritTty)) === null || $rc === 0) {
-        return;
+        return $rc === 0;
     }
 
     logMessage($recoveryMessage);
@@ -95,10 +102,11 @@ function pmssRunUpgradeWithRecovery(string $command, string $env, string $recove
         ['[ERROR] dist-upgrade: dpkg lock did not clear; skipping apt update', "$env apt-get update"],
         ['[ERROR] dist-upgrade: dpkg lock did not clear; skipping apt retry', $command],
     ] as [$lockMessage, $recoveryCommand]) {
-        if (pmssDistUpgradeRunLockedCommand($recoveryCommand, $lockMessage, $inheritTty) === null) {
-            return;
+        if (($rc = pmssDistUpgradeRunLockedCommand($recoveryCommand, $lockMessage, $inheritTty)) === null) {
+            return false;
         }
     }
+    return $rc === 0;
 }
 
 function pmssRemoveLegacyWireguardDkms(string $fromMajor, string $toMajor): void

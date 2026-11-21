@@ -64,8 +64,13 @@ function pmssRunDistUpgrade(?string $maxTarget = null): int
     logMessage(sprintf('Initiating Debian %s → %s upgrade', $from, $next));
     pmssRewriteSources($from, $next);
     pmssEnsureLibcryptBeforeUpgrade($from, $next);
-    if (!pmssExecuteUpgrade()) {
-        logMessage('dist-upgrade aborted: apt phase did not complete');
+    $aptOk = pmssExecuteUpgrade();
+    pmssResetOsReleaseCache();
+    $reached = getDistroVersion();
+    if (!$aptOk || $reached !== $next) {
+        // A partly applied upgrade may have installed a kernel; keep it bootable before stopping.
+        pmssEnsureInitrdAfterDistUpgrade();
+        logMessage(sprintf('dist-upgrade aborted: apt phase did not complete (host reports Debian %s, expected %s)', $reached, $next));
         return 1;
     }
 
