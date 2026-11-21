@@ -5,6 +5,10 @@ require_once __DIR__.'/DelugeAppTestCase.php';
 
 class DelugeBindTextdomainCompatPatchTest extends DelugeAppTestCase
 {
+    // Keep the original and expected patch bytes independent of the runtime transformer.
+    private const LEGACY_UTIL_SOURCE = "import gettext\n\ndef setup_translations():\n    gettext.bindtextdomain('deluge', translations_path)\n    gettext.bind_textdomain_codeset('deluge', 'UTF-8')\n";
+    private const PATCHED_UTIL_SOURCE = "import gettext\n\ndef setup_translations():\n    gettext.bindtextdomain('deluge', translations_path)\n    if hasattr(gettext, 'bind_textdomain_codeset'):\n        gettext.bind_textdomain_codeset('deluge', 'UTF-8')\n";
+
     protected function setUp(): void
     {
         $this->pmssSetUpDelugeFixture('pmss-deluge-bindtextdomain-');
@@ -12,15 +16,15 @@ class DelugeBindTextdomainCompatPatchTest extends DelugeAppTestCase
 
     public function testPatchGuardsLegacyCodesetCall(): void
     {
-        [$result, $content] = $this->pmssDelugePatchFixtureApply('util.py', $this->legacyUtilSource(), 'pmssPatchDelugeBindTextdomainCodeset');
+        [$result, $content] = $this->pmssDelugePatchFixtureApply('util.py', self::LEGACY_UTIL_SOURCE, 'pmssPatchDelugeBindTextdomainCodeset');
 
         $this->assertTrue($result, 'Expected legacy gettext codeset call to be patched');
-        $this->assertEquals($this->patchedUtilSource(), $content);
+        $this->assertEquals(self::PATCHED_UTIL_SOURCE, $content);
     }
 
     public function testPatchReturnsTrueWhenCodesetCallAlreadyGuarded(): void
     {
-        $original = $this->patchedUtilSource();
+        $original = self::PATCHED_UTIL_SOURCE;
         [$result, $content] = $this->pmssDelugePatchFixtureApply('util.py', $original, 'pmssPatchDelugeBindTextdomainCodeset');
 
         $this->assertTrue($result, 'Expected already guarded gettext codeset call to be accepted');
@@ -36,7 +40,7 @@ class DelugeBindTextdomainCompatPatchTest extends DelugeAppTestCase
 
     public function testPatchDryRunDoesNotModifyFile(): void
     {
-        $original = $this->legacyUtilSource();
+        $original = self::LEGACY_UTIL_SOURCE;
         [$result, $content] = $this->pmssDelugePatchFixtureApply('util.py', $original, 'pmssPatchDelugeBindTextdomainCodeset', true);
 
         $this->assertTrue($result, 'Expected dry-run patch to report success');
@@ -46,16 +50,6 @@ class DelugeBindTextdomainCompatPatchTest extends DelugeAppTestCase
 
     public function testPatchRejectsSymlinkPath(): void
     {
-        $this->pmssAssertDelugePatchSymlinkRefused('util.py', $this->legacyUtilSource(), 'pmssPatchDelugeBindTextdomainCodeset');
-    }
-
-    private function legacyUtilSource(): string
-    {
-        return "import gettext\n\ndef setup_translations():\n    gettext.bindtextdomain('deluge', translations_path)\n    gettext.bind_textdomain_codeset('deluge', 'UTF-8')\n";
-    }
-
-    private function patchedUtilSource(): string
-    {
-        return "import gettext\n\ndef setup_translations():\n    gettext.bindtextdomain('deluge', translations_path)\n    if hasattr(gettext, 'bind_textdomain_codeset'):\n        gettext.bind_textdomain_codeset('deluge', 'UTF-8')\n";
+        $this->pmssAssertDelugePatchSymlinkRefused('util.py', self::LEGACY_UTIL_SOURCE, 'pmssPatchDelugeBindTextdomainCodeset');
     }
 }

@@ -6,16 +6,40 @@ require_once __DIR__.'/../common/TestCase.php';
 /** Lock update-step2.php's package phase without executing package or service commands. */
 class UpdatePackagePhaseCharacterizationTest extends TestCase
 {
+    /** Expected command and log bytes from the original inline package phase. */
+    private const HEALTHY_TRACE = [
+        ['run', 'Attempting apt fix-broken install (pre-package phase)', 'APT --fix-broken install -y'],
+        ['call', 'Refreshing package repositories', 'pmssRefreshRepositories', ['debian', 12, 'logmsg']],
+        ['call', 'Applying distro dpkg baseline selections', 'pmssApplyDpkgSelections', [12, true]],
+        ['call', 'Applying system service disable/mask policy (pre-app)', 'pmssStopDisableMaskSeedboxSystemServices', []],
+        ['call', 'Purging failed unbound daemon if present', 'pmssPurgeFailedUnbound', []],
+        ['call', 'Ensuring systemd service guard boot unit', 'pmssEnsureSystemdServicesGuardBootUnit', []],
+        ['run', 'Removing residual Apache packages', 'APT purge -y apache2 apache2-bin apache2-data libapache2-mod-php7.4 || true'],
+        ['call', 'Hardening legacy Apache systemd unit (post-purge)', 'pmssStopDisableMaskSystemdUnit', ['apache2', 'Apache httpd (legacy)', true]],
+        ['call', 'Holding libssl3/openssl for PECL ssh2 compat (dpkg-direct guard)', 'pmssHoldLibssl3ForPeclSsh2Compat', [12]],
+        ['call', 'Healing openssh-server post-cascade if missing/deleted', 'pmssHealOpensshServerIfMissing', [12]],
+        ['call', 'Ensuring openssh-server is libssl3-3.0.17-compatible (canonical baseline downgrade)', 'pmssEnsureOpensshCompatibleWithHeldLibssl3', [12]],
+        ['log', '[OK] Package phase relies on dpkg baseline selections only'],
+        ['recover', 'Attempting apt fix-broken install (post-package phase)'],
+        ['run', 'Removing packages no longer required', 'APT autoremove -y'],
+        ['versions'],
+        ['changed', ['docker-ce' => '1'], ['docker-ce' => '1']],
+        ['env', 'PMSS_DOCKER_PACKAGES_CHANGED=0'],
+        ['json', ['event' => 'docker_package_versions', 'changed' => false, 'before' => ['docker-ce' => '1'], 'after' => ['docker-ce' => '1']]],
+        ['env', 'PMSS_PACKAGE_PHASE=complete'],
+        ['json', ['event' => 'package_phase', 'status' => 'ok']],
+    ];
+
     public function testHealthyPhaseTraceAndCompletionState(): void
     {
         $result = $this->phaseRun([]);
-        $this->assertSame(['trace' => $this->healthyTrace(), 'ready' => true, 'sameFailure' => false], $result);
+        $this->assertSame(['trace' => self::HEALTHY_TRACE, 'ready' => true, 'sameFailure' => false], $result);
     }
 
     public function testBaselineRecoveryRetainsRetryGatesWarningsAndLaterSteps(): void
     {
         foreach ([[true, true], [true, false], [false, false]] as [$recover, $retry]) {
-            $expected = $this->healthyTrace();
+            $expected = self::HEALTHY_TRACE;
             $insert = [
                 ['log', 'deferred repository diagnostic'],
                 ['log', '[WARN] Dpkg baseline application reported issues; attempting recovery'],
@@ -34,7 +58,7 @@ class UpdatePackagePhaseCharacterizationTest extends TestCase
 
     public function testDockerSignalKeepsJsonFieldOrderAndChangeDiagnostic(): void
     {
-        $expected = $this->healthyTrace();
+        $expected = self::HEALTHY_TRACE;
         $expected[15] = ['changed', ['docker-ce' => '1'], ['docker-ce' => '2']];
         $expected[16] = ['env', 'PMSS_DOCKER_PACKAGES_CHANGED=1'];
         $expected[17] = ['json', ['event' => 'docker_package_versions', 'changed' => true,
@@ -45,7 +69,7 @@ class UpdatePackagePhaseCharacterizationTest extends TestCase
 
     public function testUnknownVersionIsPassedToRepositoryButNotToBaselineOrCompat(): void
     {
-        $expected = $this->healthyTrace();
+        $expected = self::HEALTHY_TRACE;
         $expected[1][3] = ['debian', 0, 'logmsg'];
         $expected[2][3] = [null, true];
         foreach ([8, 9, 10] as $index) $expected[$index][3] = [null];
@@ -56,38 +80,11 @@ class UpdatePackagePhaseCharacterizationTest extends TestCase
     {
         foreach (['RuntimeException', 'Error'] as $class) {
             foreach ([1, 2, 7, 8, 12, 14, 17] as $index) {
-                $expected = array_slice($this->healthyTrace(), 0, $index + 1);
+                $expected = array_slice(self::HEALTHY_TRACE, 0, $index + 1);
                 $this->assertSame(['trace' => $expected, 'ready' => false, 'sameFailure' => true],
                     $this->phaseRun(['throwAt' => $index, 'throwClass' => $class]));
             }
         }
-    }
-
-    /** Expected command and log bytes from the original inline package phase. */
-    private function healthyTrace(): array
-    {
-        return [
-            ['run', 'Attempting apt fix-broken install (pre-package phase)', 'APT --fix-broken install -y'],
-            ['call', 'Refreshing package repositories', 'pmssRefreshRepositories', ['debian', 12, 'logmsg']],
-            ['call', 'Applying distro dpkg baseline selections', 'pmssApplyDpkgSelections', [12, true]],
-            ['call', 'Applying system service disable/mask policy (pre-app)', 'pmssStopDisableMaskSeedboxSystemServices', []],
-            ['call', 'Purging failed unbound daemon if present', 'pmssPurgeFailedUnbound', []],
-            ['call', 'Ensuring systemd service guard boot unit', 'pmssEnsureSystemdServicesGuardBootUnit', []],
-            ['run', 'Removing residual Apache packages', 'APT purge -y apache2 apache2-bin apache2-data libapache2-mod-php7.4 || true'],
-            ['call', 'Hardening legacy Apache systemd unit (post-purge)', 'pmssStopDisableMaskSystemdUnit', ['apache2', 'Apache httpd (legacy)', true]],
-            ['call', 'Holding libssl3/openssl for PECL ssh2 compat (dpkg-direct guard)', 'pmssHoldLibssl3ForPeclSsh2Compat', [12]],
-            ['call', 'Healing openssh-server post-cascade if missing/deleted', 'pmssHealOpensshServerIfMissing', [12]],
-            ['call', 'Ensuring openssh-server is libssl3-3.0.17-compatible (canonical baseline downgrade)', 'pmssEnsureOpensshCompatibleWithHeldLibssl3', [12]],
-            ['log', '[OK] Package phase relies on dpkg baseline selections only'],
-            ['recover', 'Attempting apt fix-broken install (post-package phase)'],
-            ['run', 'Removing packages no longer required', 'APT autoremove -y'],
-            ['versions'],
-            ['changed', ['docker-ce' => '1'], ['docker-ce' => '1']],
-            ['env', 'PMSS_DOCKER_PACKAGES_CHANGED=0'],
-            ['json', ['event' => 'docker_package_versions', 'changed' => false, 'before' => ['docker-ce' => '1'], 'after' => ['docker-ce' => '1']]],
-            ['env', 'PMSS_PACKAGE_PHASE=complete'],
-            ['json', ['event' => 'package_phase', 'status' => 'ok']],
-        ];
     }
 
     /** Namespace shims record effects; the real module supplies all phase ordering and policy. */

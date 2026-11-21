@@ -8,12 +8,9 @@ require_once dirname(__DIR__, 2).'/user/userConfigStore.php';
 class UserConfigStoreCharacterizationTest extends TestCase
 {
     /** Expected empty-record projection, in the historical SORT_STRING order. */
-    private function defaults(): array
-    {
-        return ['billingClientId' => 0, 'billingServiceId' => 0, 'dockerEnabled' => true, 'gpuEnabled' => true,
-            'lighttpdEnabled' => true, 'panelSessionLogin' => false, 'scheduledConfigBackup' => false,
-            'suspended' => false, 'trafficLimit' => 0];
-    }
+    private const DEFAULTS = ['billingClientId' => 0, 'billingServiceId' => 0, 'dockerEnabled' => true, 'gpuEnabled' => true,
+        'lighttpdEnabled' => true, 'panelSessionLogin' => false, 'scheduledConfigBackup' => false,
+        'suspended' => false, 'trafficLimit' => 0];
 
     /** Exercise normalization through get(), so the same fixture also characterizes the old class. */
     private function readPayload(array $payload): array
@@ -25,7 +22,7 @@ class UserConfigStoreCharacterizationTest extends TestCase
 
     public function testEmptyAndLegacyRecordProjectionsHaveExactKeysAndValues(): void
     {
-        $this->assertSame($this->defaults(), $this->readPayload([]));
+        $this->assertSame(self::DEFAULTS, $this->readPayload([]));
         $this->assertSame([
             'IOWeight' => 'invalid', 'billingClientId' => 0, 'billingServiceId' => 12,
             'dockerEnabled' => false, 'gpuEnabled' => true, 'lighttpdEnabled' => true, 'panelSessionLogin' => false,
@@ -75,7 +72,7 @@ class UserConfigStoreCharacterizationTest extends TestCase
             $this->assertSame(17, $store->get('fixtur01')['quota']);
         }
         $this->pmssWriteFile($root.'/config/users/fixtur01.json', '{}');
-        $this->assertSame($this->defaults(), $store->get('fixtur01'));
+        $this->assertSame(self::DEFAULTS, $store->get('fixtur01'));
         $this->assertSame(null, $store->get('../fixtur01'));
         $this->assertSame(null, $store->get('fixtur09'));
     }

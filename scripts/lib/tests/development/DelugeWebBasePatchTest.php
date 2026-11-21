@@ -5,20 +5,18 @@ require_once __DIR__.'/DelugeAppTestCase.php';
 
 final class DelugeWebBasePatchTest extends DelugeAppTestCase
 {
+    // Literal input retains its trailing newline for exact patch and dry-run checks.
+    private const LEGACY_SERVER = "class DelugeWeb:\n    def setup(self):\n        if self.base != '/':\n"
+        ."            self.top_level.putChild(self.base.strip('/'), self.top_level)\n";
+
     protected function setUp(): void
     {
         $this->pmssSetUpDelugeFixture('pmss-deluge-web-base-');
     }
 
-    private function legacyServer(): string
-    {
-        return "class DelugeWeb:\n    def setup(self):\n        if self.base != '/':\n"
-            ."            self.top_level.putChild(self.base.strip('/'), self.top_level)\n";
-    }
-
     public function testPatchRewritesLegacyCallAndSecondRunDoesNotWrite(): void
     {
-        [$result, $content] = $this->pmssDelugePatchFixtureApply('server.py', $this->legacyServer(),
+        [$result, $content] = $this->pmssDelugePatchFixtureApply('server.py', self::LEGACY_SERVER,
             'pmssPatchDelugeWebBasePathBytes');
         $expected = "class DelugeWeb:\n    def setup(self):\n        if self.base != '/':\n"
             ."            self.top_level.putChild(self.base.strip('/').encode(), self.top_level)\n";
@@ -46,17 +44,17 @@ final class DelugeWebBasePatchTest extends DelugeAppTestCase
 
     public function testDryRunReportsPatchWithoutWriting(): void
     {
-        [$result, $content] = $this->pmssDelugePatchFixtureApply('server.py', $this->legacyServer(),
+        [$result, $content] = $this->pmssDelugePatchFixtureApply('server.py', self::LEGACY_SERVER,
             'pmssPatchDelugeWebBasePathBytes', true);
         $this->assertTrue($result);
-        $this->assertSame($this->legacyServer(), $content);
+        $this->assertSame(self::LEGACY_SERVER, $content);
         $this->pmssAssertMessagesContain($this->logs, 'Would patch Deluge WebUI base path bytes',
             'Dry-run should describe the planned repair');
     }
 
     public function testSymlinkIsRefusedWithoutChangingTarget(): void
     {
-        $this->pmssAssertDelugePatchSymlinkRefused('server.py', $this->legacyServer(),
+        $this->pmssAssertDelugePatchSymlinkRefused('server.py', self::LEGACY_SERVER,
             'pmssPatchDelugeWebBasePathBytes');
     }
 

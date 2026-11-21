@@ -6,6 +6,15 @@ require_once dirname(__DIR__, 4).'/scripts/lib/rutorrent/config.php';
 
 class RutorrentConfigOwnershipTest extends TestCase
 {
+    /** Literal template shared by fresh-file and linked-destination scenarios. */
+    private const CONFIG_TEMPLATE = <<<'PHP'
+<?php
+$scgi_host = "";
+$tempDirectory = null;
+$topDirectory = '/';
+$log_file = '/tmp/errors.log';
+PHP;
+
     public function testUpdateRutorrentConfigConvergesFreshFileOwnershipAndMode(): void
     {
         [$user, $uid, $gid] = $this->currentUserWithMatchingGroup();
@@ -15,7 +24,7 @@ class RutorrentConfigOwnershipTest extends TestCase
         $confDir = $home.'/www/rutorrent/conf';
 
         $this->pmssEnsureDir($confDir);
-        $this->pmssWriteFiles($configRoot, ['template.rutorrent.config' => $this->configTemplate(), 'template.rutorrent.access' => "allow = test\n"]);
+        $this->pmssWriteFiles($configRoot, ['template.rutorrent.config' => self::CONFIG_TEMPLATE, 'template.rutorrent.access' => "allow = test\n"]);
 
         $this->pmssWithEnv(['PMSS_CONFIG_DIR' => $configRoot, 'PMSS_HOME_DIR' => $homeRoot], function () use ($user): void {
             \updateRutorrentConfig($user, 1);
@@ -49,7 +58,7 @@ class RutorrentConfigOwnershipTest extends TestCase
         $homeRoot = $this->pmssMakeTempDir('pmss-rutorrent-home-');
         $confDir = $this->pmssUserHomePath($homeRoot, $user).'/www/rutorrent/conf';
         $this->pmssEnsureDir($confDir);
-        $this->pmssWriteFiles($configRoot, ['template.rutorrent.config' => $this->configTemplate(), 'template.rutorrent.access' => "allow = test\n"]);
+        $this->pmssWriteFiles($configRoot, ['template.rutorrent.config' => self::CONFIG_TEMPLATE, 'template.rutorrent.access' => "allow = test\n"]);
         $outside = $this->pmssWriteFile($configRoot.'/outside', 'keep');
         $this->assertTrue(symlink($outside, $confDir.'/config.php'));
 
@@ -60,17 +69,6 @@ class RutorrentConfigOwnershipTest extends TestCase
         $this->assertSame('keep', (string) file_get_contents($outside));
         $this->assertTrue(is_link($confDir.'/config.php'));
         $this->assertFalse(file_exists($confDir.'/access.ini'));
-    }
-
-    private function configTemplate(): string
-    {
-        return <<<'PHP'
-<?php
-$scgi_host = "";
-$tempDirectory = null;
-$topDirectory = '/';
-$log_file = '/tmp/errors.log';
-PHP;
     }
 
     /**
