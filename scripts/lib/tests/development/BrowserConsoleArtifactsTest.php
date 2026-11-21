@@ -35,15 +35,9 @@ class BrowserConsoleArtifactsTest extends TestCase
 
     public function testLauncherExportsHomeForTheSpawnedShell(): void
     {
-        $src = $this->pmssReadRepoFile('etc/skel/www/console.php');
-        $cd = strpos($src, "'cd '.escapeshellarg(\$home)");
-        $export = strpos($src, "'export HOME='.escapeshellarg(\$home)");
-        $cmd = strpos($src, "\$cmd.' </dev/null");
-
-        $this->assertTrue($cd !== false, 'spawn must change to the customer home');
-        $this->assertTrue($export !== false, 'spawn must export the customer home');
-        $this->assertTrue($cmd !== false, 'spawn must run the ttyd command');
-        $this->assertTrue($cd < $export && $export < $cmd, 'export HOME between cd and ttyd');
+        $this->pmssAssertRepoFileContainsOrderedStrings('etc/skel/www/console.php', [
+            "'cd '.escapeshellarg(\$home)", "'export HOME='.escapeshellarg(\$home)", "\$cmd.' </dev/null",
+        ], 'Console spawn is missing: ', 'Export HOME between cd and ttyd: ');
     }
 
     public function testLauncherLivenessProbeIsNotAProcessMatch(): void
@@ -273,17 +267,10 @@ class BrowserConsoleArtifactsTest extends TestCase
     public function testConsoleSerializesProbeCleanupAndSpawn(): void
     {
         $src = $this->pmssReadRepoFile('etc/skel/www/console.php');
-        $lock = strpos($src, 'LOCK_EX | LOCK_NB');
-        $probe = strpos($src, '$running = pmssConsoleSocketLive($sock)');
-        $cleanup = strpos($src, 'if (!pmssConsoleSpawnAllowed(');
-        $unlink = strpos($src, '@unlink($sock)');
-        $spawn = strpos($src, "@exec('setsid");
-        $unlock = strpos($src, 'fclose($consoleLock)');
-        foreach (array($lock, $probe, $cleanup, $unlink, $spawn, $unlock) as $offset) {
-            $this->assertTrue($offset !== false);
-        }
-        $this->assertTrue($lock < $probe && $probe < $cleanup && $cleanup < $unlink
-            && $unlink < $spawn && $spawn < $unlock);
+        $this->assertOrderedStrings([
+            'LOCK_EX | LOCK_NB', '$running = pmssConsoleSocketLive($sock)', 'if (!pmssConsoleSpawnAllowed(',
+            '@unlink($sock)', "@exec('setsid", 'fclose($consoleLock)',
+        ], $src);
         $this->assertStringContainsAllStrings(["console.lock', 'ce'", "'exec '.\$cmd"], $src);
     }
 }

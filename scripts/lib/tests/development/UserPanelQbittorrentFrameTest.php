@@ -8,11 +8,8 @@ class UserPanelQbittorrentFrameTest extends TestCase
     public function testBridgePrecedesTabInitialization(): void
     {
         $html = $this->renderPanel();
-        $bridge = strpos($html, 'function pmssQbtWindow()');
-        $this->assertTrue($bridge !== false);
         foreach (["$('#tabs').tabs(", 'if (!fromHash())'] as $initialization) {
-            $position = strpos($html, $initialization);
-            $this->assertTrue($position !== false && $bridge < $position, $initialization);
+            $this->assertOrderedStrings(['function pmssQbtWindow()', $initialization], $html);
         }
     }
 

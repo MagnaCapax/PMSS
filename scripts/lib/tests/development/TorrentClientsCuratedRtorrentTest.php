@@ -108,7 +108,6 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
 
     public function testPickerAndRestartReuseDeliveredCustomerFiles(): void
     {
-        $root = dirname(__DIR__, 4);
         $this->pmssAssertRepoFileContainsString('etc/skel/www/configure.php', 'pmssConfigureTorrentClientCardsBuild($home)');
         $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/configureTorrentClientsCard.php', ["'rtorrent' => 'rTorrent'", 'pmssConfigureTorrentClientVersionsOffered($client, $path)']);
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/filesystem.php', [
@@ -120,9 +119,9 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
             // A stale executor exits with a fresh run stamp; the consumer must look at the executor lock as well.
             "flock(\$executorLock, LOCK_EX | LOCK_NB)", '$lastRun == 0 or $executorIdle or']);
         // Stop in Apps must hold: the executor leaves instead of relaunching while the stop marker exists.
-        $executor = file_get_contents($root.'/etc/skel/.rtorrentExecute.php');
-        $stopCheck = strpos($executor, "if (file_exists('.rtorrentDisable'))");
-        $this->assertTrue($stopCheck !== false && $stopCheck < strpos($executor, 'passthru($rtorrentCommand'));
+        $this->pmssAssertRepoFileContainsOrderedStrings('etc/skel/.rtorrentExecute.php', [
+            "if (file_exists('.rtorrentDisable'))", 'passthru($rtorrentCommand',
+        ]);
     }
     public function testRtorrent016EntriesArePinnedAndLaunchWithDeprecatedRedirects(): void
     {

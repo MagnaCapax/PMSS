@@ -53,10 +53,9 @@ class StaticLintsTest extends TestCase
 
     public function testStaticLintsSkipsTheDevSuite(): void
     {
-        $php = (string) file_get_contents($this->pmssRepoPath('scripts/testing/test-php.sh'));
-        $skip = strpos($php, 'PMSS_TESTING_SKIP_DEV_TESTS');
-        $runner = strpos($php, 'scripts/lib/tests/development/Runner.php');
-        $this->assertTrue($skip !== false && $runner !== false && $skip < $runner, 'test-php.sh skips Runner.php when asked');
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/testing/test-php.sh', [
+            'PMSS_TESTING_SKIP_DEV_TESTS', 'scripts/lib/tests/development/Runner.php',
+        ], '', 'test-php.sh skips Runner.php when asked: ');
         $this->assertStringContainsString('PMSS_TESTING_SKIP_DEV_TESTS=1', (string) file_get_contents($this->pmssRepoPath('scripts/testing/static-lints.sh')));
     }
 }

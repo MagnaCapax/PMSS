@@ -344,12 +344,10 @@ class CustomerBackupTest extends TestCase
     public function testWelcomeRoutesAndExplainsBackupBeforeRendering(): void
     {
         $welcome = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
-        $route = strpos($welcome, "\$_GET['backup'] === 'download'");
-        $restoreRoute = strpos($welcome, "\$_GET['restore'] === 'config'");
-        $pageState = strpos($welcome, '$pageState = pmssWelcomePageStateBuild();');
-
-        $this->assertTrue($route !== false && $pageState !== false && $route < $pageState, 'Backup response must run before welcome HTML rendering.');
-        $this->assertTrue($restoreRoute !== false && $pageState !== false && $restoreRoute < $pageState, 'Restore response must run before welcome HTML rendering.');
+        foreach (["\$_GET['backup'] === 'download'", "\$_GET['restore'] === 'config'"] as $route) {
+            $this->assertOrderedStrings([$route, '$pageState = pmssWelcomePageStateBuild();'], $welcome,
+                '', 'Backup/restore response must run before welcome HTML rendering: ');
+        }
         $this->assertSame(1, substr_count($welcome, 'name="configBackup'), 'Welcome must expose only the streamed backup control.');
         $this->assertSame(1, substr_count($welcome, 'name="torrentConfigRestore"'), 'Welcome must expose the guided restore control once.');
         $this->assertStringContainsAllStrings(array(

@@ -396,6 +396,8 @@ Keep the canonical installer/update details under `docs/install.md` and
   Repository-only checks use the `pmssAssertRepoFile*` helpers for file reads and
   assertion batches; reuse returned source for later parsing, counts or ordering.
   Ordering-only checks call `pmssAssertRepoFileContainsOrderedStrings()` directly.
+  Panel initialization, backup routing, console lifecycle, rTorrent stop and CI
+  skip checks share these ordering assertions, retaining independent order pairs.
   Adjacent required/forbidden checks share one read; reuse that source for later
   regexes or checks with distinct diagnostic prefixes, preserving assertion order.
 - Generated CLI, service-command and torrent-client fixtures use the same batch
