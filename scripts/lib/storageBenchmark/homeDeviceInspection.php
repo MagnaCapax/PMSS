@@ -56,7 +56,9 @@ function storageBenchmarkHomeDeviceResolve(
         }
         // An overflowed sysfs counter cannot be reported as a reliable md status.
         $degradedCount = $degraded === false ? null : pmssUnsignedDecimalIntParse(trim($degraded));
-        if ($state === false || $level === false || $degradedCount === null) {
+        // An empty successful read is not an observation of array state or RAID level.
+        if ($state === false || $level === false || trim($state) === '' || trim($level) === ''
+            || $degradedCount === null) {
             return $entry + ['ok' => false, 'error' => 'unable to read md array status'];
         }
         $entry['md'] = ['array_state' => trim($state), 'degraded' => $degradedCount, 'level' => trim($level)];

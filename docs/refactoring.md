@@ -560,6 +560,11 @@ ownership; the existing benchmark safety tests retain normal cleanup coverage.
 The read-only home-device probe parses md degraded counts as representable
 unsigned integers. Malformed or overflowed sysfs values retain its existing
 preflight failure result; valid counts keep the same report shape.
+Empty or whitespace-only md array-state and level reads use that same status-read
+failure instead of certifying an incomplete inspection. Nonempty metadata,
+whitespace normalization and the raid0/linear missing-counter fallback remain
+unchanged. `StorageBenchmarkMdStatusSafetyTest` covers these observations with
+intercepted I/O on the testing machine; devbox checks changed PHP syntax only.
 
 Fio results require an array of job objects and array-valued read/write sections
 when present. Malformed job containers use the existing invalid-JSON result;
