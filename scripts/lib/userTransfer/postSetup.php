@@ -14,6 +14,7 @@ require_once dirname(__DIR__).'/torrentClients/postSetup.php';
 require_once dirname(__DIR__).'/user/trafficLimit.php';
 require_once __DIR__.'/rtorrentRestart.php';
 require_once __DIR__.'/qbittorrentRestart.php';
+require_once dirname(__DIR__).'/update/systemPrep/renderNodeDeny.php';
 
 function pmssUserTransferPostSetup(array $cfg, string $home, array $scratchPaths): void
 {
@@ -43,6 +44,8 @@ function pmssUserTransferPostSetup(array $cfg, string $home, array $scratchPaths
         'Normalising user permissions',
         pmssBuildCommand('php', [dirname(__DIR__, 2).'/util/userPermissions.php', $localUser])
     );
+    // Repair target-store GPU denies before any transferred services reopen devices.
+    pmssEnsureIntelRenderNodeDenies('logMessage');
     pmssTorrentClientsPostSetupConverge($localUser, $home);
     // rsync -a can leave the imported share owned by the source UID. Repair it
     // before asking the local account to rename that directory.

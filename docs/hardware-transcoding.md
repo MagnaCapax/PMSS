@@ -91,12 +91,15 @@ apt install i965-va-driver
 
 ### Render Group Membership
 
-On PMSS hosts with an Intel iGPU, PMSS opens Intel render nodes to all local
-accounts through a managed udev rule ([ADR 0096](adr/0096-intel-igpu-hardware-transcoding-firmware-and-render-node-access.md)).
-PMSS also adds every account to the `render` group automatically; no support
-request is needed. A session started before the account was added must restart
-(log out and back in, and restart tmux or Docker) before `groups` shows the new
-membership. Check the device and VAAPI:
+On PMSS hosts with an Intel iGPU, PMSS opens Intel render nodes through a managed
+udev rule ([ADR 0096](adr/0096-intel-igpu-hardware-transcoding-firmware-and-render-node-access.md)).
+GPU access defaults on. An operator can provision an account without access using
+`addUser.php --gpu-enabled=false`, or change it with
+`userConfig.php <account> --gpu-enabled=false`. Named-user ACLs deny that account
+while the shared node retains mode `0666`, including for rootless Docker.
+PMSS adds accounts with access to `render` automatically. A session started before
+the account was added must restart (log out and back in, and restart tmux or
+Docker) before `groups` shows the new membership. Check the device and VAAPI:
 
 ```bash
 ls -la /dev/dri/renderD128
@@ -110,6 +113,14 @@ dmesg | grep -i -E 'guc|wedged'
 ```
 
 Firmware installed during an update loads at the next boot.
+
+For a transfer, provision the target account with the same `gpuEnabled` policy:
+the source's root-owned store is not copied through the account login, and home
+files cannot set this policy. Normal transfers reapply the target store's deny
+rules before restarting transferred services; `--into` recovery leaves setup
+untouched. Already-open GPU descriptors remain usable until their processes
+close them. ADR 0096 also documents the console-seat ACL reset limitation and
+the real-hardware acceptance checks.
 
 ### Environment Variables
 
