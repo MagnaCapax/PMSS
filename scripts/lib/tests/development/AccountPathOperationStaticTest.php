@@ -170,8 +170,8 @@ final class AccountPathOperationStaticTest extends TestCase
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/pathSafety.php', [
             "[ ! -L '.\$arg",
             'cd -P --',
-            'find -P . -depth',
-            'rm -rf -- ./* ./.[!.]* ./..?*',
+            'find -P . -xdev -depth',
+            'rm -rf --one-file-system --preserve-root=all -- ./* ./.[!.]* ./..?*',
         ]);
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/pathSafety/immutableClear.pl', [
             'O_NOFOLLOW',

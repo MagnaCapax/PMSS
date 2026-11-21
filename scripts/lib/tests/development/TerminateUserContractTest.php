@@ -356,7 +356,7 @@ PHP;
             'purge must be remove -> clear-immutable -> remove-leftovers'
         );
         $this->assertStringNotContainsString('immutableClear.pl', $steps[0][1], 'first removal must not walk the tree');
-        $this->assertStringContainsAllStrings(['find -P . -depth', 'immutableClear.pl',
+        $this->assertStringContainsAllStrings(['find -P . -xdev -depth', 'immutableClear.pl',
             "'/home/user1234'" => 'path must be shell-escaped'], $steps[1][1]);
         $this->assertSame($steps[0][1], $steps[2][1], 'leftover removal repeats the initial removal');
 

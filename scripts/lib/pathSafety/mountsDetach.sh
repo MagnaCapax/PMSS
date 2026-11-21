@@ -1,0 +1,40 @@
+#!/bin/bash
+# Detach nested mounts from a pinned purge directory before any recursive work.
+set -euo pipefail
+
+purge_root=${1-}
+mountinfo=${2-/proc/self/mountinfo}
+[[ -n "$purge_root" && "$purge_root" != / && "$(pwd -P)" == "$purge_root" ]] || exit 1
+
+# Decode exactly the kernel's three-digit escapes; printf %b can consume a
+# following octal digit. Decode backslashes last to avoid a second expansion.
+mountTargetDecode() {
+	target=${1//\\040/ }
+	target=${target//\\011/$'\t'}
+	target=${target//\\012/$'\n'}
+	target=${target//\\134/\\}
+}
+
+# Keep the kernel's escaped fields until after sorting, so newlines and tabs in
+# customer-chosen mount names cannot split targets or become shell syntax.
+targets=()
+rows=0
+while read -r mount_id parent_id device mount_root encoded_target details; do
+	[[ "$mount_id" =~ ^[0-9]+$ && "$encoded_target" == /* && "$details" == *" - "* ]] || exit 1
+	rows=$((rows + 1))
+	mountTargetDecode "$encoded_target"
+	if [[ "$target" == "$purge_root/"* ]]; then
+		targets+=("$encoded_target")
+	fi
+done < "$mountinfo"
+((rows > 0)) || exit 1
+((${#targets[@]} > 0)) || exit 0
+
+# Reverse lexical order puts every child before its parent; retain duplicate
+# targets for stacked mounts. Failed discovery or detachment forbids the walk.
+sorted=$(printf '%s\n' "${targets[@]}" | LC_ALL=C sort -r)
+while IFS= read -r encoded_target; do
+	mountTargetDecode "$encoded_target"
+	# Kernel paths are already canonical. Avoid FUSE stat calls and helper hooks.
+	timeout --kill-after=5s 45s umount --internal-only --no-canonicalize --lazy -- "$target"
+done <<< "$sorted"

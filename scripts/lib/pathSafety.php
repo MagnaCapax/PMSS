@@ -268,7 +268,7 @@ function pmssInodeSafeRewriteRegularFile(string $root, string $path, callable $r
     }
 }
 
-/** Build one purge step anchored in the opened directory, never a followed link. */
+/** Build one purge step anchored in the opened directory, detaching nested mounts. */
 function pmssPinnedTreePurgeCommand(string $path, bool $clearImmutable): string
 {
     if (!pmssPathAbsoluteStringIsSafe($path, ['allowRoot' => false, 'allowTrailingSlash' => false])) {
@@ -276,11 +276,11 @@ function pmssPinnedTreePurgeCommand(string $path, bool $clearImmutable): string
     }
     $arg = escapeshellarg($path);
     $action = $clearImmutable
-        ? 'command -v perl >/dev/null 2>&1 && find -P . -depth \\( -type f -o -type d \\) -execdir perl '
+        ? 'command -v perl >/dev/null 2>&1 && find -P . -xdev -depth \\( -type f -o -type d \\) -execdir perl '
             .escapeshellarg(__DIR__.'/pathSafety/immutableClear.pl').' "$(pwd -P)" {} + 2>/dev/null || true'
-        : 'rm -rf -- ./* ./.[!.]* ./..?* && cd / && rmdir -- '.$arg;
+        : 'rm -rf --one-file-system --preserve-root=all -- ./* ./.[!.]* ./..?* && cd / && rmdir -- '.$arg;
     return 'if [ -d '.$arg.' ] && [ ! -L '.$arg.' ]; then '
         .'pin=$(stat -Lc %d:%i -- '.$arg.') && ( cd -P -- '.$arg
         .' && [ "$(pwd -P)" = '.$arg.' ] && [ "$(stat -Lc %d:%i -- .)" = "$pin" ] && '
-        .$action.' ); fi';
+        .'bash '.escapeshellarg(__DIR__.'/pathSafety/mountsDetach.sh').' '.$arg.' && ( '.$action.' ) ); fi';
 }
