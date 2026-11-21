@@ -1152,7 +1152,7 @@ iptables helpers:
   and missing-source omission. Billing requests only its source fields, prefers
   hierarchical memory totals, and records IO bytes, ops, and source atomically.
   Telemetry retains local memory counters and available IO bytes even when ops
-  are absent. Both choose ops from the bytes accounting family; a valid zero
+  are absent. Both choose ops from each direction's bytes accounting family; a valid zero
   hierarchical total takes precedence over a nonzero local value.
 - Cgroup-v1 IO bytes and operations use the matching family's `_recursive`
   counters at the account slice, including nested systemd services. Billing
@@ -1161,6 +1161,11 @@ iptables helpers:
   legacy scope). CPU deltas and existing runaway ceilings remain unchanged.
   Missing recursive counters retain omission behavior; parent-only counters
   cannot substitute for a recursive billing baseline (Refs #1022).
+- When BFQ write bytes and ops are both zero, a complete recursive throttle pair
+  with positive write bytes supplies writes while BFQ retains reads (Refs #1296,
+  ADR 0317). `io_source=bfq-read-throttle-write` makes transitions reseed through
+  the existing guard. Positive BFQ write bytes or ops retain BFQ precedence;
+  unusable throttle counters leave the BFQ sample unchanged.
 - Passive I/O ceiling samples, persisted ceiling reads, and derived read-IOPS oversell settings use the shared finite, non-negative numeric parser.
 - Read-IOPS storage observations reject NUL bytes in the original device path
   before trimming or basename extraction, and reject `.` and `..` device names.

@@ -82,7 +82,7 @@ function pmssResourceLogReadMemoryStatField(string $path, string $field): ?int {
 
 /**
  * Acquire v1 sources once in telemetry order; billing may request just its non-IO fields.
- * Missing counters are omitted. IO ops always use the selected bytes accounting family.
+ * Missing counters are omitted. Each direction's IO ops use its bytes accounting family.
  */
 function pmssResourceV1ReadMetrics(int $uid, ?string $cgroupRoot = null, ?array $wanted = null): array
 {
@@ -126,8 +126,19 @@ function pmssResourceV1ReadMetrics(int $uid, ?string $cgroupRoot = null, ?array 
     // Keep partial IO for telemetry; billing enforces its atomic group at projection time.
     $bytes = pmssResourceLogReadBlkioBytesWithSource($root.'/blkio'.$slice);
     if ($bytes !== null) {
-        $metrics += ['io_bytes_read' => $bytes['read'], 'io_bytes_write' => $bytes['write'], 'io_source' => $bytes['source']];
         $ops = pmssResourceLogReadBlkioReadWrite($root.'/blkio'.$slice.'blkio.'.$bytes['source'].'.io_serviced_recursive');
+        // BFQ can account reads but miss writes on md hosts (#1296). Keep reads and use
+        // a complete throttle write pair; a distinct source makes either transition reseed.
+        if ($bytes['source'] === 'bfq' && $bytes['write'] === 0 && $ops !== null && $ops['write'] === 0) {
+            $writeBytes = pmssResourceLogReadBlkioReadWrite($root.'/blkio'.$slice.'blkio.throttle.io_service_bytes_recursive');
+            $writeOps = pmssResourceLogReadBlkioReadWrite($root.'/blkio'.$slice.'blkio.throttle.io_serviced_recursive');
+            if ($writeBytes !== null && $writeBytes['write'] > 0 && $writeOps !== null) {
+                $bytes['write'] = $writeBytes['write'];
+                $ops['write'] = $writeOps['write'];
+                $bytes['source'] = 'bfq-read-throttle-write';
+            }
+        }
+        $metrics += ['io_bytes_read' => $bytes['read'], 'io_bytes_write' => $bytes['write'], 'io_source' => $bytes['source']];
         if ($ops !== null) $metrics += ['io_ops_read' => $ops['read'], 'io_ops_write' => $ops['write']];
     }
     return $metrics;
