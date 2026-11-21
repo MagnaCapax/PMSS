@@ -55,9 +55,8 @@ class UpdateHelpersSafeWriteTest extends TestCase
     public function testSafeWriteSourcesRejectsSymlinkTarget(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-apt-symlink-target-');
-        $victim = $dir.'/victim';
+        $victim = $this->pmssWriteFile($dir.'/victim', 'victim');
         $target = $dir.'/sources.list';
-        file_put_contents($victim, 'victim');
         $this->assertTrue(symlink($victim, $target));
 
         $this->pmssWithAptSourcesPath($target, function () use ($victim): void {
@@ -73,8 +72,7 @@ class UpdateHelpersSafeWriteTest extends TestCase
     public function testSafeWriteSourcesRejectsSymlinkBackup(): void
     {
         $target = $this->pmssWriteTempFile('sources', 'old');
-        $victim = $target.'.victim';
-        file_put_contents($victim, 'victim');
+        $victim = $this->pmssWriteFile($target.'.victim', 'victim');
         $this->assertTrue(symlink($victim, $target.'.pmss-backup'));
 
         $this->pmssWithAptSourcesPath($target, function () use ($target, $victim): void {
@@ -104,8 +102,7 @@ class UpdateHelpersSafeWriteTest extends TestCase
     public function testAptWriteValidUntilOverrideLogsParentDirectoryFailure(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-apt-override-blocked-');
-        $blocker = $dir.'/blocked';
-        file_put_contents($blocker, 'not-a-directory');
+        $blocker = $this->pmssWriteFile($dir.'/blocked', 'not-a-directory');
         $target = $blocker.'/90ignore-release-date';
         [$result, $logs] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($target): bool {
             return \pmssAptWriteValidUntilOverride($logger, $target);

@@ -238,8 +238,7 @@ PHP
 
     public function testSerializedTargetRejectsMalformedModesBeforePublishing(): void
     {
-        $path = $this->tempDir.'/mode-state.dat';
-        file_put_contents($path, 'original');
+        $path = $this->pmssWriteFile($this->tempDir.'/mode-state.dat', 'original');
 
         foreach (['', 'invalid', '-1', '640junk', "640\n", -1, 010000, str_repeat('9', 30)] as $mode) {
             $failures = [];

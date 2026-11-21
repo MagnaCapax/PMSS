@@ -19,8 +19,7 @@ class QbittorrentManagedConfigTest extends TestCase
     private function storeUploadCap(int $kib): void
     {
         $configDir = $this->pmssMakeTempDir('pmss-qbittorrent-config-');
-        $this->pmssEnsureDir($configDir.'/users');
-        file_put_contents($configDir.'/users/fixtur01.json', json_encode(['ramMiB' => 512, 'rtorrentPort' => 0, 'quota' => 5, 'quotaBurst' => 6, 'uploadThrottleKib' => $kib]));
+        $this->pmssWriteFile($configDir.'/users/fixtur01.json', json_encode(['ramMiB' => 512, 'rtorrentPort' => 0, 'quota' => 5, 'quotaBurst' => 6, 'uploadThrottleKib' => $kib]));
         $this->pmssTrackEnvOverrides(['PMSS_CONFIG_DIR' => $configDir]);
     }
 

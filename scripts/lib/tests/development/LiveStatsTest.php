@@ -113,8 +113,8 @@ class LiveStatsTest extends TestCase
     public function testRingReadRefusesSymlinkAndMalformedFiles(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-livestats');
-        file_put_contents($dir.'/ok.json', \pmssLiveStatsRingEncode([], ['t' => 1]));
-        file_put_contents($dir.'/bad.json', '{not json');
+        $this->pmssWriteFiles($dir, ['ok.json' => \pmssLiveStatsRingEncode([], ['t' => 1]),
+            'bad.json' => '{not json']);
         symlink($dir.'/ok.json', $dir.'/link.json');
         $this->assertSame([['t' => 1]], \pmssLiveStatsRingRead($dir.'/ok.json'));
         $this->assertSame([['t' => 1]], \pmssStatsLiveRingRead($dir.'/ok.json'));
