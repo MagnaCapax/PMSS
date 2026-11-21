@@ -14,8 +14,7 @@ class UpdateCodeloadFallbackTest extends TestCase
     public function testDatedPinsResolveRealHistoryOrFailBeforeStaging(): void
     {
         $root = $this->pmssMakeTempDir('pmss-dated-pin-');
-        $repo = $root.'/source';
-        mkdir($repo);
+        $repo = $this->pmssEnsureDir($root.'/source', 0777);
         // Disable inherited config/hooks and use only local file transport.
         $environment = [
             'GIT_CONFIG_NOSYSTEM' => '1', 'GIT_CONFIG_GLOBAL' => '/dev/null',
@@ -41,7 +40,7 @@ class UpdateCodeloadFallbackTest extends TestCase
             $source = preg_replace('/^#![^\n]*\n/', '', $source);
             $source = str_replace("const JSON_LOG              = '/var/log/pmss-update.jsonl';",
                 'const JSON_LOG = '.var_export($root.'/events.jsonl', true).';', $source);
-            file_put_contents($root.'/bootstrap.php', $source);
+            $this->pmssWriteFile($root.'/bootstrap.php', $source);
             $script = 'function logmsg(string $message): void { echo $message."\\n"; }'
                 .' require '.var_export($root.'/bootstrap.php', true).';'
                 .' $spec = ["type" => "git", "repo" => $argv[1], "branch" => "main", "pin" => $argv[2]];'

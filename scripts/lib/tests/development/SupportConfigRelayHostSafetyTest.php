@@ -11,7 +11,6 @@ class SupportConfigRelayHostSafetyTest extends TestCase
     protected function setUp(): void
     {
         $this->pmssAssignTempDirProperty('configDir', 'pmss-support-config-');
-        $this->pmssEnsureDir($this->configDir);
         $this->pmssTrackEnvOverrides([
             'PMSS_CONFIG_DIR' => $this->configDir,
             'PMSS_SUPPORT_CONFIG_PATH' => null,
@@ -20,7 +19,7 @@ class SupportConfigRelayHostSafetyTest extends TestCase
 
     private function writeConfig(array $overrides): void
     {
-        file_put_contents($this->configDir.'/support.php', "<?php\nreturn ".var_export(array_merge([
+        $this->pmssWriteFile($this->configDir.'/support.php', "<?php\nreturn ".var_export(array_merge([
             'targetEmail' => 'support@example.com',
             'snapshotDirectory' => '.support/requests',
             'smtpPort' => 25,

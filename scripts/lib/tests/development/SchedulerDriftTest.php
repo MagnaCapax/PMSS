@@ -19,7 +19,7 @@ class SchedulerDriftTest extends TestCase
             $this->pmssWriteFiles($root, [$device.'/queue/scheduler' => $scheduler."\n"], 0700);
         }
         foreach ($slaves as $device => $members) {
-            foreach ($members as $member) @mkdir($root.'/'.$device.'/slaves/'.$member, 0700, true);
+            foreach ($members as $member) $this->pmssEnsureDir($root.'/'.$device.'/slaves/'.$member, 0700);
         }
         foreach ($partitions as $disk => $members) {
             foreach ($members as $member) $this->pmssWriteFiles($root, [$disk.'/'.$member.'/partition' => "1\n"], 0700);

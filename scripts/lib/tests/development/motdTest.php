@@ -15,8 +15,7 @@ class MotdTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-motd-', 0700);
         $output   = $dir.'/motd.txt';
-        $runtime  = $dir.'/run';
-        @mkdir($runtime, 0700, true);
+        $runtime  = $this->pmssEnsureDir($dir.'/run', 0700);
 
         $template = $this->pmssWriteFile($dir.'/template.motd', "Host: %HOSTNAME%\nVersion: %PMSS_VERSION%\n");
 
@@ -38,8 +37,7 @@ class MotdTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-motd-', 0700);
         $output   = $dir.'/motd.txt';
-        $runtime  = $dir.'/run';
-        @mkdir($runtime, 0700, true);
+        $runtime  = $this->pmssEnsureDir($dir.'/run', 0700);
 
         $template = $this->pmssWriteFile($dir.'/template.motd', "Host: %HOSTNAME%\nKernel: %KERNEL_VERSION%\nNet: %NETWORK_SPEED%\n");
 

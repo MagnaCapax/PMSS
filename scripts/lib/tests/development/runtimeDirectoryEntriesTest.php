@@ -32,7 +32,7 @@ class RuntimeDirectoryEntriesTest extends TestCase
     {
         $directory = $this->pmssMakeTempDir('pmss-directory-entries-');
         $this->pmssWriteFiles($directory, array_fill_keys(['z', '.hidden', ' spaced ', "line\nbreak", 'A'], 'fixture'));
-        mkdir($directory.'/child');
+        $this->pmssEnsureDir($directory.'/child', 0777);
         symlink($directory.'/missing', $directory.'/broken-link');
         $expected = array_diff(scandir($directory), ['.', '..']);
         $this->assertSame($expected, pmssDirectoryEntriesRead($directory));
