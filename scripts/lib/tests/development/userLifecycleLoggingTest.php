@@ -8,7 +8,7 @@ class userLifecycleLoggingTest extends TestCase
 {
     public function testSuspendMoveFailureStillExpiresAndKillsAccount(): void
     {
-        $source = file_get_contents(dirname(__DIR__, 3).'/suspend.php');
+        $source = $this->pmssReadRepoFile('scripts/suspend.php');
         $source = preg_replace('/^require_once .*;\n/m', '', substr($source, strpos($source, '<?php') + 5));
         $record = $this->pmssMakeTempPath('pmss-suspend-steps-');
         $script = <<<'PHP'

@@ -114,7 +114,7 @@ final class ChromiumRuntimeInstallTest extends TestCase
     {
         // The baselines are applied additively on every host regardless of free space (ADR 0123).
         foreach (['12', '13'] as $major) {
-            $baseline = (string) file_get_contents(dirname(__DIR__, 2).'/update/dpkg/selections-debian'.$major.'.txt');
+            $baseline = $this->pmssReadRepoFile('scripts/lib/update/dpkg/selections-debian'.$major.'.txt');
             $this->assertSame(0, preg_match('/^chromium/m', $baseline), "selections-debian{$major}.txt must not list chromium packages");
         }
     }

@@ -57,7 +57,7 @@ class LoggerTest extends TestCase
     /** Run update.php's own bootstrap logmsg in a child process with an unwritable primary log directory. */
     private function runUpdateBootstrapLogmsg(string $scriptName, string $message): void
     {
-        $source = (string) file_get_contents(dirname(__DIR__, 3).'/update.php');
+        $source = $this->pmssReadRepoFile('scripts/update.php');
         $start = strpos($source, 'function pmssEnsureDirectory(');
         $end = strpos($source, "if (!function_exists('pmssCorrelationId'))");
         $this->assertTrue($start !== false && $end !== false && $end > $start, 'update.php bootstrap logger located');

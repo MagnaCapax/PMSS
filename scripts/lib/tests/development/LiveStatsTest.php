@@ -197,7 +197,7 @@ class LiveStatsTest extends TestCase
 
     public function testCustomerFilesNeverRequireOperatorTree(): void
     {
-        $source = (string) file_get_contents(dirname(__DIR__, 4).'/etc/skel/www/statsLive.php');
+        $source = $this->pmssReadRepoFile('etc/skel/www/statsLive.php');
         $this->assertFalse((bool) preg_match('~(require|include)(_once)?[^;]*/scripts/~', $source), 'statsLive.php must not touch /scripts');
     }
 }

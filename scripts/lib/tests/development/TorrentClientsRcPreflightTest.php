@@ -40,7 +40,7 @@ final class TorrentClientsRcPreflightTest extends TestCase
             'log.add_output = "notice", "rtorrent.log"',
             'log.add_output = socket_critical_custom,rtorrent.log',
             'schedule2 = later,5,0,"log.add_output=socket_critical,rtorrent.log"',
-            file_get_contents(dirname(__DIR__, 4).'/etc/skel/.rtorrent.rc.custom'));
+            $this->pmssReadRepoFile('etc/skel/.rtorrent.rc.custom'));
         foreach ($cases as $raw) {
             $this->pmssWriteFile($home.'/.rtorrent.rc.custom', $raw);
             $this->assertSame(null, \pmssConfigureTorrentClientRtorrentRcCheck($home, '0.16.26'));

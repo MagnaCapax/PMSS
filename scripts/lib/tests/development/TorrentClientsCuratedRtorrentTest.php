@@ -171,7 +171,7 @@ final class TorrentClientsCuratedRtorrentTest extends TestCase
 
     public function testTemplateGuardsTheOnlyRcLinesThatDifferBetweenFamilies(): void
     {
-        $rc = file_get_contents(dirname(__DIR__, 4).'/etc/seedbox/config/template.rtorrent.rc');
+        $rc = $this->pmssReadRepoFile('etc/seedbox/config/template.rtorrent.rc');
         // 0.16 rejects encoding.add even with -D; it must only run inside the 0.9.8 branch.
         $this->assertSame(1, preg_match_all('/encoding\.add/', preg_replace('/^#.*$/m', '', $rc)));
         $this->assertStringContainsString('branch = ((equal, ((system.client_version)), ((cat, "0.9.8")))), '
