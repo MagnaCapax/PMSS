@@ -39,8 +39,8 @@ final class TorrentClientsP2ConvergenceTest extends TestCase
     public function testConvergesLinksAndPreservesSelectionWithoutHostSetup(): void
     {
         [$root, $home, $ops, $events] = $this->fixture('selection');
-        $this->pmssWriteFile($root.'/store/qbittorrent/5.1.0/qbittorrent-nox', 'binary');
-        $this->pmssWriteFile($root.'/projection.json', '{"versions":[{"client":"qbittorrent","version":"5.1.0","kind":"static"}]}');
+        $this->pmssWriteFiles($root, ['store/qbittorrent/5.1.0/qbittorrent-nox' => 'binary',
+            'projection.json' => '{"versions":[{"client":"qbittorrent","version":"5.1.0","kind":"static"}]}']);
         $target = $root.'/store/qbittorrent/5.1.0';
         $this->pmssWriteSymlinks($home, ['bin/qbittorrent/default' => $target]);
         \pmssTorrentClientsPostSetupConverge('t', $home, $ops);
@@ -81,8 +81,7 @@ final class TorrentClientsP2ConvergenceTest extends TestCase
         // A Deluge store version is a virtualenv whose daemon lives in bin/ (ADR 0110), not at the top level.
         [$root, $home, $ops, $events] = $this->fixture('deluge-venv');
         $target = $root.'/store/deluge/2.2.0';
-        $this->pmssWriteFile($target.'/bin/deluged', '#!/usr/bin/python3');
-        $this->pmssWriteFile($target.'/bin/deluge-web', '#!/usr/bin/python3');
+        $this->pmssWriteFiles($target, ['bin/deluged' => '#!/usr/bin/python3', 'bin/deluge-web' => '#!/usr/bin/python3']);
         $this->pmssWriteFile($root.'/projection.json', '{"versions":[{"client":"deluge","version":"2.2.0","kind":"venv"}]}');
         $this->pmssWriteSymlinks($home, ['bin/deluge/default' => $target]);
         \pmssTorrentClientsPostSetupConverge('t', $home, $ops);

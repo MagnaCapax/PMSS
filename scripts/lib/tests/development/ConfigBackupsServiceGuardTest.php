@@ -26,12 +26,11 @@ class ConfigBackupsServiceGuardTest extends TestCase
         [$sourceRoot, $parentRoot] = $this->pmssConfigBackupsFixtureRoots();
         $source = $this->pmssWriteRelativeFile($sourceRoot, 'etc/nginx/nginx.conf', "worker_processes auto;\n");
         $backupRoot = $parentRoot.'/config';
-        mkdir($backupRoot, 0755);
         $name = '20000101000000__'.\pmssConfigBackupsPathKey($source).'.bak';
         $modes = [];
         // Both dot components resolve inside this fixture, including on a regression.
         foreach ([$parentRoot, $backupRoot] as $directory) {
-            file_put_contents($directory.'/'.$name, 'keep');
+            $this->pmssWriteFile($directory.'/'.$name, 'keep');
             $modes[$directory] = fileperms($directory);
         }
 

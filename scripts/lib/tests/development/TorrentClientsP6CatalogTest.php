@@ -50,7 +50,7 @@ final class TorrentClientsP6CatalogTest extends TestCase
     {
         [$root, $home, $store] = $this->pmssTorrentClientStoreFixture('pmss-p6-resolve-',
             'deluge', '2.1.1', ['bin/deluged' => 'fixture'], 't@localhost');
-        symlink($store.'/deluge/2.1.1', $home.'/bin/deluge/default');
+        $this->pmssWriteSymlinks($home, ['bin/deluge/default' => $store.'/deluge/2.1.1']);
         $projection = $root.'/projection.json';
         foreach (['static', 'venv'] as $kind) {
             $this->pmssWriteFile($projection, json_encode(['versions' => [

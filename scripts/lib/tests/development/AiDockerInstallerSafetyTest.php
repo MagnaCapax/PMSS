@@ -34,10 +34,8 @@ class AiDockerInstallerSafetyTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-ai-node-');
         $tree = $root.'/node-v22.23.4-linux-x64';
         $outside = $root.'/outside';
-        $this->assertTrue(@mkdir($tree.'/bin', 0700, true));
-        $this->assertTrue(@mkdir($outside));
-        $this->assertSame(1, @file_put_contents($tree.'/bin/node', 'n'));
-        $this->assertSame(1, @file_put_contents($outside.'/keep', 'x'));
+        $this->assertSame(1, @file_put_contents($this->pmssEnsureDir($tree.'/bin', 0700).'/node', 'n'));
+        $this->assertSame(1, @file_put_contents($this->pmssEnsureDir($outside, 0777).'/keep', 'x'));
         $this->assertTrue(@symlink($outside, $tree.'/bin/outside-link'));
 
         $uid = @fileowner($tree);
@@ -52,8 +50,7 @@ class AiDockerInstallerSafetyTest extends TestCase
         $this->assertTrue(\pmssRootOwnedTreeRemove($tree));
 
         $stale = $root.'/.pmss-remove-0123456789abcdef';
-        $this->assertTrue(@mkdir($stale.'/tree/bin', 0700, true));
-        $this->assertSame(1, @file_put_contents($stale.'/tree/bin/node', 'n'));
+        $this->assertSame(1, @file_put_contents($this->pmssEnsureDir($stale.'/tree/bin', 0700).'/node', 'n'));
         $this->assertTrue(\pmssRootOwnedTreeRemove($stale));
         $this->assertSame([], glob($root.'/.pmss-remove-*'));
     }

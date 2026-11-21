@@ -73,8 +73,7 @@ class ProcessArchiveDirPermissionsTest extends TestCase
         $outside = $root.'/outside';
         mkdir($outside, 0755);
         chmod($outside, 0755);
-        mkdir($root.'/var/log', 0755, true);
-        $this->pmssCreateSymlinkOrSkip($outside, $root.'/var/log/atop');
+        $this->pmssWriteSymlinks($root, ['var/log/atop' => $outside]);
 
         try {
             \pmssProcessArchiveDirHarden($root);
