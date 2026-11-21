@@ -12,6 +12,11 @@ Security for PMSS emphasizes defense-in-depth on a shared host.
 - Masked file opens share `pmssFileOpenWithUmask()` in `runtime/filesystemStream.php`.
   Logging, staging, rebuild probes, restart audits and support snapshots retain their
   open modes, masks and path guards; fault fixtures load the real helper beside their I/O shims.
+- Shared-log creation in `scripts/lib/log/append.php` requires successful stream
+  closure before authorizing an append. A false close returns `false` before
+  further inspection; open-failure recovery, ownership/mode guards and thrown
+  close faults retain their existing behavior. `LogUmaskSafetyTest` covers false
+  closes across creation modes and caller masks without filesystem writes.
 - Directory and support snapshot creation restore the caller's umask in `finally`,
   including when `mkdir` or exclusive `fopen` throws. `CreationUmaskSafetyTest`
   injects exceptions, errors and false returns without creating host files;

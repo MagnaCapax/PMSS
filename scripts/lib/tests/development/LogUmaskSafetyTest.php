@@ -25,7 +25,10 @@ function posix_geteuid() { return 1000; }
 function stat($path) { return ['mode' => 01700]; }
 function clearstatcache(...$args) {}
 function pmssPathExistsOrLink($path) { return $GLOBALS['exists']; }
-function lstat($path) { return $GLOBALS['exists'] ? ['mode' => 0100600, 'uid' => 1000, 'nlink' => 1] : false; }
+function lstat($path) {
+    if ($GLOBALS['stage'] === 'close-false') throw new \RuntimeException('inspection after failed close');
+    return $GLOBALS['exists'] ? ['mode' => 0100600, 'uid' => 1000, 'nlink' => 1] : false;
+}
 function pmssPathSegmentsAreSafe(...$args) { return true; }
 function pmssLockFilePathIsSafe($path) { return true; }
 function is_dir($path) { return true; }
@@ -39,7 +42,7 @@ function fopen($path, $mode) {
 function fclose($stream) {
     \fclose($stream);
     observe('close');
-    return true;
+    return $GLOBALS['stage'] !== 'close-false';
 }
 function date($format) { observe('format', [$format]); return 'stamp'; }
 function pmssFileWriteComplete($path, $bytes, $flags) {
@@ -76,7 +79,9 @@ PHP;
             foreach ($kind === 'create' ? [0600, 0644] : [null, 0600, 0644] as $mode) {
                 foreach ([0022, 0077] as $initial) {
                     $faults = $kind === 'create' ? ['open', 'close'] : ['format', 'write', 'chmod'];
-                    foreach (array_merge(['ok', $kind === 'create' ? 'open-false' : 'write-false'], $faults) as $stage) {
+                    // False closure must refuse creation before inspecting or authorizing the log.
+                    $resultsWithoutThrow = $kind === 'create' ? ['ok', 'open-false', 'close-false'] : ['ok', 'write-false'];
+                    foreach (array_merge($resultsWithoutThrow, $faults) as $stage) {
                         if ($stage === 'chmod' && $mode === null) continue;
                         $throws = in_array($stage, $faults, true);
                         foreach ($throws ? ['RuntimeException', 'Error'] : [''] as $type) {

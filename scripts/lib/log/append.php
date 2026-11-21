@@ -56,7 +56,8 @@ function pmssLogSharedFileIsOwn(string $path, int $mode): bool
     clearstatcache(true, $path);
     if (!pmssPathExistsOrLink($path)) {
         $handle = pmssFileOpenWithUmask($path, 'x', 0777 & ~$mode);
-        $handle !== false && fclose($handle);
+        // A failed close cannot certify creation before the caller appends a record.
+        if ($handle !== false && !fclose($handle)) return false;
         clearstatcache(true, $path);
     }
     $stat = @lstat($path);
