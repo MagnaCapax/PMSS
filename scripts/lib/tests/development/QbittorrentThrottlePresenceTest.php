@@ -44,8 +44,7 @@ final class QbittorrentThrottlePresenceTest extends TestCase
     {
         $home = $this->pmssMakeTrackedHomeRoot('pmss-qbt-cap-link-').'/fixtur01';
         $entry = $home.'/.config/pmss/torrentClients/qbittorrent.throttleApplied';
-        $this->pmssEnsureDir(dirname($entry));
-        $this->pmssCreateSymlinkOrSkip($home.'/missing', $entry);
+        $this->pmssWriteSymlinks(dirname($entry), [basename($entry) => $home.'/missing']);
         $calls = 0;
         $this->assertTrue(\pmssQbittorrentThrottleWatchdog('fixtur01', $home, true, [
             'account' => static function ($user, $home, $cap) use (&$calls): bool {

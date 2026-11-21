@@ -28,8 +28,7 @@ final class QbittorrentSocketTest extends TestCase
     public function testListenerReaderMatchesOnlyTheDaemonSocketInodes(): void
     {
         $proc = $this->pmssMakeTempDir('pmss-qbt-sockets-');
-        $this->pmssEnsureDir($proc.'/101/fd');
-        $this->pmssCreateSymlinkOrSkip('socket:[123]', $proc.'/101/fd/3');
+        $this->pmssWriteSymlinks($proc, ['101/fd/3' => 'socket:[123]']);
         $this->pmssWriteFile($proc.'/net/tcp', "header\n0: 0100007F:5BA0 00000000:0000 0A 0 0 0 1000 0 123\n"
             ."1: 00000000:1F90 00000000:0000 0A 0 0 0 1001 0 999\n");
         $this->pmssWriteFile($proc.'/net/tcp6', "header\n");

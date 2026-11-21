@@ -28,8 +28,7 @@ final class QbittorrentStartSafetyTest extends TestCase
     public function testSelectedResolverAlsoRefusesBeforeExecutingResolvedBinary(): void
     {
         $home = $this->pmssMakeTempDir('pmss-qbt-selected-');
-        $this->pmssEnsureDir($home.'/bin/qbittorrent');
-        $this->pmssCreateSymlinkOrSkip('custom', $home.'/bin/qbittorrent/default');
+        $this->pmssWriteSymlinks($home, ['bin/qbittorrent/default' => 'custom']);
         $restores = 0;
         $this->assertFalse(\pmssTorrentClientResolverLaunch($home, 'qbittorrent', false, [
             'restore' => static function () use (&$restores): bool { $restores++; return false; },

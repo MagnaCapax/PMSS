@@ -74,8 +74,7 @@ HTML;
         $helper = $directory.'/etc/skel/www/storageHealthRaidDisplay.php';
         foreach ([false, true] as $symlink) {
             if ($symlink) {
-                $this->pmssEnsureDir(dirname($helper));
-                $this->pmssCreateSymlinkOrSkip($this->pmssRepoPath('etc/skel/www/storageHealthRaidDisplay.php'), $helper);
+                $this->pmssWriteSymlinks(dirname($helper), [basename($helper) => $this->pmssRepoPath('etc/skel/www/storageHealthRaidDisplay.php')]);
             }
             $result = $this->pmssRunRepoPhpScriptCommand('scripts/lib/tests/fixtures/storageHealthNoticeContract.php', ['bridge', $script]);
             $this->pmssAssertArraySubsetSame(['rc' => 0, 'output' => 'Storage RAID display helper unavailable'], $result);

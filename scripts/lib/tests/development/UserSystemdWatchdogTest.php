@@ -23,8 +23,7 @@ class UserSystemdWatchdogTest extends TestCase
         $this->pmssWriteRelativeFile($target, 'user/custom.service', '[Unit]');
         $this->assertSame([], \pmssUserSystemdWatchdogUnitNames($home));
 
-        $this->pmssEnsureDir($home.'/.config');
-        $this->pmssCreateSymlinkOrSkip($target, $home.'/.config/systemd');
+        $this->pmssWriteSymlinks($home, ['.config/systemd' => $target]);
         $this->assertSame([], \pmssUserSystemdWatchdogUnitNames($home));
     }
 

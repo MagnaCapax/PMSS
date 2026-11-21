@@ -23,8 +23,7 @@ final class QbittorrentStoppedNoticeTest extends TemporaryHomeRootTestCase
     {
         $home = $this->pmssMakeTempDir('pmss-qbt-link-notice-');
         $original = $this->pmssWriteFile($home.'/private.conf', 'untouched');
-        $this->pmssEnsureDir($home.'/.config/qBittorrent');
-        $this->pmssCreateSymlinkOrSkip($original, $home.'/.config/qBittorrent/qBittorrent.conf');
+        $this->pmssWriteSymlinks($home, ['.config/qBittorrent/qBittorrent.conf' => $original]);
         foreach (['pmssQbittorrentRestore', 'pmssQbittorrentFrontendRestore'] as $restore) {
             $this->pmssWriteFile($home.'/.config/pmss/torrentClients/qbittorrent.notice', 'stale busy message');
             $this->assertFalse($restore($home, self::pmssMakeCallbacks(['stopped' => true])));
