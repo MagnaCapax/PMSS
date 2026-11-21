@@ -10,14 +10,13 @@ class PinnedArtifactChecksumSafetyTest extends TestCase
     public function testRegularLinksAndEmptyFilesKeepTheirChecksums(): void
     {
         $root = $this->pmssMakeTempDir('pmss-checksum-safety-');
-        $path = $root.'/artifact with spaces';
-        file_put_contents($path, 'payload');
+        $path = $this->pmssWriteFile($root.'/artifact with spaces', 'payload');
         link($path, $root.'/hardlink');
         symlink($path, $root.'/symlink');
         foreach ([$path, $root.'/hardlink', $root.'/symlink'] as $file) {
             $this->assertSame(hash('sha256', 'payload'), \pmssPinnedRemoteChecksum($file));
         }
-        file_put_contents($path, '');
+        $this->pmssWriteFile($path, '');
         $this->assertSame(hash('sha256', ''), \pmssPinnedRemoteChecksum($path));
         $this->assertSame('', \pmssPinnedRemoteChecksum($root));
         $this->assertSame('', \pmssPinnedRemoteChecksum($root.'/missing'));

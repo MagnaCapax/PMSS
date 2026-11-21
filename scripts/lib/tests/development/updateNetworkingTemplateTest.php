@@ -39,7 +39,7 @@ class UpdateNetworkingTemplateTest extends TestCase
         $target = $targetDir.'/network';
         $existing = "<?php\nreturn array('interface' => 'eno1');\n";
         $this->pmssWriteRelativeFile($configDir, 'template.network', $this->pmssReadRepoFile('etc/seedbox/config/template.network'));
-        file_put_contents($target, $existing);
+        $this->pmssWriteFile($target, $existing);
         $messages = array();
 
         $this->pmssWithEnv(

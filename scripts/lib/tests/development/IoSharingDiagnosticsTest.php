@@ -66,7 +66,7 @@ class IoSharingDiagnosticsTest extends TestCase
         $age = (int) $this->collect('shadow_log_age_seconds', $paths);
         $this->assertTrue($age >= 100 && $age < 120);
         $this->assertSame("DefaultIOAccounting=yes\nDefaultIOAccounting=no", $this->collect('default_io_accounting', $paths));
-        file_put_contents($root.'/ceiling.json', '{malformed');
+        $this->pmssWriteFile($root.'/ceiling.json', '{malformed');
         $this->assertSame('unknown', $this->collect('published_read_iops', $paths));
     }
 }

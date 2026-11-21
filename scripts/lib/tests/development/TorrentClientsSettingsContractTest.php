@@ -31,7 +31,7 @@ final class TorrentClientsSettingsContractTest extends TestCase
         foreach ($root as $key => $value) {
             $changed = $root;
             $changed[$key] = $value === false ? true : false;
-            file_put_contents($path, json_encode($changed));
+            $this->pmssWriteFile($path, json_encode($changed));
             $this->assertFalse(\pmssTransmissionSettingsReady($home));
         }
     }
@@ -39,11 +39,9 @@ final class TorrentClientsSettingsContractTest extends TestCase
     public function testBothDeployTreesAgreeOnSnakeCasePolicy(): void
     {
         $home = $this->pmssMakeTempDir('pmss-transmission-snake-').'/t';
-        $this->pmssEnsureDir($home.'/.config/transmission-daemon');
         $this->pmssEnsureDir($home.'/.lighttpd');
-        $path = $home.'/.config/transmission-daemon/settings.json';
         $raw = '{"rpc_bind_address":"old","download-dir":"/keep"}';
-        file_put_contents($path, $raw);
+        $path = $this->pmssWriteFile($home.'/.config/transmission-daemon/settings.json', $raw);
         $root = $this->pmssDecodeJsonArray(\pmssTransmissionSettingsContent($raw,
             $home.'/.lighttpd/transmission.sock', '/user-t/transmission/'));
         $this->assertTrue(\pmssTransmissionSettingsPrepare($home));

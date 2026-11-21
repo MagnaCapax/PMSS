@@ -23,9 +23,8 @@ class MediaStackWatchdogTest extends TestCase
     public function testExpectedAppsOnlyIncludesPreparedAccountDirectories(): void
     {
         $home = $this->pmssMakeTempDir('media-stack-watchdog-apps-');
-        $this->pmssWriteRelativeFile($home, '.config/sonarr/config.xml', '<Config />');
-        $this->pmssWriteRelativeFile($home, '.bin/Radarr/Radarr.dll', 'binary');
-        $this->pmssWriteRelativeFile($home, '.bin/autobrr/autobrr', 'binary');
+        $this->pmssWriteFiles($home, ['.config/sonarr/config.xml' => '<Config />',
+            '.bin/Radarr/Radarr.dll' => 'binary', '.bin/autobrr/autobrr' => 'binary']);
 
         $apps = \pmssMediaStackWatchdogExpectedApps($home);
 
@@ -92,8 +91,8 @@ class MediaStackWatchdogTest extends TestCase
     {
         $homeRoot = $this->pmssMakeTempDir('media-stack-watchdog-run-');
         $home = $homeRoot.'/fixtur01';
-        $this->pmssWriteRelativeFile($home, '.config/jellyfin/config/network.xml', '<NetworkConfiguration />');
-        $this->pmssWriteRelativeFile($home, '.config/sonarr/config.xml', '<Config />');
+        $this->pmssWriteFiles($home, ['.config/jellyfin/config/network.xml' => '<NetworkConfiguration />',
+            '.config/sonarr/config.xml' => '<Config />']);
 
         $status = \pmssMediaStackWatchdogRunUser('fixtur01', $homeRoot, self::pmssMakeCallbacks(['probe' => true])['probe']);
 
@@ -132,7 +131,7 @@ class MediaStackWatchdogTest extends TestCase
         $home = $this->pmssMakeTempDir('media-stack-encoding-');
         $path = $home.'/.media-stack-status.json';
         foreach ([false, true] as $existing) {
-            if ($existing) file_put_contents($path, 'previous status');
+            if ($existing) $this->pmssWriteFile($path, 'previous status');
             foreach ([['invalid' => "\xff"], ['invalid' => INF], ['invalid' => NAN]] as $status) {
                 $this->assertFalse(\pmssMediaStackWatchdogStatusWrite($home, $path, $status));
                 $this->assertSame([], array_values(array_diff(glob($home.'/.media-stack-status.*'), [$path])));
