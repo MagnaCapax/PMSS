@@ -46,6 +46,43 @@ class DistUpgradeAptResultTest extends TestCase
         );
     }
 
+    public function testAptStepsGetTheirOwnDeadlineAndRestoreTheCallersOne(): void
+    {
+        foreach ([
+            // [PMSS_DIST_UPGRADE_APT_TIMEOUT, caller's PMSS_COMMAND_TIMEOUT, deadline seen by the command]
+            'default two hours, caller unset' => [null, null, '7200'],
+            'default two hours, caller set' => [null, '900', '7200'],
+            'override' => ['14400', '900', '14400'],
+            'no deadline' => ['0', null, '0'],
+        ] as $scenario => [$aptTimeout, $callerTimeout, $seen]) {
+            $run = $this->runLockedCommand($aptTimeout, $callerTimeout, false);
+            $this->assertSame(['rc' => 0, 'seen' => $seen, 'after' => $callerTimeout ?? 'unset'], $run, $scenario);
+        }
+        // A step that throws still restores the caller's deadline.
+        $this->assertSame(['rc' => 'threw', 'seen' => '7200', 'after' => '900'], $this->runLockedCommand(null, '900', true));
+    }
+
+    /** Run the real locked-command wrapper with a runCommand stub that records the deadline it sees. */
+    private function runLockedCommand(?string $aptTimeout, ?string $callerTimeout, bool $throw): array
+    {
+        $script = 'namespace DistUpgradeAptDeadline;'
+            .($aptTimeout === null ? 'putenv("PMSS_DIST_UPGRADE_APT_TIMEOUT");' : 'putenv("PMSS_DIST_UPGRADE_APT_TIMEOUT='.$aptTimeout.'");')
+            .($callerTimeout === null ? 'putenv("PMSS_COMMAND_TIMEOUT");' : 'putenv("PMSS_COMMAND_TIMEOUT='.$callerTimeout.'");')
+            .'$GLOBALS["seen"] = null; $GLOBALS["throw"] = '.var_export($throw, true).';'
+            .'function pmssEnvReadDigits($key) { return (($v = getenv($key)) !== false && ctype_digit($v)) ? (int) $v : null; }'
+            .'function pmssDistUpgradeWaitForLocksOrLog($message) { return true; }'
+            .'function runCommand($command, $verbose, $logger, $tty) { $GLOBALS["seen"] = (string) getenv("PMSS_COMMAND_TIMEOUT"); if ($GLOBALS["throw"]) { throw new \RuntimeException("x"); } return 0; }';
+        foreach (['pmssDistUpgradeAptTimeoutSeconds', 'pmssDistUpgradeRunLockedCommand'] as $name) {
+            $function = new \ReflectionFunction($name);
+            $source = implode('', array_slice(file($function->getFileName()), $function->getStartLine() - 1, $function->getEndLine() - $function->getStartLine() + 1));
+            $script .= 'eval('.var_export('namespace DistUpgradeAptDeadline; '.$source, true).');';
+        }
+        $script .= 'try { $rc = pmssDistUpgradeRunLockedCommand("apt-get full-upgrade", "lock"); } catch (\RuntimeException $e) { $rc = "threw"; }'
+            .'$after = getenv("PMSS_COMMAND_TIMEOUT");'
+            .'echo json_encode(["rc" => $rc, "seen" => $GLOBALS["seen"], "after" => $after === false ? "unset" : $after]);';
+        return $this->pmssRunInlinePhpJson($script);
+    }
+
     /** Run the real apt-phase functions against scripted command results. */
     private function runAptPhase(array $rcs): array
     {

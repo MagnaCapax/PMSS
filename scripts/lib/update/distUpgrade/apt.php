@@ -49,9 +49,30 @@ function pmssDistUpgradeWaitForLocksOrLog(string $message): bool
     return false;
 }
 
+/**
+ * Deadline for one dist-upgrade apt/dpkg step. On a slow host one step can need longer than the
+ * 1200 s default, and killing dpkg mid-unpack leaves it interrupted with PHP half-upgraded.
+ * ADR 0035 keeps one deadline in the shared layer; this caller sets its own, like userTransfer.
+ * PMSS_DIST_UPGRADE_APT_TIMEOUT overrides it; 0 means no deadline.
+ */
+function pmssDistUpgradeAptTimeoutSeconds(): int
+{
+    return pmssEnvReadDigits('PMSS_DIST_UPGRADE_APT_TIMEOUT') ?? 7200;
+}
+
 function pmssDistUpgradeRunLockedCommand(string $command, string $lockMessage, bool $inheritTty = false): ?int
 {
-    return pmssDistUpgradeWaitForLocksOrLog($lockMessage) ? runCommand($command, true, null, $inheritTty) : null;
+    if (!pmssDistUpgradeWaitForLocksOrLog($lockMessage)) {
+        return null;
+    }
+
+    $previousTimeout = getenv('PMSS_COMMAND_TIMEOUT');
+    putenv('PMSS_COMMAND_TIMEOUT='.(string) pmssDistUpgradeAptTimeoutSeconds());
+    try {
+        return runCommand($command, true, null, $inheritTty);
+    } finally {
+        putenv($previousTimeout === false ? 'PMSS_COMMAND_TIMEOUT' : 'PMSS_COMMAND_TIMEOUT='.$previousTimeout);
+    }
 }
 
 function pmssExecuteUpgrade(): bool

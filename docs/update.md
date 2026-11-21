@@ -85,7 +85,7 @@ Common flags:
 ```
 
 - `--dry-run` – exercise the staging logic without copying or running phase 2.
-- `--dist-upgrade=<max>` – perform a Debian dist-upgrade (one major step per run) but never beyond the specified maximum; then continue with phase 2 to rebuild compiled components. If `apt-get full-upgrade` still fails after its recovery retry, or the host does not report the target release afterwards, the run stops with a non-zero exit and phase 2 does not run.
+- `--dist-upgrade=<max>` – perform a Debian dist-upgrade (one major step per run) but never beyond the specified maximum; then continue with phase 2 to rebuild compiled components. If `apt-get full-upgrade` still fails after its recovery retry, or the host does not report the target release afterwards, the run stops with a non-zero exit and phase 2 does not run. Each apt/dpkg step of the upgrade gets a 7200 s deadline (`PMSS_DIST_UPGRADE_APT_TIMEOUT`, 0 for none) instead of the 1200 s command default.
 - `--scripts-only` – deploy the new `/scripts` and `/etc/skel` content but skip
   `update-step2.php`; useful for emergency repairs. This mode MUST NOT invoke
   `apt`/`apt-get` or make any other package manager changes; it only stages
