@@ -79,11 +79,10 @@ class RtorrentThrottleInitTest extends TestCase
     {
         $home = $this->pmssMakeTempDir('pmss-rtorrent-throttle-');
         $phpRoot = $this->pmssEnsureDir($home.'/www/rutorrent/php');
-        $pluginRoot = $this->pmssEnsureDir($home.'/www/rutorrent/plugins/throttle');
         $script = $home.'/.rtorrentThrottleInit.php';
         $observed = $home.'/throttle-observed.json';
         copy($this->pmssRepoPath('etc/skel/.rtorrentThrottleInit.php'), $script);
-        $this->pmssWriteFile($pluginRoot.'/throttle.php', '<?php
+        $this->pmssWriteFile($home.'/www/rutorrent/plugins/throttle/throttle.php', '<?php
 class rThrottle
 {
     public static function load()

@@ -89,8 +89,7 @@ final class MediaStackPortManagerTest extends TestCase
         $this->assertSame(null, \pmssMediaStackConfiguredPortRead($this->home, $definitions['radarr']));
 
         unlink($config);
-        $outside = $this->pmssMakeTempFile('pmss-media-stack-outside-');
-        file_put_contents($outside, "<Config><Port>23004</Port></Config>\n");
+        $outside = $this->pmssWriteFile($this->pmssMakeTempFile('pmss-media-stack-outside-'), "<Config><Port>23004</Port></Config>\n");
         $this->pmssCreateSymlinkOrSkip($outside, $config);
         $this->assertSame(null, \pmssMediaStackConfiguredPortRead($this->home, $definitions['radarr']));
     }

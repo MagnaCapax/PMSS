@@ -42,8 +42,7 @@ final class SysctlProfileSnapshotTest extends TestCase
     public function testConntrackBuilderKeepsLegacyTimeWaitKeySelection(): void
     {
         $procSysRoot = $this->pmssMakeTempDir('pmss-sysctl-profile-legacy-proc-', 0700);
-        $legacyDir = $this->pmssEnsureDir($procSysRoot.'/net/ipv4/netfilter');
-        file_put_contents($legacyDir.'/ip_conntrack_tcp_timeout_time_wait', '');
+        $this->pmssWriteFile($procSysRoot.'/net/ipv4/netfilter/ip_conntrack_tcp_timeout_time_wait', '');
         $this->pmssTrackEnvOverrides(['PMSS_SYSCTL_PROC_SYS_PATH' => $procSysRoot]);
 
         $settings = \pmssSysctlConntrackSettingsBuild(['has_conntrack' => true]);
@@ -58,7 +57,7 @@ final class SysctlProfileSnapshotTest extends TestCase
         $this->pmssTrackEnvOverrides(['PMSS_SYSCTL_PROC_SYS_PATH' => $procSysRoot]);
         $this->assertFalse(isset(\pmssSysctlSecuritySettingsBuild()['net.mptcp.enabled']));
 
-        file_put_contents($this->pmssEnsureDir($procSysRoot.'/net/mptcp').'/enabled', "1\n");
+        $this->pmssWriteFile($procSysRoot.'/net/mptcp/enabled', "1\n");
 
         $this->assertSame('0', \pmssSysctlSecuritySettingsBuild()['net.mptcp.enabled']);
     }

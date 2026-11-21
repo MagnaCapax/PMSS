@@ -15,12 +15,11 @@ class I915DisplayPowerTest extends TestCase
     private function fakeTools(string $root, string $entry, string $updateBody = ''): array
     {
         $bin = $root.'/bin';
-        mkdir($bin, 0700);
-        file_put_contents($bin.'/lsinitramfs', "#!/bin/sh\ncat \"\$1\"\n");
         $update = $updateBody !== '' ? $updateBody : "for f in '".$root."/boot'/initrd.img-*; do printf '%s\\n' '".$entry."' >> \"\$f\"; done\n";
-        file_put_contents($bin.'/update-initramfs', "#!/bin/sh\n".$update);
-        chmod($bin.'/lsinitramfs', 0700);
-        chmod($bin.'/update-initramfs', 0700);
+        $this->pmssWriteExecutableFiles($bin, [
+            'lsinitramfs' => "#!/bin/sh\ncat \"\$1\"\n",
+            'update-initramfs' => "#!/bin/sh\n".$update,
+        ], 0700, 0700);
         return [$bin.'/lsinitramfs', $bin.'/update-initramfs'];
     }
 
@@ -31,13 +30,6 @@ class I915DisplayPowerTest extends TestCase
             exec($command.' 2>/dev/null', $output, $rc);
             return $rc;
         };
-    }
-
-    private function boot(string $root, array $initrds): string
-    {
-        mkdir($root.'/boot', 0700);
-        foreach ($initrds as $name => $listing) file_put_contents($root.'/boot/'.$name, $listing);
-        return $root.'/boot';
     }
 
     public function testNonIntelHostWritesNothingAndRunsNothing(): void
@@ -55,7 +47,7 @@ class I915DisplayPowerTest extends TestCase
         $target = $root.'/etc/modprobe.d/pmss-i915-dc.conf';
         $entry = ltrim($target, '/');
         [$ls, $update] = $this->fakeTools($root, $entry);
-        $boot = $this->boot($root, ['initrd.img-6.1.0-41-amd64' => "usr/lib/modules\n", 'initrd.img-6.1.0-40-amd64' => $entry."\n"]);
+        $boot = $this->pmssWriteFiles($root.'/boot', ['initrd.img-6.1.0-41-amd64' => "usr/lib/modules\n", 'initrd.img-6.1.0-40-amd64' => $entry."\n"], 0700);
         $messages = [];
         $commands = [];
         $path = static function (string $name) use ($ls, $update): string { return $name === 'lsinitramfs' ? $ls : $update; };
@@ -86,7 +78,7 @@ class I915DisplayPowerTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-i915-stillmissing-', 0700);
         $target = $root.'/etc/modprobe.d/pmss-i915-dc.conf';
         [$ls, $update] = $this->fakeTools($root, ltrim($target, '/'), "exit 0\n");
-        $boot = $this->boot($root, ['initrd.img-6.1.0-41-amd64' => "usr/lib/modules\n"]);
+        $boot = $this->pmssWriteFiles($root.'/boot', ['initrd.img-6.1.0-41-amd64' => "usr/lib/modules\n"], 0700);
         $messages = [];
         $commands = [];
         $path = static function (string $name) use ($ls, $update): string { return $name === 'lsinitramfs' ? $ls : $update; };
@@ -99,7 +91,7 @@ class I915DisplayPowerTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-i915-fail-', 0700);
         $target = $root.'/etc/modprobe.d/pmss-i915-dc.conf';
         [$ls, $update] = $this->fakeTools($root, ltrim($target, '/'), "exit 1\n");
-        $boot = $this->boot($root, ['initrd.img-6.1.0-41-amd64' => "usr/lib/modules\n"]);
+        $boot = $this->pmssWriteFiles($root.'/boot', ['initrd.img-6.1.0-41-amd64' => "usr/lib/modules\n"], 0700);
         $messages = [];
         $commands = [];
         $path = static function (string $name) use ($ls, $update): string { return $name === 'lsinitramfs' ? $ls : $update; };

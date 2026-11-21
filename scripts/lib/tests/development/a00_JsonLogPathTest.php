@@ -41,7 +41,6 @@ class A00_JsonLogPathTest extends TestCase
         $this->resetJsonLogPath();
         $this->resetCorrelationId();
         $path = $this->pmssMakeTempFile('pmss');
-        file_put_contents($path, '');
         putenv('PMSS_JSON_LOG='.$path);
         $expectedCorrelationId = \pmssCorrelationId();
         $this->assertEquals($path, \pmssJsonLogPath());
@@ -56,7 +55,6 @@ class A00_JsonLogPathTest extends TestCase
     {
         $this->resetJsonLogPath();
         $path = $this->pmssMakeTempFile('pmss');
-        file_put_contents($path, '');
         putenv('PMSS_JSON_LOG='.$path);
         putenv('PMSS_CORRELATION_ID=test-correlation-id');
         $GLOBALS['PMSS_CORRELATION_ID_CACHE'] = null;
