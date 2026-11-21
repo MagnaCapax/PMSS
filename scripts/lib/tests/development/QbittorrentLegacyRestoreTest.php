@@ -53,7 +53,7 @@ final class QbittorrentLegacyRestoreTest extends TemporaryHomeRootTestCase
 
     public function testExportInverseFeedsTheMigrationNineOldestNames(): void
     {
-        $config = file_get_contents(__DIR__.'/../fixtures/qbittorrentMigrated53.conf');
+        $config = $this->pmssReadRepoFile('scripts/lib/tests/fixtures/qbittorrentMigrated53.conf');
         $values = \pmssQbittorrentConfigValues(\pmssQbittorrentRestoreContent($config));
         $this->pmssAssertArraySubsetSame([
             'Downloads\\TorrentExportDir' => '/home/qafix081/export', 'Downloads\\FinishedTorrentExportDir' => '',
@@ -62,7 +62,7 @@ final class QbittorrentLegacyRestoreTest extends TemporaryHomeRootTestCase
 
     public function testPre44RoundTripPreservesOwnerSpeedAndPasswordEditsWithoutChangingMeta(): void
     {
-        $config = file_get_contents(__DIR__.'/../fixtures/qbittorrentMigrated53.conf');
+        $config = $this->pmssReadRepoFile('scripts/lib/tests/fixtures/qbittorrentMigrated53.conf');
         $config = \pmssQbittorrentConfigSet($config, 'BitTorrent', 'Session\GlobalUPSpeedLimit', '123');
         $config = \pmssQbittorrentConfigSet($config, 'Preferences', 'Connection\GlobalUPLimit', 'stale');
         foreach (['pmssQbittorrentRestoreContent', 'pmssQbittorrentFrontendRestoreContent'] as $restore) {

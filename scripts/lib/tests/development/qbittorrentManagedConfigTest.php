@@ -252,7 +252,6 @@ class QbittorrentManagedConfigTest extends TestCase
 
     public function testNewAccountTemplateListensOnIpv4Only(): void
     {
-        $template = (string) file_get_contents(dirname(__DIR__, 4).'/etc/seedbox/config/template.qbittorrent.conf');
-        $this->assertSame(1, preg_match('/^\[BitTorrent\]$[^\[]*^Session\\\\InterfaceAddress=0\.0\.0\.0$/ms', $template));
+        $this->pmssAssertRepoFileMatches('etc/seedbox/config/template.qbittorrent.conf', '/^\[BitTorrent\]$[^\[]*^Session\\\\InterfaceAddress=0\.0\.0\.0$/ms');
     }
 }

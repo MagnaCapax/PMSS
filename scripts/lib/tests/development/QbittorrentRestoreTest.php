@@ -9,7 +9,7 @@ final class QbittorrentRestoreTest extends TemporaryHomeRootTestCase
 {
     public function testFullMigratedShapeAndParityKeepNewSectionsIntact(): void
     {
-        $config = file_get_contents(__DIR__.'/../fixtures/qbittorrentMigrated53.conf');
+        $config = $this->pmssReadRepoFile('scripts/lib/tests/fixtures/qbittorrentMigrated53.conf');
         $before = \pmssQbittorrentConfigValues($config);
         $root = \pmssQbittorrentRestoreContent($config);
         $this->assertSame($root, \pmssQbittorrentFrontendRestoreContent($config));

@@ -35,7 +35,7 @@ class UserTransferPassRcTest extends TestCase
     {
         static $loaded = false;
         if (!$loaded) {
-            $source = file_get_contents($this->pmssRepoPath('scripts/lib/userTransfer.php'));
+            $source = $this->pmssReadRepoFile('scripts/lib/userTransfer.php');
             $start = strpos($source, '            if ($cfg[\'printPassword\'])');
             $end = strpos($source, '            pmssUserTransferRecordCompletion(', (int) $start);
             $this->assertTrue($start !== false && $end !== false);

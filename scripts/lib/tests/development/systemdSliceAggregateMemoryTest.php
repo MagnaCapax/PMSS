@@ -223,7 +223,7 @@ class SystemdSliceAggregateMemoryTest extends TestCase
             'env' => ['PMSS_SYSTEMD_USER_AT_SERVICE_DIR' => dirname((string) ($options['dropDir'] ?? $base.'/user-.slice.d')).'/user@.service.d'],
         ]);
         if (($options['aggregateTemplate'] ?? true) === true) {
-            $this->pmssWriteFile($fixture['cfgDir'].'/template.cgroup.user-slice.aggregate.conf', (string) file_get_contents($this->pmssRepoPath(self::TEMPLATE)));
+            $this->pmssWriteFile($fixture['cfgDir'].'/template.cgroup.user-slice.aggregate.conf', $this->pmssReadRepoFile(self::TEMPLATE));
         }
         return $fixture;
     }

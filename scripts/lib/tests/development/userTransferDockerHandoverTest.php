@@ -91,7 +91,7 @@ class UserTransferDockerHandoverTest extends TestCase
     {
         static $loaded = false;
         if (!$loaded) {
-            $source = file_get_contents($this->pmssRepoPath('scripts/lib/userTransfer.php'));
+            $source = $this->pmssReadRepoFile('scripts/lib/userTransfer.php');
             $start = strpos($source, '            $dockerIds = [];');
             $end = strpos($source, '            if ($cfg[\'printPassword\'])', $start);
             $this->assertTrue($start !== false && $end !== false);

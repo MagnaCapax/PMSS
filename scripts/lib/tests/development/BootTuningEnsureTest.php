@@ -86,14 +86,13 @@ class BootTuningEnsureTest extends TestCase
         // writer of sd*/vd*/bcache* queue knobs; template.rc.local's per-disk loop must be gated
         // on the unit's ABSENCE (one writer on updated hosts, still-tuned on un-updated hosts).
         // The gate must PRECEDE the per-disk (DISK) loop.
-        $rel = 'etc/seedbox/config/template.rc.local';
-        $this->pmssAssertRepoFileContainsOrderedStrings(
-            $rel,
+        $rcLocal = $this->pmssReadRepoFile('etc/seedbox/config/template.rc.local');
+        $this->assertOrderedStrings(
             ['if [ ! -e /usr/local/sbin/pmss-boot-tuning.sh ]; then', 'for DISK in'],
+            $rcLocal,
             'rc.local must gate the per-disk loop on boot-tuning presence (ADR 0064 step 2)',
             'the boot-tuning presence gate must appear before the per-disk (DISK) loop'
         );
-        $rcLocal = (string)file_get_contents($this->pmssRepoPath($rel));
         $gateStart = strpos($rcLocal, 'if [ ! -e /usr/local/sbin/pmss-boot-tuning.sh ]; then');
         $gateEnd = strpos($rcLocal, "\nfi\n", $gateStart);
         $mdLoop = strpos($rcLocal, 'for MD in');
@@ -104,7 +103,7 @@ class BootTuningEnsureTest extends TestCase
         $this->assertTrue($gateEnd < $bcacheMode && strpos($rcLocal, 'bcache/cache_mode', $bcacheMode) !== false,
             'bcache cache_mode loop must remain outside the gate');
 
-        $bootTuning = (string)file_get_contents($this->pmssRepoPath('etc/seedbox/config/template.pmss-boot-tuning.sh'));
+        $bootTuning = $this->pmssReadRepoFile('etc/seedbox/config/template.pmss-boot-tuning.sh');
         foreach (['sync_speed_min' => '25000', 'sync_speed_max' => '750000'] as $knob => $value) {
             $this->assertStringContainsString('echo '.$value.' | tee /sys/block/${MD}/md/'.$knob, $rcLocal,
                 'rc.local md '.$knob.' must be '.$value);
