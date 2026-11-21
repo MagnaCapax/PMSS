@@ -20,9 +20,9 @@ class ArchitectureSmokeTest extends TestCase
             'tree/a.php', 'tree/nested/b.PHP', 'tree/.hidden.sh', "tree/edge.php\n", 'outside/hidden.php',
         ], 'fixture'));
         $this->pmssEnsureDir($root.'/tree/empty.php');
-        $this->pmssCreateSymlinkOrSkip($root.'/outside', $root.'/tree/linked-directory');
-        $this->pmssCreateSymlinkOrSkip($root.'/tree/a.php', $root.'/tree/linked.php');
-        $this->pmssCreateSymlinkOrSkip($root.'/absent', $root.'/tree/dangling.php');
+        $this->pmssWriteSymlinks($root.'/tree', [
+            'linked-directory' => $root.'/outside', 'linked.php' => $root.'/tree/a.php', 'dangling.php' => $root.'/absent',
+        ]);
         $scanner = new class($root) extends TestCase {
             private $root;
             public function __construct(string $root) { $this->root = $root; }

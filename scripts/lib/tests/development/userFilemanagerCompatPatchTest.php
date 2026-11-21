@@ -85,12 +85,10 @@ PHP;
     public function testApplySkeletonFilesSkipsSymlinkedFilemanagerTarget(): void
     {
         $this->pmssWriteRelativeFile($this->skelDir, 'www/filemanager.php', "before\n        ob_flush();\nafter\n");
-        $this->pmssEnsureDir(dirname($this->pmssUserHomePath($this->homeRoot, $this->user, 'www/filemanager.php')), 0755);
 
         $target = $this->pmssMakeTempPhpPath('pmss-user-filemanager-', 'patch-symlink-target');
         $link = $this->pmssUserHomePath($this->homeRoot, $this->user, 'www/filemanager.php');
-        $this->pmssWriteFile($target, "before\n        ob_flush();\nafter\n");
-        @symlink($target, $link);
+        $this->pmssCreateSymlinkedFileOrSkip($target, $link, "before\n        ob_flush();\nafter\n");
 
         \pmssUserApplySkeletonFiles($this->pmssUserHomeContext($this->homeRoot, $this->user));
 

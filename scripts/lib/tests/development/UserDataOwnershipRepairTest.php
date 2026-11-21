@@ -36,8 +36,7 @@ class UserDataOwnershipRepairTest extends TestCase
         $this->pmssWriteFile($home.'/watch', 'kept');
         $files = ['ordinary', '-option', "quote' name", "line\nbreak", 'nested/payload'];
         foreach ($files as $name) $this->pmssWriteFile($home.'/data/'.$name, 'payload');
-        $this->pmssCreateSymlinkOrSkip($outside, $home.'/data/link');
-        $this->pmssCreateSymlinkOrSkip($this->tempDir, $home.'/data/directory-link');
+        $this->pmssWriteSymlinks($home.'/data', ['link' => $outside, 'directory-link' => $this->tempDir]);
         $this->assertTrue(link($outside, $home.'/data/hard-link'));
         $before = [filemtime($outside), filemtime($home.'/watch'), filemtime($home)];
 

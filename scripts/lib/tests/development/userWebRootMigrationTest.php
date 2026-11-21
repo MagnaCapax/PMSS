@@ -89,8 +89,7 @@ class UserWebRootMigrationTest extends TestCase
         $outside = $this->homeRoot.'/outside-rename';
         $this->pmssWriteFile($source.'/index.html', 'customer-content');
         $this->pmssWriteFile($outside.'/public/index.html', 'outside-content');
-        $this->pmssEnsureDir($this->home.'/.local/share');
-        $this->pmssCreateSymlinkOrSkip($outside, $this->home.'/.local/share/pmss');
+        $this->pmssWriteSymlinks($this->home, ['.local/share/pmss' => $outside]);
 
         $this->assertFalse(\pmssUserWebRootMigrationRenameAsAccount(
             $this->pmssCurrentOwner(), $this->home, $source, $this->home.'/.local/share/pmss/public'
@@ -223,8 +222,7 @@ class UserWebRootMigrationTest extends TestCase
         $target = $this->home.'/www/public';
         $outside = $this->homeRoot.'/outside-snapshot';
         $this->pmssWriteFile($outside.'/index.html', 'outside');
-        $this->pmssEnsureDir($target.'/nested');
-        $this->pmssCreateSymlinkOrSkip($outside, $target.'/nested/link');
+        $this->pmssWriteSymlinks($target, ['nested/link' => $outside]);
 
         $this->assertSame(null, \pmssUserWebRootMigrationSnapshot($target));
         $this->assertSame(null, \pmssUserWebRootMigrationSnapshot($target, true));
