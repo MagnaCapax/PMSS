@@ -6,6 +6,53 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class UserSliceMemswWriteSafetyTest extends TestCase
 {
+    public function testMalformedWriteInputsNeverLaunchAChild(): void
+    {
+        $cases = [];
+        foreach (['', '-', '-a', '--append', '--help', "\0/fixture/limit", "/fixture/limit\0", "/fixture/li\0mit"] as $file) {
+            $cases[] = [$file, '4096', false];
+        }
+        foreach (['', ' ', '+1', '-2', '1.0', '1e3', 'infinity', '4096junk', " 4096", "4096\t",
+            "4096\n", "4096\r", "4096\n8192", "\0-1", "-1\0", "40\00096"] as $value) {
+            $cases[] = ['/fixture/limit', $value, false];
+        }
+        foreach (['/fixture/memory limit', 'memory.limit_in_bytes', './-limit', "/fixture/limit'quoted"] as $file) {
+            foreach (['-1', '0', '1', '0004096', (string) PHP_INT_MAX] as $value) {
+                $cases[] = [$file, $value, true];
+            }
+        }
+        $script = <<<'PHP'
+namespace MemswWriteInputFixture;
+// Intercept every process operation; accepted inputs use memory streams only.
+function proc_open($command, $descriptor, &$pipes) {
+    $GLOBALS['events'][] = ['open', $command];
+    $pipes = [\fopen('php://memory', 'w+')];
+    return \fopen('php://memory', 'w+');
+}
+function fwrite($handle, $input) { $GLOBALS['events'][] = ['write', $input]; return strlen($input); }
+function fclose($handle) { $GLOBALS['events'][] = 'close'; return \fclose($handle); }
+function proc_close($handle) { $GLOBALS['events'][] = 'reap'; \fclose($handle); return 0; }
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/cgroup/userSliceMemsw.php', 'MemswWriteInputFixture');
+        $script .= '$cases = '.var_export($cases, true).';';
+        $script .= <<<'PHP'
+$rows = [];
+foreach ($cases as [$file, $value, $accepted]) {
+    $GLOBALS['events'] = [];
+    $rows[] = [pmssUserSliceMemswWrite($file, $value), $GLOBALS['events']];
+}
+echo json_encode($rows);
+PHP;
+        $rows = $this->pmssRunInlinePhpJson($script);
+        $this->assertSame(count($cases), count($rows));
+        foreach ($cases as $index => [$file, $value, $accepted]) {
+            $label = json_encode([$file, $value]);
+            $events = $accepted ? [['open', 'timeout --kill-after=5s 30s tee '.escapeshellarg($file)],
+                ['write', $value."\n"], 'close', 'reap'] : [];
+            $this->assertSame([$accepted, $events], $rows[$index], $label);
+        }
+    }
+
     public function testWriteFailuresStillCloseStdinAndReapTheChild(): void
     {
         $script = <<<'PHP'

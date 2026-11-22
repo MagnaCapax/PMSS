@@ -87,6 +87,11 @@ function pmssUserSliceMemswAnonPlusSwap(string $memoryStat): int
 /** One sysfs write through timeout(1): lowering a limit below usage reclaims inside the write. */
 function pmssUserSliceMemswWrite(string $file, string $value): bool
 {
+    // Quoting does not prevent tee options; reject corrupt paths and multi-value input before launch.
+    if ($file === '' || $file[0] === '-' || strpos($file, "\0") !== false
+        || preg_match('/\A(?:-1|[0-9]+)\z/', $value) !== 1) {
+        return false;
+    }
     $p = proc_open('timeout --kill-after=5s 30s tee '.escapeshellarg($file), [0 => ['pipe', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes);
     if (!is_resource($p)) {
         return false;

@@ -28,6 +28,13 @@ Keep the canonical installer/update details under `docs/install.md` and
    documented in [`docs/update.md`](./update.md#phase-2--scriptsutilupdate-step2php).
 
 ## Key Modules
+- **scripts/lib/cgroup/userSliceMemsw.php** rejects empty, NUL-containing and
+  option-shaped output paths and values other than unsigned decimal digits or
+  `-1` before launching its bounded sysfs writer. Invalid requests return false
+  without acquiring a child. Planner outputs, valid relative paths, command bytes
+  and cleanup retain their contracts (ADR 0298). `UserSliceMemswWriteSafetyTest`
+  covers the boundary with intercepted process operations and memory streams;
+  execution stays on testing machines, with changed-file PHP lint on the devbox.
 - **scripts/lib/mediaStackBootRelaunch.php** rejects empty or NUL-containing boot
   observation paths before file I/O and NUL-containing observations before trimming.
   Non-finite uptime readings also retain the existing zero fallback; unusable boot
