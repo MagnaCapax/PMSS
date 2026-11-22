@@ -84,8 +84,7 @@ PHP;
             'rtorrentPort' => 5000, 'IOWeight' => 100, 'uploadThrottleKib' => 64], $rows['full'][4]);
         $this->assertSame(300, $rows['named'][4]['IOWeight']);
         $this->assertFalse(array_key_exists('uploadThrottleKib', $rows['clear'][4]));
-        $this->assertSame(array_merge($prefix, ['welcome', 'persist']), $rows['welcome'][3]);
-        $this->assertSame(null, $rows['welcome'][5]);
+        $this->pmssAssertArraySubsetSame([3 => array_merge($prefix, ['welcome', 'persist']), 5 => null], $rows['welcome']);
         $this->assertSame([1, '', "Error: failed to persist user config for fixtur01\n",
             array_merge($prefix, ['persist', ['log', 'fixtur01', 'userConfig: user store write failed; no settings applied']])],
             array_slice($rows['persist-failed'], 0, 4));

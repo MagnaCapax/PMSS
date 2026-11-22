@@ -549,8 +549,8 @@ final class SystemStatusCharacterizationTest extends TestCase
 
         $result = pmssSystemStatusOpenvpnClientArtifactCheck($isFile, 'seedbox.example.org');
 
-        $this->assertSame('OK', $result['status']);
-        $this->assertSame('openvpn-seedbox-example-org.ovpn, openvpn-seedbox-example-org.crt', $result['detail']);
+        $this->pmssAssertArraySubsetSame(['status' => 'OK',
+            'detail' => 'openvpn-seedbox-example-org.ovpn, openvpn-seedbox-example-org.crt'], $result);
         $this->assertSame(['/home/openvpn-seedbox-example-org.ovpn', '/home/openvpn-seedbox-example-org.crt'], $paths);
     }
 

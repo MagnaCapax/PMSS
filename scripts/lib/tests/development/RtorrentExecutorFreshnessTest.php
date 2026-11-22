@@ -98,8 +98,7 @@ PHP;
     {
         foreach (['fresh', 'suffixOnly', 'unreadableExe', 'unreadableInitial', 'unreadableCurrent'] as $mode) {
             $result = $this->runExecutor($mode);
-            $this->assertSame(2, $result['children'], $mode);
-            $this->assertSame([true, true], $result['childLocks'], $mode);
+            $this->pmssAssertArraySubsetSame(['children' => 2, 'childLocks' => [true, true]], $result, $mode);
             $this->assertFalse($result['lockFree'], $mode);
             $this->assertTrue((int) $result['marker'] > 0, $mode);
         }

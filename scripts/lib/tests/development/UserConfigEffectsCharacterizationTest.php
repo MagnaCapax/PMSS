@@ -92,8 +92,8 @@ PHP;
         $directory = ['directory', '/fixture/runtime', 0700];
         $persist = ['persist', 0, 'invalid operations value'];
         $complete = ['bonus', 'traffic', $targets, $directory, $persist];
-        $this->assertSame([$complete, '', null], $rows['zero']);
-        $this->assertSame([$complete, "Warning: failed to persist bonus quota display copy for fixtur01\n", null], $rows['bonus']);
+        $this->pmssAssertArraySubsetSame(['zero' => [$complete, '', null],
+            'bonus' => [$complete, "Warning: failed to persist bonus quota display copy for fixtur01\n", null]], $rows);
         foreach (['targets' => 3, 'directory' => 4, 'persist' => 5] as $case => $length) {
             $reason = $case === 'persist' ? 'fixture failure' : 'unable to prepare runtime targets';
             $this->assertSame([array_slice($complete, 0, $length),
