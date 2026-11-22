@@ -351,6 +351,14 @@ and serialized field order retain their contracts.
 
 ## Minimal Contract Rules (Joukahainen)
 
+Watchdog process observations reject NUL-containing PID rows before trimming,
+retaining the existing invalid-PID omission. NUL-containing status reads retain
+the conservative running result, so a matching zombie row cannot certify a
+corrupted observation. Valid PID normalization, command bytes, zombie filtering
+and short-circuit read order remain unchanged (ADR 0211).
+`WatchdogProcessLivenessTest` intercepts all process and proc reads; execution
+stays on testing machines, with changed-file PHP syntax checks on the devbox.
+
 Watchdog process start-time reads reject NUL-containing boot and process-stat
 observations before matching fields or normalizing whitespace. Corruption anywhere
 in either read uses the existing inode-time fallback. Valid command names, clock

@@ -42,8 +42,10 @@ function pmssUserWatchdogProcessPids(string $username, string $processPattern, a
 
     $pids = array();
     foreach ($matches as $rawPid) {
-        // Parse before selecting a process target; zero is not a PID.
-        $pid = pmssUnsignedDecimalIntParse(trim((string) $rawPid));
+        // Reject corruption before trim() can turn it into a usable process target.
+        $rawPid = (string) $rawPid;
+        if (strpos($rawPid, "\0") !== false) continue;
+        $pid = pmssUnsignedDecimalIntParse(trim($rawPid));
         if ($pid !== null && $pid > 0) $pids[$pid] = $pid;
     }
     return array_values($pids);
@@ -56,8 +58,8 @@ function pmssUserWatchdogProcessRunning(string $username, string $processName): 
     if ($exitCode !== 0) return false;
     foreach ($pids as $pid) {
         $status = (string) @file_get_contents('/proc/'.$pid.'/status');
-        // pgrep also matches zombies; unknown status retains the conservative running result.
-        if (!preg_match('/^State:\s*Z\b/m', $status)) return true;
+        // pgrep also matches zombies; unknown or corrupt status retains the conservative running result.
+        if (strpos($status, "\0") !== false || !preg_match('/^State:\s*Z\b/m', $status)) return true;
     }
     return false;
 }
