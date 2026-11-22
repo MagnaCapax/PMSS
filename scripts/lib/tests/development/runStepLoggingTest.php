@@ -31,7 +31,6 @@ class RunStepLoggingTest extends TestCase
     {
         self::$logMessages = [];
         $this->pmssResetRuntimeProfile();
-        $long = str_repeat('x', 1000);
         runStep('Echo long', 'php -r '.escapeshellarg('fwrite(STDOUT, str_repeat("x", 1000)); fwrite(STDERR, str_repeat("y", 1000));'));
         $profile = $GLOBALS['PMSS_PROFILE'][0];
         $this->assertTrue(strlen($profile['stdout_excerpt']) <= 300, 'stdout excerpt should be truncated');

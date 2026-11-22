@@ -112,7 +112,7 @@ class rtorrentCustomConfigQuarantineTest extends TestCase
 
     public function testQuarantineLogsLegacyDirectivesBeforeMovingFile(): void
     {
-        $src = $this->pmssWriteRelativeFile($this->tempHome, '.rtorrent.rc.custom',
+        $this->pmssWriteRelativeFile($this->tempHome, '.rtorrent.rc.custom',
             "schedule = watch,1,1,\"load_start=~/watch/*.torrent\"\nexecute = sh,-c,echo ok\n");
 
         $messages = [];

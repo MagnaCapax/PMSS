@@ -72,7 +72,7 @@ class UserMovedTest extends TestCase
 
     public function testSharedPredicateUsesStoreAndLeavesWebRootPredicateUnchanged(): void
     {
-        $store = $this->store();
+        $this->store();
         $this->pmssWriteFile($this->tempDir.'/home/mvdtst/www/index.php', 'keep');
         $script = 'namespace MovedPredicateFixture; function pmssUserMovedUntil($user) { return \\pmssUserMovedUntil($user, $GLOBALS["store"]); }';
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/user/watchdog.php', 'MovedPredicateFixture');

@@ -90,7 +90,7 @@ final class TorrentClientsSwitchRecoveryTest extends TestCase
                 $home = $this->pmssMakeTempDir('pmss-backup-full-');
                 $target = '/home/.pmss/clients/'.$client.'/4.1.3';
                 $this->pmssWriteSymlinks($home, ['bin/'.$client.'/default' => $target]);
-                $dir = $this->pmssEnsureDir($home.'/.config/pmss/torrentClients');
+                $this->pmssEnsureDir($home.'/.config/pmss/torrentClients');
                 $unexpected = static function (): void { throw new \RuntimeException('Backup failure changed the client'); };
                 // The backup fails the way the real one does at quota: a suppressed filesystem warning, then a false result.
                 $backup = static function () use ($warning): array { @trigger_error($warning, E_USER_WARNING); return ['ok' => false, 'message' => 'Could not create backup directory.']; };

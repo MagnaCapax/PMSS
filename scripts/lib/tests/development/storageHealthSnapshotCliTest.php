@@ -53,7 +53,7 @@ class StorageHealthSnapshotCliTest extends TestCase
         $link = $this->pmssMakeTempDir('pmss-storage-health-link-').'/events.jsonl';
         $this->pmssCreateSymlinkOrSkip($target, $link);
 
-        $result = $this->assertSnapshotRejectsUnsafeLogTarget(['--json', $link]);
+        $this->assertSnapshotRejectsUnsafeLogTarget(['--json', $link]);
 
         $this->assertSame('', (string) file_get_contents($target));
     }
@@ -70,8 +70,8 @@ class StorageHealthSnapshotCliTest extends TestCase
         $this->assertTrue(!is_dir($targetDir.'/nested'), 'must not create log directories through symlinked parents');
     }
 
-    /** @return array{rc:int,output:string,lines:array<int,string>} */
-    private function assertSnapshotRejectsUnsafeLogTarget(array $arguments): array
+    /** Assert the CLI refuses an unsafe log target using a hermetic device stub. */
+    private function assertSnapshotRejectsUnsafeLogTarget(array $arguments): void
     {
         $result = $this->pmssRunRepoPhpScriptCommand(
             'scripts/util/storageHealthSnapshot.php', $arguments,
@@ -79,6 +79,5 @@ class StorageHealthSnapshotCliTest extends TestCase
         );
         $this->pmssAssertArraySubsetSame(['rc' => 1], $result, 'snapshot rejection ');
         $this->assertStringContainsString('Refusing unsafe storage health log path', $result['output']);
-        return $result;
     }
 }
