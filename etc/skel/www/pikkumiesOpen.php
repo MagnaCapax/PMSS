@@ -289,7 +289,7 @@ function pmssPikkumiesOpenAsk($binary, $local, $body)
     if (!is_file($binary) || !is_executable($binary) || !is_dir($local) || is_file($local.'/eternals.off')
         || pmssPikkumiesOpenMoving($local)) return 1;
     // The text goes on stdin only, never on a command line.
-    $process = @proc_open('/usr/bin/timeout -k 1s 10s '.escapeshellarg($binary).' ask '.escapeshellarg('--nonce='.$nonce),
+    $process = @proc_open('/usr/bin/timeout --kill-after=1s 10s '.escapeshellarg($binary).' ask '.escapeshellarg('--nonce='.$nonce),
         [0 => ['pipe', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes);
     if (!is_resource($process)) return 1;
     fwrite($pipes[0], $text);
@@ -458,7 +458,7 @@ if ($statusView) {
         return;
     }
     $rows = [];
-    exec('/usr/bin/timeout -k 1s 2s '.escapeshellarg($binary).' eternal list --json 2>/dev/null', $rows, $rowsRc);
+    exec('/usr/bin/timeout --kill-after=1s 2s '.escapeshellarg($binary).' eternal list --json 2>/dev/null', $rows, $rowsRc);
     $eternals = $rowsRc === 0 ? json_decode(implode("\n", $rows), true) : null;
     $setup = false;
     $primaryRunning = false;
