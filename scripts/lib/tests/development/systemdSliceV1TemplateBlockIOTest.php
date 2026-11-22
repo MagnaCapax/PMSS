@@ -9,8 +9,6 @@ class SystemdSliceV1TemplateBlockIOTest extends TestCase
     public function testV1TemplateIncludesBlockIOAccounting(): void
     {
         $out = $this->pmssSystemdSliceRender([
-            'cfgPrefix' => 'pmss-cg-cfgv1b-',
-            'dropPrefix' => 'pmss-cg-dropv1b-',
             'mode' => 'v1',
             'v1Template' => $this->pmssSystemdSliceTasksTemplate(['BlockIOAccounting=yes']),
             'totalMemMiB' => 4096,

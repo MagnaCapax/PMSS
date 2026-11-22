@@ -396,6 +396,8 @@ Keep the canonical installer/update details under `docs/install.md` and
 - Development runner: `php scripts/lib/tests/development/Runner.php`
 - Production scaffolding: `php scripts/lib/tests/production/Runner.php`
 - Shared helpers: `scripts/lib/tests/common/`
+- Slice fixtures use the shared temporary-directory prefixes; each preparation
+  still creates unique tracked directories, with explicit paths kept for migration checks.
 - Process, HTTP, plugin, logging, resource, transfer and path-guard fixtures use `TestCase::pmssWriteFiles()`
   and `pmssWriteFile()` for checked publication and parent creation. Keep deliberately
   empty directories, append operations and injected runtime writes explicit.

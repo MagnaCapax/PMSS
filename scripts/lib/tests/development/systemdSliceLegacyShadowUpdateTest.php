@@ -12,7 +12,6 @@ class SystemdSliceLegacyShadowUpdateTest extends TestCase
         $legacyShadow = $this->pmssWriteFile($drop.'/99-pmss.conf', "[Slice]\nTasksMax=1000\n");
 
         $this->pmssSystemdSliceEnsure($this->pmssSystemdSliceFixturePrepare([
-            'cfgPrefix' => 'pmss-cg-cfg-shadow-',
             'dropDir' => $drop,
             'v2Template' => $this->pmssSystemdSliceTasksTemplate(),
             'totalCpuThreads' => 2,

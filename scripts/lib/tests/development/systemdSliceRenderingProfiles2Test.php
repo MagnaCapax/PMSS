@@ -18,8 +18,6 @@ class SystemdSliceRenderingProfiles2Test extends TestCase
     public function testCpuQuotaInfinityPreserved(): void
     {
         $this->assertStringContainsString('CPUQuota=infinity', $this->pmssSystemdSliceRender([
-            'cfgPrefix' => 'pmss-cg-cfginf-',
-            'dropPrefix' => 'pmss-cg-dropinf-',
             'v2Template' => "[Slice]\nCPUQuota=%%USER_CGROUP_CPU_QUOTA%%\n",
             'policy' => ['cpuQuotaPercent' => 'infinity'],
             'totalMemMiB' => 2048,
@@ -30,8 +28,6 @@ class SystemdSliceRenderingProfiles2Test extends TestCase
     {
         // Device string varies; assert IO lines present.
         $this->assertStringContainsAllStrings(['IOReadBandwidthMax=', 'IOWriteBandwidthMax='], $this->pmssSystemdSliceRender([
-            'cfgPrefix' => 'pmss-cg-cfg2-',
-            'dropPrefix' => 'pmss-cg-drop2-',
             'v2Template' => $this->pmssSystemdSliceTasksTemplate(),
             'policy' => [
                 'tasksMax' => 512,

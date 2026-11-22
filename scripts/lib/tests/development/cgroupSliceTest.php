@@ -31,8 +31,6 @@ class cgroupSliceTest extends TestCase
         $tplBody = "[Slice]\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\n";
         // Very low RAM: ensure MemoryHigh >= 250MiB
         $content = $this->pmssSystemdSliceRender([
-            'cfgPrefix' => 'pmss-cg-cfg2-',
-            'dropPrefix' => 'pmss-cg-drop2-',
             'v2Template' => $tplBody,
             'totalMemMiB' => 512,
         ]);
@@ -43,8 +41,6 @@ class cgroupSliceTest extends TestCase
 
         // Large RAM: MemoryMax <= 95% and about 1.25x MemoryHigh
         $content2 = $this->pmssSystemdSliceRender([
-            'cfgPrefix' => 'pmss-cg-cfg2-',
-            'dropPrefix' => 'pmss-cg-drop3-',
             'v2Template' => $tplBody,
             'totalMemMiB' => 65536,
         ]);
@@ -59,8 +55,6 @@ class cgroupSliceTest extends TestCase
     public function testV1TemplateSelectedWhenModeV1(): void
     {
         $content = $this->pmssSystemdSliceRender([
-            'cfgPrefix' => 'pmss-cg-cfgv1-',
-            'dropPrefix' => 'pmss-cg-dropv1-',
             'mode' => 'v1',
             'v1Template' => "[Slice]\nBlockIOAccounting=yes\nCPUWeight=%%USER_CGROUP_CPU_WEIGHT%%\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\n",
             'totalMemMiB' => 4096,
@@ -73,8 +67,6 @@ class cgroupSliceTest extends TestCase
     {
         $tplBody = $this->pmssSystemdSliceTasksTemplate();
         $fixture = $this->pmssSystemdSliceFixturePrepare([
-            'cfgPrefix' => 'pmss-cg-cfgv3-',
-            'dropPrefix' => 'pmss-cg-dropv3-',
             'v1Template' => $tplBody,
             'v2Template' => $tplBody,
             'totalMemMiB' => 2048,
@@ -90,8 +82,6 @@ class cgroupSliceTest extends TestCase
     {
         // Do not write any template; function should log a warning and return.
         $fixture = $this->pmssSystemdSliceFixturePrepare([
-            'cfgPrefix' => 'pmss-cg-cfgbad-',
-            'dropPrefix' => 'pmss-cg-dropbad-',
             'v1Template' => null,
             'v2Template' => null,
             'totalMemMiB' => 1024,
@@ -132,8 +122,6 @@ class cgroupSliceTest extends TestCase
             [64, 262144, 'TasksMax=16384', 'TasksMax ceiling clamp not applied'], // 131072 → 16384
         ] as [$cpuThreads, $memMiB, $needle, $message]) {
             $content = $this->pmssSystemdSliceRender([
-                'cfgPrefix' => 'pmss-cg-cfg-tasks-',
-                'dropPrefix' => 'pmss-cg-drop-tasks-',
                 'v2Template' => $tplBody,
                 'totalCpuThreads' => $cpuThreads,
                 'totalMemMiB' => $memMiB,

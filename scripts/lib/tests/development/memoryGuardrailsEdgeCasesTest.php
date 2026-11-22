@@ -21,8 +21,6 @@ class MemoryGuardrailsEdgeCasesTest extends TestCase
     public function testHugeRamRespects95PercentCap(): void
     {
         $content = $this->pmssSystemdSliceRender([
-            'cfgPrefix' => 'pmss-cg-cfg2-',
-            'dropPrefix' => 'pmss-cg-drop2-',
             'v2Template' => "[Slice]\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\n",
             'totalMemMiB' => 65536,
         ]);
@@ -33,8 +31,6 @@ class MemoryGuardrailsEdgeCasesTest extends TestCase
     public function testDefaultBurstabilityAlignsTo25Percent(): void
     {
         $content = $this->pmssSystemdSliceRender([
-            'cfgPrefix' => 'pmss-cg-cfg3-',
-            'dropPrefix' => 'pmss-cg-drop3-',
             'v2Template' => "[Slice]\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\n",
             'totalMemMiB' => 10240,
         ]);
