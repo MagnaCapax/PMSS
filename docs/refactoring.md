@@ -499,14 +499,15 @@ the same fixture covers acquisition refusals and snapshot exceptions.
 
 Quota recovery header inspection closes its stream in `finally` when the read
 throws an exception or error, preserving the original throwable. Normal header
-decisions, failed/short reads and pre-open refusals retain their existing results;
+decisions, short reads and pre-open refusals retain their existing results;
 quota recount selection remains unchanged (ADR 0159). `QuotaFixGuardTest` covers
 the stream lifetime with isolated read faults on the testing machine.
 
-Quota header inspection also requires successful stream closure before selecting
-fresh-file recovery (`-c`/`-b`). A failed close retains the non-fresh recount path;
-completed reads retain the existing magic/version, short-read and failed-read
-decisions. `QuotaRecoveryStateInputSafetyTest` covers close refusals, read/close
+Quota header inspection also requires a string read and successful stream closure
+before selecting fresh-file recovery (`-c`/`-b`). A failed read or close retains the
+non-fresh recount path: an I/O error does not prove the stored header is corrupt.
+Completed string reads retain the existing magic/version and short-read decisions.
+`QuotaRecoveryStateInputSafetyTest` covers read/close refusals, read/close
 exceptions and errors, original throwable identity and combined-fault precedence
 using memory streams and intercepted quota observations. No live recount or dry
 run is executed on the devbox; execution stays on testing machines.

@@ -333,7 +333,7 @@ PHP;
             ['user', '111fc0d902000000', 'ok', true],
             ['user', '111fc0d9', 'ok', true],
             ['group', '', 'ok', true],
-            ['user', '', 'read-false', true],
+            ['user', '', 'read-false', false],
             ['user', '', 'exception', null],
             ['group', '', 'error', null],
             ['user', '', 'open-false', false],

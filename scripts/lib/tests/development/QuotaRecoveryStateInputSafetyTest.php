@@ -52,8 +52,8 @@ echo json_encode($results);
 PHP;
         $results = $this->pmssRunInlinePhpJson($script);
         $index = 0;
-        // Valid v0/v1 headers retain limits; every other completed read retains fresh-file recovery.
-        foreach ([false, false, true, true, true, true, true, true] as $invalid) {
+        // Valid headers and read errors retain limits; corrupt/short strings allow fresh recovery.
+        foreach ([false, false, true, true, true, true, true, false] as $invalid) {
             foreach ([true, false] as $closed) {
                 foreach (['none', 'read', 'close', 'both'] as $fault) {
                     foreach ([0, 1] as $kind) {
