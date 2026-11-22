@@ -54,7 +54,7 @@ class UserWebRootReconcileTest extends TestCase
         $this->assertSame('../data', readlink($this->home.'/www/data'));
         $this->assertSame('../../.local/share/pmss/rutorrent/share', readlink($this->home.'/www/rutorrent/share'));
         $this->assertStringContainsString('unix://'.$this->home.'/.rtorrent.socket', file_get_contents($this->home.'/www/rutorrent/conf/config.php'));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Restored complete web root'), implode('|', $messages));
+        $this->pmssAssertMessagesContain($messages, 'Restored complete web root', implode('|', $messages));
         $this->assertMatches(
             '/web_root_reconcile reason=missing-or-empty-web-root mode=full-restore files_restored=[1-9][0-9]* duration_ms=[0-9]+ preserved_conflict=0/',
             $this->pmssReconcileSummary($messages)
@@ -69,8 +69,7 @@ class UserWebRootReconcileTest extends TestCase
             'www/public/index.html' => 'public-state', 'www/rutorrent/share/users/profile.ini' => 'user-override',
         ]);
 
-        $migrationMessages = [];
-        pmssUserMigrateWebRootState($this->context(), $this->logger($migrationMessages));
+        pmssUserMigrateWebRootState($this->context(), self::pmssMakeCallbacks(['log' => null])['log']);
         // Observe the same ordered paths before deletion and after recovery.
         $paths = [
             'data' => $this->home.'/data/keep.bin',
@@ -124,7 +123,7 @@ class UserWebRootReconcileTest extends TestCase
         $this->assertEquals('rutorrent', file_get_contents($this->home.'/www/rutorrent/index.html'));
         $this->assertEquals('must-not-change', file_get_contents($outsideContent));
         $this->assertFalse(is_link($this->home.'/www/unsafe.php'));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Refusing unsafe skeleton symlink: unsafe.php'));
+        $this->pmssAssertMessagesContain($messages, 'Refusing unsafe skeleton symlink: unsafe.php');
         $this->assertFalse($this->pmssMessagesContain($messages, 'Restored complete web root'));
         $this->assertMatches(
             '/web_root_reconcile reason=managed-entry-check mode=partial-merge files_restored=[1-9][0-9]* duration_ms=[0-9]+ preserved_conflict=[1-9][0-9]*/',
@@ -172,7 +171,7 @@ class UserWebRootReconcileTest extends TestCase
         $this->assertTrue(pmssUserReconcileWebRoot($this->context(), $this->logger($messages)));
         $this->assertSame('customer', file_get_contents($this->home.'/www/linked/customer.txt'));
         $this->assertFalse(file_exists($this->home.'/www/linked/secret.txt'));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Refusing unsafe skeleton symlink: linked'));
+        $this->pmssAssertMessagesContain($messages, 'Refusing unsafe skeleton symlink: linked');
     }
 
     public function testPartialMergeRefusesLinkedTenantDirectoryWithoutChangingOutside(): void
@@ -238,7 +237,7 @@ class UserWebRootReconcileTest extends TestCase
             $messages = [];
             $this->assertFalse(pmssUserReconcileWebRoot($this->context(), $this->logger($messages)));
             $this->assertFalse(is_dir($this->home.'/www'));
-            $this->assertTrue($this->pmssMessagesContain($messages, 'per-user lock is busy'));
+            $this->pmssAssertMessagesContain($messages, 'per-user lock is busy');
         } finally {
             pmssLockHandleRelease($handle);
         }

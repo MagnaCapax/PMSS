@@ -109,7 +109,7 @@ class UserConfigFilesystemTest extends TestCase
 
         $this->assertFalse(\pmssDirEnsureExists($root."\0suffix", 0755));
         $this->assertSame(null, \pmssPrivateTempDirRealpath($root."\0suffix", 'pmss-user-config-fs-', $this->pmssMakeArrayLogger($logs)));
-        $this->assertTrue($this->pmssMessagesContain($logs, 'Refusing temporary directory cleanup for unsafe path'));
+        $this->pmssAssertMessagesContain($logs, 'Refusing temporary directory cleanup for unsafe path');
     }
 
     public function testRequiredFileRejectsNulBytePathBeforeFilesystemCall(): void

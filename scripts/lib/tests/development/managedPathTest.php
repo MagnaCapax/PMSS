@@ -22,7 +22,7 @@ class ManagedPathTest extends TestCase
         $messages = [];
 
         $this->assertFalse(\pmssManagedPathIsSafe($linkDir.'/managed.conf', 'test target', $this->pmssMakeArrayLogger($messages)));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Unsafe test target directory'));
+        $this->pmssAssertMessagesContain($messages, 'Unsafe test target directory');
     }
 
     public function testManagedPathRejectsFileAsParent(): void
@@ -32,7 +32,7 @@ class ManagedPathTest extends TestCase
         $messages = [];
 
         $this->assertFalse(\pmssManagedPathIsSafe($parentFile.'/managed.conf', 'test target', $this->pmssMakeArrayLogger($messages)));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Unsafe test target directory'));
+        $this->pmssAssertMessagesContain($messages, 'Unsafe test target directory');
     }
 
     public function testManagedWriteCreatesRegularFile(): void
@@ -73,7 +73,7 @@ class ManagedPathTest extends TestCase
         $this->assertFalse(\pmssWriteCompletedVersionMarker($versionPath, $completedPath, $logger));
         $this->assertFalse(file_exists($completedPath));
         $this->assertSame(2, count($messages));
-        $this->assertTrue($this->pmssMessagesContain($messages, '[WARN] Cannot write completed version marker'));
+        $this->pmssAssertMessagesContain($messages, '[WARN] Cannot write completed version marker');
     }
 
     public function testCompletedVersionMarkerMatchesPhase2DryRunWrite(): void
@@ -82,10 +82,9 @@ class ManagedPathTest extends TestCase
         $versionPath = $root.'/version';
         $completedPath = $root.'/version.completed';
         $this->pmssWriteFile($versionPath, "git/main\n");
-        $messages = [];
 
-        $this->pmssWithEnv(['PMSS_DRY_RUN' => '1'], function () use ($versionPath, $completedPath, &$messages): void {
-            $this->assertTrue(\pmssWriteCompletedVersionMarker($versionPath, $completedPath, $this->pmssMakeArrayLogger($messages)));
+        $this->pmssWithEnv(['PMSS_DRY_RUN' => '1'], function () use ($versionPath, $completedPath): void {
+            $this->assertTrue(\pmssWriteCompletedVersionMarker($versionPath, $completedPath, self::pmssMakeCallbacks(['log' => null])['log']));
         });
         $this->assertSame("git/main\n", file_get_contents($completedPath));
     }
@@ -111,7 +110,7 @@ class ManagedPathTest extends TestCase
 
         $this->assertFalse(\pmssWriteManagedPathFile($link, "new\n", 'test target', $this->pmssMakeArrayLogger($messages)));
         $this->assertEquals("old\n", file_get_contents($target));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Unsafe test target target'));
+        $this->pmssAssertMessagesContain($messages, 'Unsafe test target target');
     }
 
     public function testManagedWriteWithBackupPreservesOriginalAndLogsSuccess(): void
@@ -134,7 +133,7 @@ class ManagedPathTest extends TestCase
         $backups = glob($path.'.pmss-backup-*') ?: [];
         $this->assertEquals(1, count($backups), 'expected exactly one backup');
         $this->assertEquals("before\n", file_get_contents($backups[0]));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Wrote updated '.$path.' (backup '));
+        $this->pmssAssertMessagesContain($messages, 'Wrote updated '.$path.' (backup ');
     }
 
     public function testManagedBackupSkipsPreExistingSymlinkCandidate(): void
@@ -182,7 +181,7 @@ class ManagedPathTest extends TestCase
         $this->assertSame('', \pmssCreateManagedPathBackup($link, 'test target', $this->pmssMakeArrayLogger($messages), '20260102030408'));
         $this->assertSame("outside\n", file_get_contents($target));
         $this->assertSame([], glob($link.'.pmss-backup-*') ?: []);
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Unsafe test target target'));
+        $this->pmssAssertMessagesContain($messages, 'Unsafe test target target');
     }
 
     public function testManagedBackupRejectsMissingSource(): void
@@ -192,7 +191,7 @@ class ManagedPathTest extends TestCase
 
         $this->assertSame('', \pmssCreateManagedPathBackup($path, 'test target', $this->pmssMakeArrayLogger($messages), '20260102030409'));
         $this->assertSame([], glob($path.'.pmss-backup-*') ?: []);
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Unable to open test target for backup'));
+        $this->pmssAssertMessagesContain($messages, 'Unable to open test target for backup');
     }
 
     public function testManagedBackupLogsWhenAllTimestampCandidatesExist(): void
@@ -208,7 +207,7 @@ class ManagedPathTest extends TestCase
         $backup = \pmssCreateManagedPathBackup($path, 'test target', $this->pmssMakeArrayLogger($messages), $timestamp);
 
         $this->assertEquals('', $backup);
-        $this->assertTrue($this->pmssMessagesContain($messages, 'timestamped backup paths already exist for '.$path));
+        $this->pmssAssertMessagesContain($messages, 'timestamped backup paths already exist for '.$path);
     }
 
     public function testManagedWritePreservesOriginalWhenBackupCandidatesAreFull(): void
@@ -225,7 +224,7 @@ class ManagedPathTest extends TestCase
             $path, ['after'], 'test target', $this->pmssMakeArrayLogger($messages)
         ));
         $this->assertEquals("before\n", file_get_contents($path));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'timestamped backup paths already exist for '.$path));
+        $this->pmssAssertMessagesContain($messages, 'timestamped backup paths already exist for '.$path);
     }
 
     public function testManagedWriteWithBackupRejectsSymlinkTarget(): void
@@ -244,7 +243,7 @@ class ManagedPathTest extends TestCase
             )
         );
         $this->assertEquals("before\n", file_get_contents($target));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Unsafe test target target'));
+        $this->pmssAssertMessagesContain($messages, 'Unsafe test target target');
         $this->assertEquals([], glob($link.'.pmss-backup-*') ?: []);
     }
 
@@ -256,7 +255,7 @@ class ManagedPathTest extends TestCase
 
         $this->assertFalse(\pmssRemoveManagedPathFile($link, 'test target', $this->pmssMakeArrayLogger($messages)));
         $this->assertEquals("old\n", file_get_contents($target));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Unsafe test target target'));
+        $this->pmssAssertMessagesContain($messages, 'Unsafe test target target');
     }
 
     public function testManagedRemoveLogsFailedUnlink(): void
@@ -266,6 +265,6 @@ class ManagedPathTest extends TestCase
         $messages = [];
 
         $this->assertFalse(\pmssRemoveManagedPathFile($path, 'test target', $this->pmssMakeArrayLogger($messages)));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Unable to remove test target at '.$path));
+        $this->pmssAssertMessagesContain($messages, 'Unable to remove test target at '.$path);
     }
 }

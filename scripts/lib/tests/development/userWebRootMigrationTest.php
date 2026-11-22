@@ -47,8 +47,8 @@ class UserWebRootMigrationTest extends TestCase
         $this->assertEquals('share-payload', file_get_contents($this->home.'/.local/share/pmss/rutorrent/share/users/'.$this->user.'/settings.ini'));
         $this->assertSame($publicStat['mode'] & 07777, fileperms($this->home.'/.local/share/pmss/public') & 07777);
         $this->assertSame($shareStat['mode'] & 07777, fileperms($this->home.'/.local/share/pmss/rutorrent/share') & 07777);
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Migrated www/public'));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Migrated www/rutorrent/share'));
+        $this->pmssAssertMessagesContain($messages, 'Migrated www/public');
+        $this->pmssAssertMessagesContain($messages, 'Migrated www/rutorrent/share');
     }
 
     public function testAccountRenameKeepsDirectoryInodeAndNestedContent(): void
@@ -148,7 +148,7 @@ class UserWebRootMigrationTest extends TestCase
         $this->assertTrue(is_dir($target) && !is_link($target));
         $this->assertEquals('source', file_get_contents($source.'/source.txt'));
         $this->assertEquals('destination', file_get_contents($target.'/destination.txt'));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Preserving destination conflict for www/public'));
+        $this->pmssAssertMessagesContain($messages, 'Preserving destination conflict for www/public');
     }
 
     public function testUnexpectedSourceSymlinkRemainsUntouched(): void
@@ -164,7 +164,7 @@ class UserWebRootMigrationTest extends TestCase
         $this->assertSame($outside, readlink($this->home.'/www/public'));
         $this->assertEquals('outside', file_get_contents($outside.'/index.html'));
         $this->assertFalse(file_exists($this->home.'/.local/share/pmss/public'));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Refusing unexpected symlink at www/public'));
+        $this->pmssAssertMessagesContain($messages, 'Refusing unexpected symlink at www/public');
     }
 
     public function testIdentitySnapshotMatchesNestedTreeAfterRename(): void
@@ -280,7 +280,7 @@ class UserWebRootMigrationTest extends TestCase
         $this->assertTrue(is_link($this->home.'/www/rutorrent/share'));
         $this->assertSame('../../.local/share/pmss/rutorrent/share', readlink($this->home.'/www/rutorrent/share'));
         $this->assertEquals('durable-share', file_get_contents($target.'/users/'.$this->user.'/settings.ini'));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Restored symlink for www/rutorrent/share'));
+        $this->pmssAssertMessagesContain($messages, 'Restored symlink for www/rutorrent/share');
     }
 
     public function testCopiesMisfiledBasenameTreesIntoAbsentDurableTargets(): void
@@ -318,8 +318,8 @@ class UserWebRootMigrationTest extends TestCase
         $this->assertSame('../../.local/share/pmss/rutorrent/share', readlink($this->home.'/www/rutorrent/share'));
         $this->assertTrue(is_link($this->home.'/www/public'));
         $this->assertSame('../.local/share/pmss/public', readlink($this->home.'/www/public'));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Copied misfiled share'));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Copied misfiled public'));
+        $this->pmssAssertMessagesContain($messages, 'Copied misfiled share');
+        $this->pmssAssertMessagesContain($messages, 'Copied misfiled public');
     }
 
     public function testMisfiledShareDoesNotClobberPopulatedDurableTarget(): void
@@ -334,7 +334,7 @@ class UserWebRootMigrationTest extends TestCase
 
         $this->assertEquals('misfiled-profile', file_get_contents($misfile));
         $this->assertEquals('durable-profile', file_get_contents($target));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Preserving destination conflict for www/rutorrent/share'));
+        $this->pmssAssertMessagesContain($messages, 'Preserving destination conflict for www/rutorrent/share');
     }
 
     public function testMissingBasenameMisfileLeavesNormalMigrationUnchanged(): void
@@ -349,7 +349,7 @@ class UserWebRootMigrationTest extends TestCase
         $this->assertFalse(file_exists($this->home.'/share'));
         $this->assertEquals('ordinary-profile', file_get_contents($target));
         $this->assertTrue(is_link($this->home.'/www/rutorrent/share'));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Migrated www/rutorrent/share'));
+        $this->pmssAssertMessagesContain($messages, 'Migrated www/rutorrent/share');
         $this->assertFalse($this->pmssMessagesContain($messages, 'Copied misfiled share'));
     }
 
@@ -367,7 +367,7 @@ class UserWebRootMigrationTest extends TestCase
         $this->assertEquals('outside-profile', file_get_contents($outside.'/users/'.$this->user.'/settings/profile.ini'));
         $this->assertFalse(file_exists($this->home.'/.local/share/pmss/rutorrent/share'));
         $this->assertFalse(file_exists($this->home.'/www/rutorrent/share'));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Refusing unsafe symlink or unreadable tree at share'));
+        $this->pmssAssertMessagesContain($messages, 'Refusing unsafe symlink or unreadable tree at share');
     }
 
     public function testMisfiledShareRepairIsIdempotent(): void
@@ -389,8 +389,8 @@ class UserWebRootMigrationTest extends TestCase
         $this->assertEquals('legacy-profile', file_get_contents($target.'/users/'.$this->user.'/settings/profile.ini'));
         $this->assertEquals('legacy-profile', file_get_contents($misfile));
         $this->assertTrue(is_link($this->home.'/www/rutorrent/share'));
-        $this->assertTrue($this->pmssMessagesContain($firstMessages, 'Copied misfiled share'));
-        $this->assertTrue($this->pmssMessagesContain($secondMessages, 'Preserving destination conflict for www/rutorrent/share'));
+        $this->pmssAssertMessagesContain($firstMessages, 'Copied misfiled share');
+        $this->pmssAssertMessagesContain($secondMessages, 'Preserving destination conflict for www/rutorrent/share');
         $this->assertFalse($this->pmssMessagesContain($secondMessages, 'Copied misfiled share'));
     }
 

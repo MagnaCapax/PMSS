@@ -120,7 +120,7 @@ class ResourceStatsProcessorTest extends TestCase
         ]);
         $processor->ensureRuntime();
 
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Unable to prepare resource runtime directory'));
+        $this->pmssAssertMessagesContain($messages, 'Unable to prepare resource runtime directory');
         $this->assertTrue(!is_dir($targetRuntime.'/resourceStats'));
     }
 
@@ -174,8 +174,8 @@ class ResourceStatsProcessorTest extends TestCase
 
         $processor->processUser($user, \pmssStatsCompareTimesBuild());
 
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Unable to prepare resource runtime directory'));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Failed to write resource stats for '.$user.' at '.$paths['runtime_dir'].'/resourceStats/'.$user));
+        $this->pmssAssertMessagesContain($messages, 'Unable to prepare resource runtime directory');
+        $this->pmssAssertMessagesContain($messages, 'Failed to write resource stats for '.$user.' at '.$paths['runtime_dir'].'/resourceStats/'.$user);
         $this->assertFalse($this->pmssMessagesContain($messages, 'Resource stats for '.$user.' saved, month read bytes:'));
         $this->assertTrue(is_file($paths['home_dir'].'/'.$user.'/.resourceData'));
         $this->assertTrue(!is_file($targetRuntime.'/resourceStats/'.$user));
@@ -355,7 +355,7 @@ class ResourceStatsProcessorTest extends TestCase
         $this->assertTrue($this->readSavedResourceStats('fixtur01') !== null);
         $this->assertTrue($this->readSavedResourceStats('fixtur02') !== null);
         $this->assertTrue(!is_file($this->paths['home_dir'].'/no-passwd/.resourceData'));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'resourceStats processed 2 accounts in'));
+        $this->pmssAssertMessagesContain($messages, 'resourceStats processed 2 accounts in');
         $busy = false;
         $this->assertEquals(false, \pmssLockFileAcquire($this->paths['runtime_dir'].'/resourceStats.lock', true, 'c+', false, true, $busy));
         $this->assertTrue($busy, 'Expected the run lock to stay held after the account loop');
@@ -377,7 +377,7 @@ class ResourceStatsProcessorTest extends TestCase
         try {
             $this->assertEquals(0, $processor->runCli(['/scripts/cron/resourceStats.php'], '/scripts/cron/resourceStats.php'));
             $this->assertTrue($this->readSavedResourceStats($user) === null);
-            $this->assertTrue($this->pmssMessagesContain($messages, 'held by an earlier run; skipping this run'));
+            $this->pmssAssertMessagesContain($messages, 'held by an earlier run; skipping this run');
         } finally {
             \pmssLockHandleRelease($handle);
         }
@@ -411,7 +411,7 @@ class ResourceStatsProcessorTest extends TestCase
         ]);
 
         $this->assertTrue($processor->beforeSpawn());
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Unable to open lock file '.$this->paths['runtime_dir'].'/resourceStats.lock'));
+        $this->pmssAssertMessagesContain($messages, 'Unable to open lock file '.$this->paths['runtime_dir'].'/resourceStats.lock');
     }
 
     /**
