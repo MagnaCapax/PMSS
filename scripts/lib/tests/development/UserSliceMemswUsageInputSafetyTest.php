@@ -76,14 +76,15 @@ namespace MemswUsageInputFixture;
 // No host account, systemd, sysfs or process operations may escape this fixture.
 function posix_geteuid() { return 0; }
 function is_file($path) { return true; }
-function pmssReadSystemdProperties($unit, $names) { return ['MemoryMax' => '4096']; }
+function pmssReadSystemdProperties($unit, $names) { return ['MemoryMax' => getenv('PMSS_TEST_MEMSW_TARGET') ?: '4096']; }
 function date($format) { return 'fixture-time'; }
 function file_get_contents($path) {
     $GLOBALS['events'][] = ['read', basename($path)];
     return basename($path) === 'memory.stat' ? json_decode(getenv('PMSS_TEST_MEMSW_USAGE'), true) : '8192';
 }
 function pmssUserSliceMemswWrite($file, $value) {
-    throw new \LogicException('Unexpected sysfs write');
+    $GLOBALS['events'][] = ['write', basename($file), $value];
+    return true;
 }
 function pmssCliReturnWithStderr($message, $code) {
     throw new \LogicException('Unexpected preflight refusal');
@@ -99,13 +100,14 @@ PHP;
         $script .= 'require_once '.var_export($this->pmssRepoPath('scripts/lib/cgroup/userSliceMemsw.php'), true).';';
         $script .= 'eval('.var_export('declare(strict_types=1); namespace MemswUsageInputFixture;'.
             substr($source, $start), true).');';
-        foreach (["\0total_rss 5000\n", "total_rss 5000\0\n", "total_shmem 5000\0\n",
+        foreach ([false, "\0total_rss 5000\n", "total_rss 5000\0\n", "total_shmem 5000\0\n",
             "total_swap 5000\0\n", "total_rss 5000\ncache 0\0\n",
             "total_rss -5000\n", "total_shmem 5e3\n", "total_swap 5000bytes\n",
             "total_rss\n", "total_shmem\t5000\n", "total_swap 5000 \ntotal_swap 1\n"] as $raw) {
             foreach (['0', '1'] as $dryRun) {
                 $result = $this->pmssExecInlinePhp($script, [
                     'PMSS_TEST_MEMSW_USAGE' => json_encode($raw), 'PMSS_TEST_MEMSW_DRY_RUN' => $dryRun,
+                    'PMSS_TEST_MEMSW_TARGET' => '4096',
                 ]);
                 $this->assertSame(0, $result['rc'], $result['output']);
                 $this->assertSame([
@@ -113,6 +115,26 @@ PHP;
                     'fixture-time tenants hold '.PHP_INT_MAX
                         ." bytes of anonymous memory plus swap, above the bound 4096: memsw limit not written\n",
                 ], json_decode($result['output'], true));
+            }
+        }
+        // Failed reads still permit raises, rollback and convergence; successful reads keep their plans.
+        foreach ([[false, '16384', '16384', ['memory.memsw.limit_in_bytes', 'memory.limit_in_bytes']],
+            [false, 'infinity', '-1', ['memory.memsw.limit_in_bytes', 'memory.limit_in_bytes']],
+            [false, '8192', '8192', []], ['', '4096', '4096', ['memory.limit_in_bytes', 'memory.memsw.limit_in_bytes']],
+            ["total_rss 4096\n", '4096', '4096', ['memory.limit_in_bytes', 'memory.memsw.limit_in_bytes']]] as [$raw, $target, $value, $files]) {
+            foreach (['0', '1'] as $dryRun) {
+                $events = [['read', 'memory.limit_in_bytes'], ['read', 'memory.memsw.limit_in_bytes'], ['read', 'memory.stat']];
+                $output = '';
+                foreach ($files as $file) {
+                    if ($dryRun === '0') $events[] = ['write', $file, $value];
+                    $output .= ($dryRun === '1' ? '[DRY-RUN]' : 'fixture-time')." user.slice $file: 8192 -> $value\n";
+                }
+                $result = $this->pmssExecInlinePhp($script, [
+                    'PMSS_TEST_MEMSW_USAGE' => json_encode($raw), 'PMSS_TEST_MEMSW_DRY_RUN' => $dryRun,
+                    'PMSS_TEST_MEMSW_TARGET' => $target,
+                ]);
+                $this->assertSame(0, $result['rc'], $result['output']);
+                $this->assertSame([$events, $output], json_decode($result['output'], true));
             }
         }
     }

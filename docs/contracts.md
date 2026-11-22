@@ -1021,6 +1021,12 @@ Sub-handlers:
   Raising, infinity rollback and already-converged limits retain their existing
   plans. `UserSliceMemswUsageInputSafetyTest` covers parsing and isolated cron
   refusal, including dry runs, on the testing machine.
+  The cron retains a failed `memory.stat` read as saturated usage instead of
+  casting it to the parser's empty-string zero default. It therefore cannot
+  authorize lowering memsw; raises, infinity rollback and convergence remain
+  available. Successful reads, including empty strings, keep their existing
+  interpretation. The same fixture checks live and dry-run write ordering and
+  output with all host I/O intercepted; no sysfs writes run on the devbox.
 
 - pmssUserSliceMemswWrite(string $file, string $value): bool → after a thrown
   reap, terminates and reaps the child only while its handle remains open, using

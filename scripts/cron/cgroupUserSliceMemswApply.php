@@ -36,7 +36,10 @@ if ($target === null || $memory <= 0 || $memsw <= 0) {
     exit(pmssCliReturnWithStderr("ERROR: unreadable user.slice MemoryMax or limits (target=".var_export($target, true)." memory=$memory memsw=$memsw)\n", 1));
 }
 
-$plan = pmssUserSliceMemswPlan($target, $memory, $memsw, pmssUserSliceMemswAnonPlusSwap((string) @file_get_contents($cg.'/memory.stat')));
+$memoryStat = @file_get_contents($cg.'/memory.stat');
+// An unavailable usage observation cannot authorize a reclaiming memsw write.
+$plan = pmssUserSliceMemswPlan($target, $memory, $memsw,
+    $memoryStat === false ? PHP_INT_MAX : pmssUserSliceMemswAnonPlusSwap($memoryStat));
 if ($plan['note'] !== null) {
     echo date('Y-m-d H:i:s').' '.$plan['note']."\n";
 }
