@@ -34,13 +34,9 @@ class SetupLetsEncryptTest extends TestCase
             'cronPath' => $this->pmssMakeTempDir('pmss-certbot-cron-').'/certbot',
             'createNginxConfigCommand' => 'create-nginx',
             'nginxReloadCommand' => 'reload-nginx',
-            'fileExists' => static function (string $path): bool {
-                return false;
-            },
-            'commandRunner' => static function (string $command, string $description): array {
-                return ['rc' => 0, 'stdout' => '', 'stderr' => ''];
-            },
-        ], $overrides);
+        ] + self::pmssMakeCallbacks([
+            'fileExists' => false, 'commandRunner' => ['rc' => 0, 'stdout' => '', 'stderr' => ''],
+        ]), $overrides);
     }
 
     public function testRejectsMissingEmailArgument(): void
@@ -175,11 +171,8 @@ class SetupLetsEncryptTest extends TestCase
     public function testSharedSetupRejectsInvalidCommandRunnerPayload(): void
     {
         $this->assertThrowsRuntime(function (): void {
-            \pmssSetupLetsEncryptRun('example.com', 'user@example.com', 'bullseye', $this->pmssLetsEncryptTestOptions([
-                'commandRunner' => static function (string $command, string $description) {
-                    return 'not-a-command-result';
-                },
-            ]));
+            \pmssSetupLetsEncryptRun('example.com', 'user@example.com', 'bullseye', $this->pmssLetsEncryptTestOptions(
+                self::pmssMakeCallbacks(['commandRunner' => 'not-a-command-result'])));
         }, 'Install certbot packages returned invalid command result');
     }
 

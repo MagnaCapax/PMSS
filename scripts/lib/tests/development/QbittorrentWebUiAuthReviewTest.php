@@ -13,12 +13,11 @@ final class QbittorrentWebUiAuthReviewTest extends TestCase
         $native = $this->pmssWriteFile($root.'/qbittorrent-nox', 'binary');
         return [
             'roots' => [$native],
-            'exe' => static function () use ($native): string { return $native; },
             'log' => static function ($user, $message) use (&$events): void { $events[] = 'log:'.$message; },
             'stateDir' => $root.'/run',
             'now' => 100000,
         ] + self::pmssMakeCallbacks([
-            'contextSafe' => true, 'pathSafe' => true,
+            'exe' => $native, 'contextSafe' => true, 'pathSafe' => true,
             'read' => "[Preferences]\nWebUI\\LocalHostAuth=false\n", 'pids' => [123], 'mntNs' => 'mnt:[1]'
         ]) + self::pmssMakeCallbacks(['write' => true, 'signal' => true], $events);
     }
@@ -29,8 +28,8 @@ final class QbittorrentWebUiAuthReviewTest extends TestCase
         $events = [];
         $ops = $this->fixture($events);
         $native = $ops['roots'][0];
-        $ops['exe'] = static function () use ($native): string { return $native.' (deleted)'; };
-        $this->assertSame([123], \pmssQbittorrentWebUiAuthNativePids('alice', $ops));
+        $ops = self::pmssMakeCallbacks(['exe' => $native.' (deleted)']) + $ops;
+        $this->assertSame([123], \pmssQbittorrentWebUiAuthNativePids('fixtur01', $ops));
         $this->assertTrue(\pmssQbittorrentWebUiAuthPidIsNative(123, $ops));
     }
 
@@ -40,7 +39,7 @@ final class QbittorrentWebUiAuthReviewTest extends TestCase
         $events = [];
         $ops = $this->fixture($events);
         $ops['mntNs'] = static function (int $pid): string { return $pid === 0 ? 'mnt:[1]' : 'mnt:[2]'; };
-        $this->assertSame([], \pmssQbittorrentWebUiAuthNativePids('alice', $ops));
+        $this->assertSame([], \pmssQbittorrentWebUiAuthNativePids('fixtur01', $ops));
     }
 
     /** Unreadable, empty, and unrelated proc links do not match. */
@@ -49,7 +48,7 @@ final class QbittorrentWebUiAuthReviewTest extends TestCase
         $events = [];
         $ops = $this->fixture($events);
         foreach ([false, '', '/other/qbittorrent-nox'] as $exe) {
-            $ops['exe'] = static function () use ($exe) { return $exe; };
+            $ops = self::pmssMakeCallbacks(['exe' => $exe]) + $ops;
             $this->assertFalse(\pmssQbittorrentWebUiAuthPidIsNative(123, $ops));
         }
         $ops = self::pmssMakeCallbacks(['mntNs' => false]) + $ops;
@@ -62,9 +61,9 @@ final class QbittorrentWebUiAuthReviewTest extends TestCase
         $events = [];
         $ops = $this->fixture($events);
         $ops = self::pmssMakeCallbacks(['signal' => false], $events) + $ops;
-        $this->assertFalse(\pmssQbittorrentWebUiAuthEnsure('alice', '/tmp/pmss-qbt-test/alice', $ops));
-        $this->assertFalse(\pmssQbittorrentWebUiAuthStateActive('alice', $ops));
-        $this->assertFalse(\pmssQbittorrentWebUiAuthEnsure('alice', '/tmp/pmss-qbt-test/alice', $ops));
+        $this->assertFalse(\pmssQbittorrentWebUiAuthEnsure('fixtur01', '/tmp/pmss-qbt-test/fixtur01', $ops));
+        $this->assertFalse(\pmssQbittorrentWebUiAuthStateActive('fixtur01', $ops));
+        $this->assertFalse(\pmssQbittorrentWebUiAuthEnsure('fixtur01', '/tmp/pmss-qbt-test/fixtur01', $ops));
         $this->assertSame(2, count(array_filter($events, static function ($event): bool { return $event === 'signal'; })));
         $this->assertSame(1, count(array_filter($events, static function ($event): bool { return strpos($event, 'log:') === 0; })));
     }
@@ -77,9 +76,9 @@ final class QbittorrentWebUiAuthReviewTest extends TestCase
         $native = $ops['roots'][0];
         $reads = 0;
         $ops['exe'] = static function () use ($native, &$reads): string { return ++$reads === 1 ? $native : '/other/binary'; };
-        $this->assertFalse(\pmssQbittorrentWebUiAuthEnsure('alice', '/tmp/pmss-qbt-test/alice', $ops));
+        $this->assertFalse(\pmssQbittorrentWebUiAuthEnsure('fixtur01', '/tmp/pmss-qbt-test/fixtur01', $ops));
         $this->assertSame(0, count(array_filter($events, static function ($event): bool { return $event === 'signal'; })));
-        $this->assertFalse(\pmssQbittorrentWebUiAuthStateActive('alice', $ops));
+        $this->assertFalse(\pmssQbittorrentWebUiAuthStateActive('fixtur01', $ops));
     }
 
     /** Empty and malformed marker timestamps do not hold an active interval. */
@@ -89,10 +88,10 @@ final class QbittorrentWebUiAuthReviewTest extends TestCase
         $ops = $this->fixture($events);
         $dir = $ops['stateDir'];
         $this->pmssEnsureDir($dir);
-        $path = $dir.'/qbittorrentWebui-alice.state';
+        $path = $dir.'/qbittorrentWebui-fixtur01.state';
         foreach (['', "oops\n0\n", "oops\n1\n", "0\n0\n"] as $value) {
             $this->pmssWriteFile($path, $value);
-            $this->assertFalse(\pmssQbittorrentWebUiAuthStateActive('alice', $ops));
+            $this->assertFalse(\pmssQbittorrentWebUiAuthStateActive('fixtur01', $ops));
         }
     }
 
@@ -101,13 +100,13 @@ final class QbittorrentWebUiAuthReviewTest extends TestCase
     {
         $events = [];
         $ops = $this->fixture($events);
-        $this->assertTrue(\pmssQbittorrentWebUiAuthEnsure('alice', '/tmp/pmss-qbt-test/alice', $ops));
-        $this->assertFalse(\pmssQbittorrentWebUiAuthEnsure('alice', '/tmp/pmss-qbt-test/alice', $ops));
-        $this->assertFalse(\pmssQbittorrentWebUiAuthEnsure('alice', '/tmp/pmss-qbt-test/alice', $ops));
+        $this->assertTrue(\pmssQbittorrentWebUiAuthEnsure('fixtur01', '/tmp/pmss-qbt-test/fixtur01', $ops));
+        $this->assertFalse(\pmssQbittorrentWebUiAuthEnsure('fixtur01', '/tmp/pmss-qbt-test/fixtur01', $ops));
+        $this->assertFalse(\pmssQbittorrentWebUiAuthEnsure('fixtur01', '/tmp/pmss-qbt-test/fixtur01', $ops));
         $logs = array_values(array_filter($events, static function ($event): bool { return strpos($event, 'log:') === 0; }));
         $this->assertSame(2, count($logs));
         $ops['now'] = 186401;
-        $this->assertTrue(\pmssQbittorrentWebUiAuthEnsure('alice', '/tmp/pmss-qbt-test/alice', $ops));
+        $this->assertTrue(\pmssQbittorrentWebUiAuthEnsure('fixtur01', '/tmp/pmss-qbt-test/fixtur01', $ops));
         $logs = array_values(array_filter($events, static function ($event): bool { return strpos($event, 'log:') === 0; }));
         $this->assertSame(3, count($logs));
     }
@@ -118,10 +117,10 @@ final class QbittorrentWebUiAuthReviewTest extends TestCase
         $events = [];
         $ops = $this->fixture($events);
         $this->pmssEnsureDir($ops['stateDir']);
-        $stateFile = $this->pmssWriteFile($ops['stateDir'].'/qbittorrentWebui-alice.state', "0\n0\n");
+        $stateFile = $this->pmssWriteFile($ops['stateDir'].'/qbittorrentWebui-fixtur01.state', "0\n0\n");
         $this->assertTrue(chmod($stateFile, 0600));
-        $this->assertTrue(\pmssQbittorrentWebUiAuthStateShouldLog('alice', 'state-failed', $ops));
-        $this->assertFalse(\pmssQbittorrentWebUiAuthStateShouldLog('alice', 'state-failed', $ops));
-        $this->assertTrue(\pmssQbittorrentWebUiAuthStateShouldLog('alice', 'deferred', $ops));
+        $this->assertTrue(\pmssQbittorrentWebUiAuthStateShouldLog('fixtur01', 'state-failed', $ops));
+        $this->assertFalse(\pmssQbittorrentWebUiAuthStateShouldLog('fixtur01', 'state-failed', $ops));
+        $this->assertTrue(\pmssQbittorrentWebUiAuthStateShouldLog('fixtur01', 'deferred', $ops));
     }
 }

@@ -516,9 +516,8 @@ PHP;
     public function testSuccessfulAccountWriteDoesNotReachRootStageEligibility(): void
     {
         $fixture = $this->pmssRootStageRestoreFixture("<?php echo 'panel';\n", '<?php broken(', [
-            'accountWrite' => static function (): bool { return true; },
             'eligible' => static function () { throw new \RuntimeException('Unexpected eligibility check'); },
-        ]);
+        ] + self::pmssMakeCallbacks(['accountWrite' => true]));
         $this->assertTrue($fixture['restored']);
         $this->assertSame([], $fixture['deliveries']);
     }
@@ -533,7 +532,7 @@ PHP;
         $user = $user === '' ? $this->pmssCurrentOwner() : $user;
         $messages = []; $events = []; $deliveries = [];
         $ops += $this->pmssMakeCallbacks(['accountWrite' => false, 'eligible' => 'over quota'], $events);
-        $deliver = $ops['deliver'] ?? static function (): bool { return true; };
+        $deliver = $ops['deliver'] ?? self::pmssMakeCallbacks(['deliver' => true])['deliver'];
         $ops['deliver'] = static function ($user, $target, $bytes, &$failure) use ($deliver, &$events, &$deliveries): bool {
             $events[] = 'deliver';
             $deliveries[] = [$user, $target, $bytes];

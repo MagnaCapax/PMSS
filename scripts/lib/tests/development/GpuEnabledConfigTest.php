@@ -19,12 +19,9 @@ class GpuEnabledConfigTest extends TestCase
             $this->assertSame(false, \pmssUserConfigParseGpuEnabledOption($value));
         }
         foreach ([true, false, 1, [], new \stdClass(), '', 'invalid', '-1', 'true;id', "false\0"] as $value) {
-            try {
+            $this->assertThrows(\InvalidArgumentException::class, static function () use ($value): void {
                 \pmssUserConfigParseGpuEnabledOption($value);
-                $this->fail('Malformed GPU option was accepted');
-            } catch (\InvalidArgumentException $error) {
-                $this->assertStringContainsString('--gpu-enabled', $error->getMessage());
-            }
+            }, '--gpu-enabled');
         }
     }
 

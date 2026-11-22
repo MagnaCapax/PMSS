@@ -61,7 +61,7 @@ final class QbittorrentWebUiSectionTest extends TestCase
     public function testMigratedPasswordPresenceUsesOnlyTheAuthoritativeSection(): void
     {
         $path = $this->pmssMakeTempPath('pmss-qbt-section-', '.conf');
-        $safe = static function (): bool { return true; };
+        $safe = self::pmssMakeCallbacks(['safe' => true])['safe'];
         $modern = "[Meta]\nMigrationVersion=12\n[Preferences]\nWebUI\\Password_PBKDF2=old\n[WebUI]\n";
         foreach (['' => true, 'Password_PBKDF2=owner' => false,
             'Password_PBKDF2="'.\pmssQbittorrentWebUiAuthSentinel().'"' => true] as $line => $required) {
@@ -93,7 +93,7 @@ final class QbittorrentWebUiSectionTest extends TestCase
     {
         // 5.3 moved the password out of [Preferences]; Start on a pre-5.3 build must not ask for one again.
         $path = $this->pmssMakeTempPath('pmss-qbt-moved-', '.conf');
-        $safe = static function (): bool { return true; };
+        $safe = self::pmssMakeCallbacks(['safe' => true])['safe'];
         $this->pmssWriteFile($path, "[Meta]\nMigrationVersion=12\n[Preferences]\nGeneral\\Locale=en\n[WebUI]\nPort=32162\nPassword_PBKDF2=owner\n");
         foreach (['4.3.9', '4.5.2', '5.2.4', '5.3.0'] as $build)
             $this->assertFalse(\pmssQbittorrentFrontendPasswordRequired($path, $safe, $build), $build);
