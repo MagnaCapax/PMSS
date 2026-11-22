@@ -240,6 +240,14 @@ cleanup stay with the file-backed controller. Consult [ADR 0178](adr/0178-storag
 and [ADR 0189](adr/0189-storage-benchmark-probe-boundaries.md) before consolidating
 these boundaries further.
 
+The saved `--show-last` report currently omits file-backed metrics when their
+JSONL rows carry a printable, nonzero `device`; live file summaries still print
+them. An empty saved file table therefore does not prove that no file measurements
+were recorded. The result-classification prerequisite in [Code Quality Audits](TODO.md#code-quality-audits)
+tracks this existing stdout contract, locked by
+`StorageBenchmarkShowLastTest::testShowLastCharacterizesFileRowsWithMountDeviceMetadata()`.
+Resolve that behavior separately before unifying live and saved presentation.
+
 Base system preparation retains `systemPrep.php` as its include (ADR 0267).
 Temporary-mount policy, boot-tuning installation, locale/timezone convergence
 and root-shell defaults have separate modules. Boot templates share ordered
