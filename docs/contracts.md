@@ -1679,6 +1679,14 @@ Automation often invokes these utilities; below are expected inputs and effects.
     inodes and are never added again. Primary limits, grace and kernel markers stay
     unchanged. Failed aggregation follows the existing failed-probe policy;
     timeouts stop the sweep before publication. See ADR 0285.
+  - The snapshot cron logs one report-only aggregate hard-limit diagnostic per
+    account when any filesystem exceeds its primary UID's numeric block hard
+    limit (#1270). Each affected filesystem reports exact aggregate KiB, hard-limit
+    KiB and the deduplicated count of subordinate UIDs holding blocks or inodes.
+    Zero/unlimited, missing and invalid primary limits produce no diagnostic;
+    failed or timed-out aggregation emits no partial overage diagnostic. The
+    existing `updateQuotas.log` receives the line; quota limits and enforcement
+    remain unchanged, and provisioning keeps its existing logging behavior.
 
 - scripts/cron/checkGui.php
   - Boundaries: The cron keeps account traversal and its original logger identity;

@@ -13,10 +13,14 @@ function pmssQuotaSnapshotFilesystemReport(string $filesystem): array
     return $reports[$filesystem];
 }
 
-/** @return array{0:int,1:int}|null KiB and inodes, or null for invalid/overflowing counters. */
-function pmssQuotaSnapshotUsageSum(array $rows, int $primaryId, array $ranges): ?array
+/**
+ * @param array|null $details Receives the primary hard limit and used subordinate ID count.
+ * @return array{0:int,1:int}|null KiB and inodes, or null for invalid/overflowing counters.
+ */
+function pmssQuotaSnapshotUsageSum(array $rows, int $primaryId, array $ranges, ?array &$details = null): ?array
 {
     $totals = [0, 0];
+    $details = ['hard_limit_kib' => null, 'subordinate_ids' => 0];
     $seen = [];
     foreach ($rows as $row) {
         $id = pmssUnsignedDecimalIntParse($row[0]);
@@ -33,6 +37,12 @@ function pmssQuotaSnapshotUsageSum(array $rows, int $primaryId, array $ranges): 
             if ($value === null || $totals[$index] > PHP_INT_MAX - $value) return null;
             $totals[$index] += $value;
         }
+        // Keep exact numeric limits beside the same deduplicated ownership traversal.
+        if ($id === $primaryId) {
+            $details['hard_limit_kib'] = pmssUnsignedDecimalIntParse($row[3]);
+        } elseif ($row[1] > 0 || $row[4] > 0) {
+            ++$details['subordinate_ids'];
+        }
     }
     return $totals;
 }
@@ -44,9 +54,10 @@ function pmssQuotaSnapshotUsageSum(array $rows, int $primaryId, array $ranges): 
  * process for each of the usually 65536 subordinate IDs. Missing records mean zero.
  *
  * @param callable|null $capture Optional bounded filesystem report reader for hermetic tests.
+ * @param callable|null $log Optional cron logger for report-only aggregate hard-limit diagnostics.
  * @return array{rc:int,lines:array<int,string>,timed_out:bool} Existing capture/failure contract.
  */
-function pmssQuotaSnapshotAggregateReport(string $user, array $report, ?callable $capture = null): array
+function pmssQuotaSnapshotAggregateReport(string $user, array $report, ?callable $capture = null, ?callable $log = null): array
 {
     if ($report['timed_out'] || $report['rc'] > 1) return $report;
     $content = implode("\n", $report['lines']);
@@ -62,6 +73,7 @@ function pmssQuotaSnapshotAggregateReport(string $user, array $report, ?callable
     // quota wraps long device names onto a separate line unless invoked with -w.
     $report['lines'] = explode("\n", preg_replace('~^(\h*/\S+)\h*\n\h+(?=[0-9])~m', '$1 ', $content));
     $updated = false;
+    $overages = [];
     foreach ($report['lines'] as &$line) {
         $columns = pmssQuotaSnapshotDataRows($line)[0] ?? [];
         if ($columns === []) continue;
@@ -76,13 +88,23 @@ function pmssQuotaSnapshotAggregateReport(string $user, array $report, ?callable
         if (strpos(implode("\n", $usage['lines']), 'Report for user quotas on device') === false) {
             return ['rc' => 2, 'lines' => [], 'timed_out' => false];
         }
-        $totals = pmssQuotaSnapshotUsageSum(pmssQuotaSnapshotParseRepquotaUserRows($usage['lines']), $primaryId, $ranges);
+        $details = null;
+        $totals = pmssQuotaSnapshotUsageSum(pmssQuotaSnapshotParseRepquotaUserRows($usage['lines']), $primaryId, $ranges, $details);
         if ($totals === null) return ['rc' => 2, 'lines' => [], 'timed_out' => false];
+        // Zero means unlimited; a missing/invalid primary limit cannot certify an overage.
+        if ($details['hard_limit_kib'] !== null && $details['hard_limit_kib'] > 0 && $totals[0] > $details['hard_limit_kib']) {
+            $overages[] = sprintf('filesystem=%s aggregate_kib=%d hard_limit_kib=%d subordinate_ids=%d',
+                $columns[0], $totals[0], $details['hard_limit_kib'], $details['subordinate_ids']);
+        }
         $columns[1] = $totals[0].'K'.(substr($columns[1], -1) === '*' ? '*' : '');
         $columns[$fileColumn] = $totals[1].(substr($columns[$fileColumn], -1) === '*' ? '*' : '');
         $line = substr($line, 0, strlen($line) - strlen(ltrim($line))).implode(' ', $columns);
         $updated = true;
     }
     unset($line);
+    // Report once per account only after every filesystem probe has succeeded.
+    if ($updated && $log !== null && $overages !== []) {
+        $log('Aggregate quota hard limit exceeded for '.$user.': '.implode('; ', $overages));
+    }
     return $updated ? $report : ['rc' => 2, 'lines' => [], 'timed_out' => false];
 }
