@@ -2369,8 +2369,11 @@ to the account home. `L` means `Config::localDir()`.
 
 The launcher and panel state require the account install and its On state;
 no billing identity or certificate lookup participates. Existing account Off,
-transfer-hold, memory and one-time setup behavior remains. Readiness is a live
-account socket (and, for Hermes, the existing loopback sign-in check). The
+transfer-hold, memory and one-time setup behavior remains. Simplified Pikkumies
+status is ready only with a live account socket and Primary (`pm1`) in state
+`running`; a missing Primary, failed list command or unusable list response is
+not ready. `waiting-for-setup` retains the setup indication. Hermes readiness
+uses the existing loopback sign-in check. The
 status JSON `origin` field is the full panel route including its trailing slash;
 message handlers derive the bare browser origin from that URL. The vanilla
 selectors require the account's completed vanilla install.

@@ -461,11 +461,15 @@ if ($statusView) {
     exec('/usr/bin/timeout -k 1s 2s '.escapeshellarg($binary).' eternal list --json 2>/dev/null', $rows, $rowsRc);
     $eternals = $rowsRc === 0 ? json_decode(implode("\n", $rows), true) : null;
     $setup = false;
+    $primaryRunning = false;
     if (is_array($eternals)) foreach ($eternals as $eternal) {
-        if (is_array($eternal) && ($eternal['id'] ?? '') === 'pm1'
-            && ($eternal['state'] ?? '') === 'waiting-for-setup') $setup = true;
+        if (is_array($eternal) && ($eternal['id'] ?? '') === 'pm1') {
+            $setup = ($eternal['state'] ?? '') === 'waiting-for-setup';
+            $primaryRunning = ($eternal['state'] ?? '') === 'running';
+        }
     }
-    pmssPikkumiesOpenStatusEmit(true, pmssPikkumiesOpenSocketLive($socket), $origin, $setup);
+    // A live web UI alone does not mean Primary is running.
+    pmssPikkumiesOpenStatusEmit(true, pmssPikkumiesOpenSocketLive($socket) && $primaryRunning, $origin, $setup);
     return;
 }
 if ($ui === 'hermes') {
