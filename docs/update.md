@@ -138,6 +138,13 @@ rollback, pin the target explicitly, e.g. `release:2026-01-21` or
 
 ## Phase 2 – `scripts/util/update-step2.php`
 
+Quota recovery after a failed `quotaoff` rejects a declared type's contradictory
+on/off rows in the combined `quotaon -p /home` observation (ADR 0159). An off row
+and zero exit status cannot override an on row for that same type and mount.
+Valid observations, per-type command bytes and the successful-quotaoff path stay
+unchanged. `QuotaRecoveryContradictoryStateTest` isolates command and file probes;
+execution belongs on the testing machine, with changed-file PHP lint on the devbox.
+
 The shared `blockDeviceLeaves.php` topology walker rejects empty or NUL-containing
 sysfs roots before filesystem probes or visitor callbacks. These inputs retain
 the existing empty, incomplete-topology result, so callers keep their own fallback

@@ -67,7 +67,9 @@ function pmssQuotaFixCheckCommands(bool $quotaOffOk, ?callable $runner = null, ?
     $commands = [];
     foreach ($types as $type) {
         // quotaon -p exits with the number of types on and prints "<type> quota on /home (<dev>) is off".
-        if ($state['rc'] !== 0 || preg_match('#^'.$type.' quota on /home \(.*\) is off$#m', $state['output']) !== 1) {
+        // Contradictory on/off rows cannot prove that recounting this type is safe.
+        if ($state['rc'] !== 0 || preg_match('#^'.$type.' quota on /home \(.*\) is off$#m', $state['output']) !== 1
+            || preg_match('#^'.$type.' quota on /home \(.*\) is on$#m', $state['output']) === 1) {
             return [];
         }
         $fresh = pmssQuotaFileHeaderInvalid(($quotaFileDir ?? '/home').'/aquota.'.$type, $type) ? 'cb' : '';
