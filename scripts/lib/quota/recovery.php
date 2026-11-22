@@ -3,7 +3,7 @@
 require_once __DIR__.'/state.php';
 
 /**
- * Whether a quota file exists with a header quotacheck rejects (wrong magic, version above 1, short read).
+ * Whether a quota file exists with a header quotacheck rejects (wrong magic, version above 1, truncated file).
  *
  * Missing files are created by quotacheck; unopenable files fail there.
  * Neither those nor failed reads or stream closes authorize a fresh quota file.
@@ -17,6 +17,13 @@ function pmssQuotaFileHeaderInvalid(string $path, string $type): bool
     }
     try {
         $header = fread($handle, 8);
+        if (is_string($header) && strlen($header) < 8) {
+            // A short read alone cannot prove truncation; inspect the opened inode,
+            // never the pathname which may now refer to a different file.
+            $stat = @fstat($handle);
+            if (!is_array($stat) || !is_int($stat['size'] ?? null)
+                || $stat['size'] < 0 || $stat['size'] >= 8) return false;
+        }
     } finally {
         // A read exception must release the stream before recovery unwinds.
         $closed = fclose($handle);

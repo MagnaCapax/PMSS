@@ -145,6 +145,15 @@ Valid observations, per-type command bytes and the successful-quotaoff path stay
 unchanged. `QuotaRecoveryContradictoryStateTest` isolates command and file probes;
 execution belongs on the testing machine, with changed-file PHP lint on the devbox.
 
+Short quota-header reads authorize fresh-file recovery only when `fstat()` on
+the opened stream confirms a non-negative file size below eight bytes (ADR 0159).
+Failed, malformed or larger size observations retain the non-fresh recount path;
+the original stream still closes on refusals and thrown metadata failures.
+Full headers and genuinely truncated files retain their existing decisions.
+`QuotaHeaderShortReadSafetyTest` intercepts file and quota operations, covering
+both quota types, every short length, metadata failures and cleanup precedence.
+Execution stays on testing machines; devbox verification checks changed PHP syntax.
+
 The shared `blockDeviceLeaves.php` topology walker rejects empty or NUL-containing
 sysfs roots before filesystem probes or visitor callbacks. These inputs retain
 the existing empty, incomplete-topology result, so callers keep their own fallback
