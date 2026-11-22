@@ -97,7 +97,15 @@ SH
     public function testDiscoveryFailuresForbidRecursionAndUnmounting(): void
     {
         [$base, $home, $mountinfo, $env] = $this->fixture();
-        foreach (['', $this->row($home.'/remote')."invalid\n"] as $contents) {
+        $snapshots = ['', $this->row($home.'/remote')."invalid\n"];
+        // A final fragment must stop both passes, with or without queued mounts.
+        foreach (['invalid', '25', '25 1', '25 1 0:42 /',
+            '25 1 0:42 / '.$home.'/remote', rtrim($this->row($home.'/remote'), "\n"), ' ', "\t"] as $tail) {
+            foreach ([$home, $home.'/remote'] as $target) {
+                $snapshots[] = $this->row($target).$tail;
+            }
+        }
+        foreach ($snapshots as $contents) {
             $this->pmssWriteFile($mountinfo, $contents);
             foreach ([false, true] as $clear) {
                 $this->assertTrue($this->pmssExecShellCommand($this->purgeCommand($home, $mountinfo, $clear), $env)['rc'] !== 0);

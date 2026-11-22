@@ -57,6 +57,25 @@ failed discovery/detachment, immutable-fallback grouping and absent/linked roots
 Only changed-file PHP/Bash syntax checks run on the devbox; fixtures run on the
 testing machine/CI. No production termination or dry run was executed here.
 
+## Unterminated mount observation safety follow-up
+
+The reader retains each raw mountinfo row before splitting its fields. A
+nonempty final fragment without a newline now refuses the snapshot before any
+unmount, immutable scan or removal. Previously Bash's failed final `read` skipped
+that fragment, allowing preceding valid rows to authorize recursive work while
+the last mount entry was unexamined. Complete kernel rows retain their existing
+selection, decoding, order and command arguments. This guard detects a partial
+final row; it cannot detect truncation exactly at a row boundary.
+
+`TerminateUserMountBoundaryTest` covers fragments at multiple field boundaries,
+a complete-looking row missing its newline, invalid text and whitespace-only
+tails. Each follows both a root-only row and a queued descendant, checking both
+purge passes, no unmount and preservation of the fixture's remote sentinel.
+The existing security review still applies: account authority, credentials,
+permissions, logs and exposure paths are unchanged. Devbox verification is
+changed-file PHP/Bash syntax only; fixtures run on the testing machine/CI.
+No live unmount, purge or dry run was executed here.
+
 ## References
 - ADRs 0062, 0092, 0115, 0191, 0206, 0282; issue #1278.
 - [GNU rm filesystem boundaries](https://www.gnu.org/software/coreutils/manual/html_node/rm-invocation.html).

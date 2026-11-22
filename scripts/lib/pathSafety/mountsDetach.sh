@@ -19,7 +19,8 @@ mountTargetDecode() {
 # customer-chosen mount names cannot split targets or become shell syntax.
 targets=()
 rows=0
-while read -r mount_id parent_id device mount_root encoded_target details; do
+while IFS= read -r mount_row; do
+	read -r mount_id parent_id device mount_root encoded_target details <<< "$mount_row"
 	[[ "$mount_id" =~ ^[0-9]+$ && "$encoded_target" == /* && "$details" == *" - "* ]] || exit 1
 	rows=$((rows + 1))
 	mountTargetDecode "$encoded_target"
@@ -27,6 +28,9 @@ while read -r mount_id parent_id device mount_root encoded_target details; do
 		targets+=("$encoded_target")
 	fi
 done < "$mountinfo"
+# read leaves an unterminated final row in mount_row even though it returns failure.
+# Refuse that incomplete snapshot before any unmount or recursive purge work.
+[[ -z "$mount_row" ]] || exit 1
 ((rows > 0)) || exit 1
 ((${#targets[@]} > 0)) || exit 0
 
