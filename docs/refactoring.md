@@ -853,6 +853,10 @@ callers retain file guards, schema checks, and missing/malformed-data fallbacks.
 
 ## Helper Extraction Rules
 
+Systemd slice text fixtures call `pmssSystemdSliceRender()` directly and reuse
+`pmssSystemdSliceTasksTemplate()` for the common TasksMax template. Keep fixture
+records explicit when a scenario mutates prepared files or reruns convergence.
+
 In-process stdout fixtures use `TestCase::pmssCaptureStdout()` for buffer setup,
 capture and exceptional cleanup. Deluge patch catalogs, boot relaunch passes,
 Pikkumies pages/status and RAID tables retain their calls and assertions at the

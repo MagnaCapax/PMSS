@@ -9,15 +9,11 @@ class SystemdSliceRootOverrideWrittenTest extends TestCase
     public function testRootUnlimitedDropinCreated(): void
     {
         $base = $this->pmssMakeTempDir('pmss-cg-basedir-');
-        $drop = $this->pmssEnsureDir($base.'/user-.slice.d');
-
-        $fixture = $this->pmssSystemdSliceFixturePrepare([
-            'dropDir' => $drop,
+        $this->pmssSystemdSliceEnsure($this->pmssSystemdSliceFixturePrepare([
+            'dropDir' => $this->pmssEnsureDir($base.'/user-.slice.d'),
             'v2Template' => $this->pmssSystemdSliceTasksTemplate(),
             'totalMemMiB' => 1024,
-        ]);
-
-        $this->pmssSystemdSliceEnsure($fixture);
+        ]));
 
         $rootDrop = $base.'/user-0.slice.d/99-zz-pmss-unlimited.conf';
         $this->pmssAssertFileContainsAllStrings($rootDrop, [

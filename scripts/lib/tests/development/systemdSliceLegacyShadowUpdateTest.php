@@ -8,8 +8,7 @@ class SystemdSliceLegacyShadowUpdateTest extends TestCase
 {
     public function testLegacyShadowFileRewrittenEvenWithoutVendorDropin(): void
     {
-        $base = $this->pmssMakeTempDir('pmss-cg-shadow-');
-        $drop = $base.'/user-.slice.d';
+        $drop = $this->pmssMakeTempDir('pmss-cg-shadow-').'/user-.slice.d';
         $legacyShadow = $this->pmssWriteFile($drop.'/99-pmss.conf', "[Slice]\nTasksMax=1000\n");
 
         $this->pmssSystemdSliceEnsure($this->pmssSystemdSliceFixturePrepare([

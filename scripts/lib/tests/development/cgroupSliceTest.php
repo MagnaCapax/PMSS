@@ -8,9 +8,8 @@ class cgroupSliceTest extends TestCase
 {
     public function testV2RenderingReplacesPlaceholders(): void
     {
-        $tplBody = "[Slice]\nCPUAccounting=yes\nIOAccounting=yes\nMemoryAccounting=yes\nCPUWeight=%%USER_CGROUP_CPU_WEIGHT%%\nIOWeight=%%USER_CGROUP_IO_WEIGHT%%\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\n";
         $fixture = $this->pmssSystemdSliceFixturePrepare([
-            'v2Template' => $tplBody,
+            'v2Template' => "[Slice]\nCPUAccounting=yes\nIOAccounting=yes\nMemoryAccounting=yes\nCPUWeight=%%USER_CGROUP_CPU_WEIGHT%%\nIOWeight=%%USER_CGROUP_IO_WEIGHT%%\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\n",
             'totalMemMiB' => 8192,
         ]);
 
@@ -30,26 +29,25 @@ class cgroupSliceTest extends TestCase
     public function testMemoryConstraintsApplied(): void
     {
         $tplBody = "[Slice]\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\n";
-        $fixture = $this->pmssSystemdSliceFixturePrepare([
+        // Very low RAM: ensure MemoryHigh >= 250MiB
+        $content = $this->pmssSystemdSliceRender([
             'cfgPrefix' => 'pmss-cg-cfg2-',
             'dropPrefix' => 'pmss-cg-drop2-',
             'v2Template' => $tplBody,
             'totalMemMiB' => 512,
         ]);
 
-        // Very low RAM: ensure MemoryHigh >= 250MiB
-        $content = $this->pmssSystemdSliceDropinRender($fixture);
         $this->assertTrue((bool) preg_match('/MemoryHigh=(\d+)M/', $content, $m1));
         $high = (int) $m1[1];
         $this->assertTrue($high >= 250, 'MemoryHigh below minimum 250MiB');
 
         // Large RAM: MemoryMax <= 95% and about 1.25x MemoryHigh
-        $content2 = $this->pmssSystemdSliceDropinRender($this->pmssSystemdSliceFixturePrepare([
+        $content2 = $this->pmssSystemdSliceRender([
             'cfgPrefix' => 'pmss-cg-cfg2-',
             'dropPrefix' => 'pmss-cg-drop3-',
             'v2Template' => $tplBody,
             'totalMemMiB' => 65536,
-        ]));
+        ]);
         $this->assertTrue((bool) preg_match('/MemoryHigh=(\d+)M/', $content2, $mh));
         $this->assertTrue((bool) preg_match('/MemoryMax=(\d+)M/', $content2, $mm));
         $mHigh = (int) $mh[1];
@@ -60,21 +58,20 @@ class cgroupSliceTest extends TestCase
 
     public function testV1TemplateSelectedWhenModeV1(): void
     {
-        $v1Body = "[Slice]\nBlockIOAccounting=yes\nCPUWeight=%%USER_CGROUP_CPU_WEIGHT%%\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\n";
-        $content = $this->pmssSystemdSliceDropinRender($this->pmssSystemdSliceFixturePrepare([
+        $content = $this->pmssSystemdSliceRender([
             'cfgPrefix' => 'pmss-cg-cfgv1-',
             'dropPrefix' => 'pmss-cg-dropv1-',
             'mode' => 'v1',
-            'v1Template' => $v1Body,
+            'v1Template' => "[Slice]\nBlockIOAccounting=yes\nCPUWeight=%%USER_CGROUP_CPU_WEIGHT%%\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\n",
             'totalMemMiB' => 4096,
-        ]));
+        ]);
         $this->assertStringContainsAndOmitsStrings(['BlockIOAccounting=yes' => 'v1 template not applied'],
             ['%%' => 'placeholders remained'], $content);
     }
 
     public function testNoVendorPathsUsedForDropins(): void
     {
-        $tplBody = "[Slice]\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\n";
+        $tplBody = $this->pmssSystemdSliceTasksTemplate();
         $fixture = $this->pmssSystemdSliceFixturePrepare([
             'cfgPrefix' => 'pmss-cg-cfgv3-',
             'dropPrefix' => 'pmss-cg-dropv3-',
@@ -126,7 +123,7 @@ class cgroupSliceTest extends TestCase
 
     public function testTasksMaxDefaultScalesWithHostCapacity(): void
     {
-        $tplBody = "[Slice]\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\n";
+        $tplBody = $this->pmssSystemdSliceTasksTemplate();
 
         foreach ([
             [1, 1024, 'TasksMax=2048', 'TasksMax floor clamp not applied'], // 512 * max(1, 1) = 512 → 2048
@@ -134,13 +131,13 @@ class cgroupSliceTest extends TestCase
             [2, 16384, 'TasksMax=8192', 'TasksMax did not scale with RAM GiB'], // RAM dominates.
             [64, 262144, 'TasksMax=16384', 'TasksMax ceiling clamp not applied'], // 131072 → 16384
         ] as [$cpuThreads, $memMiB, $needle, $message]) {
-            $content = $this->pmssSystemdSliceDropinRender($this->pmssSystemdSliceFixturePrepare([
+            $content = $this->pmssSystemdSliceRender([
                 'cfgPrefix' => 'pmss-cg-cfg-tasks-',
                 'dropPrefix' => 'pmss-cg-drop-tasks-',
                 'v2Template' => $tplBody,
                 'totalCpuThreads' => $cpuThreads,
                 'totalMemMiB' => $memMiB,
-            ]));
+            ]);
             $this->assertStringContainsString($needle, $content, $message);
         }
     }

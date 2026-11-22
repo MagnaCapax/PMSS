@@ -8,11 +8,10 @@ class MemoryGuardrailsEdgeCasesTest extends TestCase
 {
     public function testLowRamFloorsAreApplied(): void
     {
-        $tpl = "[Slice]\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\n";
-        $content = $this->pmssSystemdSliceDropinRender($this->pmssSystemdSliceFixturePrepare([
-            'v2Template' => $tpl,
+        $content = $this->pmssSystemdSliceRender([
+            'v2Template' => "[Slice]\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\n",
             'totalMemMiB' => 512,
-        ]));
+        ]);
         preg_match('/MemoryHigh=(\d+)M/', $content, $m1);
         preg_match('/MemoryMax=(\d+)M/', $content, $m2);
         $this->assertTrue(((int) $m1[1]) >= 250, 'MemoryHigh floor not enforced');
@@ -21,26 +20,24 @@ class MemoryGuardrailsEdgeCasesTest extends TestCase
 
     public function testHugeRamRespects95PercentCap(): void
     {
-        $tpl = "[Slice]\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\n";
-        $content = $this->pmssSystemdSliceDropinRender($this->pmssSystemdSliceFixturePrepare([
+        $content = $this->pmssSystemdSliceRender([
             'cfgPrefix' => 'pmss-cg-cfg2-',
             'dropPrefix' => 'pmss-cg-drop2-',
-            'v2Template' => $tpl,
+            'v2Template' => "[Slice]\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\n",
             'totalMemMiB' => 65536,
-        ]));
+        ]);
         preg_match('/MemoryMax=(\d+)M/', $content, $m);
         $this->assertTrue(((int) $m[1]) <= (int) floor(65536 * 0.95));
     }
 
     public function testDefaultBurstabilityAlignsTo25Percent(): void
     {
-        $tpl = "[Slice]\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\n";
-        $content = $this->pmssSystemdSliceDropinRender($this->pmssSystemdSliceFixturePrepare([
+        $content = $this->pmssSystemdSliceRender([
             'cfgPrefix' => 'pmss-cg-cfg3-',
             'dropPrefix' => 'pmss-cg-drop3-',
-            'v2Template' => $tpl,
+            'v2Template' => "[Slice]\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\n",
             'totalMemMiB' => 10240,
-        ]));
+        ]);
         preg_match('/MemoryHigh=(\d+)M/', $content, $m1);
         preg_match('/MemoryMax=(\d+)M/', $content, $m2);
 

@@ -8,16 +8,14 @@ class FindmntFailureTest extends TestCase
 {
     public function testUnresolvableMountSkipsIoAppends(): void
     {
-        $tpl = "[Slice]\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\n";
-
-        $out = $this->pmssSystemdSliceDropinRender($this->pmssSystemdSliceFixturePrepare([
-            'v2Template' => $tpl,
+        $out = $this->pmssSystemdSliceRender([
+            'v2Template' => $this->pmssSystemdSliceTasksTemplate(),
             'policy' => [
                 'tasksMax' => 512,
                 'mounts' => ['/nonexistent-mount-xyz' => ['readBw' => '7M', 'writeBw' => '9M']],
             ],
             'totalMemMiB' => 2048,
-        ]));
+        ]);
 
         $this->assertStringNotContainsString('IOReadBandwidthMax=', $out, 'unexpected IOReadBandwidthMax append');
         $this->assertStringNotContainsString('IOWriteBandwidthMax=', $out, 'unexpected IOWriteBandwidthMax append');
