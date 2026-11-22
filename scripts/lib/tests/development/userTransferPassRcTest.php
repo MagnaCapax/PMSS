@@ -26,7 +26,7 @@ class UserTransferPassRcTest extends TestCase
         foreach ([[23, 0], [0, 23], [12, 0], [0, 255], [1, 24]] as [$main, $final]) {
             $result = $this->finish($main, $final);
             $this->assertSame(1, $result['rc'], "main=$main final=$final");
-            $this->assertStringContainsString(sprintf('main rc=%d, final rc=%d', $main, $final), implode("\n", $result['logs']));
+            $this->pmssAssertMessagesContain($result['logs'], sprintf('main rc=%d, final rc=%d', $main, $final));
         }
     }
 

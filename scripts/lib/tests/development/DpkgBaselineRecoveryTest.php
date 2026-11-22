@@ -99,7 +99,7 @@ class DpkgBaselineRecoveryTest extends TestCase
         foreach ([124, 100, 137] as $rc) {
             $result = $this->fixture(['install' => [$rc, 0]]);
             $this->pmssAssertArraySubsetSame(['ok' => true, 'actions' => ['install', 'configure', 'fix', 'install'], 'time' => 2], $result);
-            $this->assertStringContainsString('dpkg lock cleared', implode('\n', $result['logs']));
+            $this->pmssAssertMessagesContain($result['logs'], 'dpkg lock cleared');
         }
     }
 
@@ -136,7 +136,7 @@ class DpkgBaselineRecoveryTest extends TestCase
     {
         $result = $this->fixture(['release' => 1000]);
         $this->pmssAssertArraySubsetSame(['ok' => false, 'actions' => ['install'], 'time' => 60], $result);
-        $this->assertStringContainsString('did not clear within 60 seconds', implode('\n', $result['logs']));
+        $this->pmssAssertMessagesContain($result['logs'], 'did not clear within 60 seconds');
         $this->assertTrue($result['cleaned'], 'staged selections must be cleaned even when locks stay busy');
     }
 
@@ -156,7 +156,7 @@ class DpkgBaselineRecoveryTest extends TestCase
     {
         $result = $this->fixture(['install' => [124, 100]]);
         $this->assertFalse($result['ok']);
-        $this->assertStringContainsString('still failing after retry', implode('\n', $result['logs']));
+        $this->pmssAssertMessagesContain($result['logs'], 'still failing after retry');
     }
 
     public function testStep2RecoveryConfiguresBeforeReapplyingBaseline(): void

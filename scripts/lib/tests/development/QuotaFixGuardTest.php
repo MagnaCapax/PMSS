@@ -79,9 +79,8 @@ class QuotaFixGuardTest extends TestCase
         $this->assertSame(1, $exitCode);
         $this->assertStringContainsString("quota state\nquotaon failed\n", $output);
 
-        $logText = implode("\n", $logs);
-        $this->assertStringContainsString('[quotaFix] WARNING: command failed (rc=5): quotaon -av', $logText);
-        $this->assertStringNotContainsString('[quotaFix] WARNING: command failed (rc=2): quotaon -ap', $logText);
+        $this->pmssAssertMessagesContain($logs, '[quotaFix] WARNING: command failed (rc=5): quotaon -av');
+        $this->assertFalse($this->pmssMessagesContain($logs, '[quotaFix] WARNING: command failed (rc=2): quotaon -ap'));
     }
 
     public function testHomeQuotaEnforcementWarnsOnlyOnDeclaredShortfall(): void

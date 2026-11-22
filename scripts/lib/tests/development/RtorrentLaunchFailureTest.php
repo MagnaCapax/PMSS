@@ -84,7 +84,7 @@ PHP;
                         for ($retry = 0; $retry < 6; $retry++) {
                             $result = $this->observe(['executor' => $executor, 'count' => 3, 'command' => [$channel => $error, 'rc' => $rc]]);
                             $this->pmssAssertArraySubsetSame(['count' => 3, 'custom' => true, 'quarantines' => 0], $result);
-                            $this->assertStringContainsString($error, implode("\n", $result['messages']));
+                            $this->pmssAssertMessagesContain($result['messages'], $error);
                         }
                     }
                 }
@@ -98,7 +98,7 @@ PHP;
         foreach ([['rc' => 127, 'stderr' => 'screen: command not found'], ['timed_out' => true]] as $command) {
             $result = $this->observe(['count' => 3, 'command' => $command]);
             $this->pmssAssertArraySubsetSame(['count' => 3, 'custom' => true], $result);
-            $this->assertStringContainsString('launcher failed', implode("\n", $result['messages']));
+            $this->pmssAssertMessagesContain($result['messages'], 'launcher failed');
         }
     }
 
@@ -107,7 +107,7 @@ PHP;
     {
         $result = $this->observe(['count' => 3]);
         $this->pmssAssertArraySubsetSame(['count' => 3, 'custom' => true], $result);
-        $this->assertStringContainsString('never appeared', implode("\n", $result['messages']));
+        $this->pmssAssertMessagesContain($result['messages'], 'never appeared');
     }
 
     /** Delayed appearance followed by a crash retains four-attempt recovery. */

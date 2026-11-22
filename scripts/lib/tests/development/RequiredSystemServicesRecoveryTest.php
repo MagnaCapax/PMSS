@@ -59,7 +59,7 @@ class RequiredSystemServicesRecoveryTest extends TestCase
         foreach (['busy' => 'update lock busy', 'unavailable' => 'update lock unavailable'] as $lock => $message) {
             $row = $this->observe(['lock' => $lock]);
             $this->assertSame([], $row['steps']);
-            $this->assertStringContainsString($message, implode('\n', $row['logs']));
+            $this->pmssAssertMessagesContain($row['logs'], $message);
         }
     }
 

@@ -23,7 +23,7 @@ class StorageBenchmarkPostInstallTest extends TestCase
 
         $this->assertSame([], $calls);
         $this->assertFalse(file_exists($marker));
-        $this->assertStringContainsString('Managed users already exist', implode("\n", $logs));
+        $this->pmssAssertMessagesContain($logs, 'Managed users already exist');
     }
 
     public function testSkipsWhenSuccessMarkerExists(): void
@@ -43,7 +43,7 @@ class StorageBenchmarkPostInstallTest extends TestCase
         });
 
         $this->assertSame([], $calls);
-        $this->assertStringContainsString('already completed', implode("\n", $logs));
+        $this->pmssAssertMessagesContain($logs, 'already completed');
     }
 
     public function testRunsBenchmarkLogsWarningsAndRecordsMarkerOnSuccess(): void
@@ -71,7 +71,7 @@ class StorageBenchmarkPostInstallTest extends TestCase
         $this->assertStringContainsAllStrings(['/scripts/util/storageBenchmark.php', '--require-idle', '--devices'], $calls[0][1]);
         $this->assertTrue(is_file($marker));
         $this->assertSame('storage_benchmark_post_install', $this->pmssReadJsonArrayFile($marker)['event'] ?? '');
-        $this->assertStringContainsString('[storage-benchmark] WARN: /dev/sdb seqread < 60% median', implode("\n", $logs));
+        $this->pmssAssertMessagesContain($logs, '[storage-benchmark] WARN: /dev/sdb seqread < 60% median');
     }
 
     public function testSkipsOnVirtualizedGuestWithoutRunningOrRecordingMarker(): void
@@ -114,7 +114,7 @@ class StorageBenchmarkPostInstallTest extends TestCase
         $this->assertSame([], $calls);
         $this->assertSame([], $probed);
         $this->assertFalse(file_exists($marker));
-        $this->assertStringContainsString('Managed users already exist', implode("\n", $logs));
+        $this->pmssAssertMessagesContain($logs, 'Managed users already exist');
     }
 
     public function testDefaultGuestDetectionFollowsSystemdDetectVirt(): void
@@ -158,7 +158,7 @@ class StorageBenchmarkPostInstallTest extends TestCase
         });
 
         $this->assertFalse(file_exists($marker));
-        $this->assertStringContainsString('leaving marker unset', implode("\n", $logs));
+        $this->pmssAssertMessagesContain($logs, 'leaving marker unset');
     }
 
     public function testDeadlineScalesWithDeviceCountAndNeverDropsBelowTheGlobalOne(): void

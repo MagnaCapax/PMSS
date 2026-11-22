@@ -35,7 +35,7 @@ class DynamicIopsEnforceCycleTest extends TestCase
             foreach ($row['writes'] as $write) $this->assertStringContainsString('write_iops_device', $write[0]);
             $cycle = $row['logs']['PMSS_DYNAMIC_IOPS_LOG'][0];
             $this->pmssAssertArraySubsetSame(['read_action' => 'keep-kernel', 'read_caps' => null], $cycle);
-            $this->assertStringContainsString('read_action=keep-kernel fallback=', implode("\n", $row['messages']));
+            $this->pmssAssertMessagesContain($row['messages'], 'read_action=keep-kernel fallback=');
         }
     }
 
@@ -45,7 +45,7 @@ class DynamicIopsEnforceCycleTest extends TestCase
             ['logFailure' => true], ['throw' => true]] as $options) {
             $row = $this->enforceCycle($options);
             $this->assertSame([], $row['writes']);
-            $this->assertStringContainsString('keeping kernel read caps', implode("\n", $row['messages']));
+            $this->pmssAssertMessagesContain($row['messages'], 'keeping kernel read caps');
             $this->assertStringContainsString('errors=1', end($row['messages']));
         }
     }
