@@ -2092,6 +2092,15 @@ customer UID, audit result shape, live-client refusal and disk precheck remain.
 
 ## User Management (CLI)
 
+- `scripts/util/userConfig.php` retains its CLI arguments, output channels and
+  exit policy. `user/userConfigPrepare.php` parses and validates the existing
+  account, handles welcome-only exits, merges named changes and persists before
+  strict lighttpd refresh, GPU policy and throttle display writes.
+  `userConfigLimits.php` then publishes bonus/traffic/IOPS settings fail-soft.
+  `userConfigServices.php` owns GPU and cgroup/Docker actions behind the existing
+  `userConfigRuntime.php` include. Torrent setup, quota application and the
+  owned-process restart stay in the CLI, in their original order (ADR 0321).
+
 - `scripts/lib/user/userConfigStore.php` retains the durable store API, per-user
   locking, required-field checks and display-cache orchestration. Pure payload
   and user-map normalization live in `userConfigPayload.php`; canonical/legacy

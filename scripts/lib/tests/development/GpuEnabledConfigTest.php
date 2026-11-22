@@ -93,9 +93,9 @@ class GpuEnabledConfigTest extends TestCase
 
     public function testReconfigureParsesBeforeLookupAndAppliesOnlyAfterSuccessfulPersistence(): void
     {
-        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/util/userConfig.php', [
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/lib/user/userConfigPrepare.php', [
             "'gpu-enabled'", 'pmssUserConfigParseGpuEnabledOption', '|| $gpuEnabled !== null',
-            "pmssPasswdEntryLookup(\$user['name'])", '$presence, $dockerEnabled, $gpuEnabled)',
+            "pmssPasswdEntryLookup(\$user['name'])", 'array_fill_keys(array_keys($explicitResourceOverrides), true), $dockerEnabled, $gpuEnabled)',
             "if (!\$store->persist(\$user['name'], \$payload))", 'pmssCliExitWithStderr("Error: failed to persist user config',
             "pmssUserConfigApplyGpuPolicy(\$user['name'], \$existing, \$payload)",
         ]);

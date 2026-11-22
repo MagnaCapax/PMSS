@@ -73,12 +73,12 @@ class UserConfigLighttpdMinThreadsTest extends TestCase
 
     public function testCliPersistsBeforeStrictTargetedRefreshAndRetriesExplicitValues(): void
     {
-        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/util/userConfig.php', [
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/lib/user/userConfigPrepare.php', [
             "'lighttpd-min-threads'", 'pmssUserConfigParseLighttpdMinThreadsOption',
             '|| $lighttpdMinThreads !== null', "pmssPasswdEntryLookup(\$user['name'])",
             "if (\$lighttpdMinThreads !== null) \$payload['lighttpdMinThreads'] = \$lighttpdMinThreads;",
             "if (!\$store->persist(\$user['name'], \$payload))", 'pmssCliExitWithStderr("Error: failed to persist user config',
-            "if (\$lighttpdMinThreads !== null\n    && runStep('Configuring lighttpd worker floor'",
+            "if (\$lighttpdMinThreads !== null\n        && runStep('Configuring lighttpd worker floor'",
             "pmssBuildCommand('/scripts/util/userConfigLighttpd.php', ['--strict', \$user['name']])",
             'pmssCliExitWithStderr("Error: lighttpd config refresh failed; worker floor saved',
         ]);

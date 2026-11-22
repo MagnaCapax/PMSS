@@ -42,14 +42,17 @@ class UserConfigBonusQuotaTest extends TestCase
 
     public function testReconfigurePublishesThroughTheSharedWriterAfterStoreSuccess(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/userConfig.php', [
-            "require_once __DIR__.'/../lib/user/bonusQuota.php';",
+        $source = $this->pmssReadRepoExecutableSource('scripts/lib/user/userConfigPrepare.php')
+            .$this->pmssReadRepoFile('scripts/lib/user/userConfigLimits.php');
+        $this->pmssAssertRepoFileContainsString('scripts/util/userConfig.php',
+            "require_once __DIR__.'/../lib/user/bonusQuota.php';");
+        $this->assertStringContainsAllStrings([
             "'docker-enabled', 'bonus-quota-gib'",
             '|| $bonusQuotaGiB !== null',
             "\$user['bonusQuotaGiB'] = \$bonusQuotaGiB;",
             'if (!pmssAddUserBonusQuotaPersist($user, $expectedHome))',
             'Warning: failed to persist bonus quota display copy',
-        ]);
+        ], $source);
         $this->assertOrderedStrings([
             "pmssAddUserBonusQuotaGiBParse(pmssCliOption(\$parsed, 'bonus-quota-gib'))",
             "pmssPasswdEntryLookup(\$user['name'])",
@@ -57,7 +60,7 @@ class UserConfigBonusQuotaTest extends TestCase
             'pmssCliExitWithStderr("Error: failed to persist user config for ',
             'pmssAddUserBonusQuotaPersist($user, $expectedHome)',
             'userApplyTrafficLimit($user)',
-        ], $this->pmssReadRepoExecutableSource('scripts/util/userConfig.php'));
+        ], $source);
         // Both legacy include paths must still expose the same helpers after extraction.
         foreach (['cli.php', 'postProvision.php'] as $file) {
             $this->pmssAssertRepoFileContainsString('scripts/lib/user/add/'.$file,

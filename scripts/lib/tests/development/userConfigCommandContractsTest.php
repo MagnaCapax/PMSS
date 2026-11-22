@@ -7,11 +7,13 @@ class userConfigCommandContractsTest extends TestCase
 {
     public function testUserConfigSourceContractsRemainStable(): void
     {
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/util/userConfig.php', [
+        $source = $this->pmssReadRepoFile('scripts/util/userConfig.php')
+            .$this->pmssReadRepoFile('scripts/lib/user/userConfigPrepare.php');
+        $this->assertStringContainsAndOmitsStrings([
             "require_once __DIR__.'/../lib/user/userConfigRuntime.php';",
             'pmssUserConfigInvocationMode($args, $welcomeMessage !== null, $namedConfigChange)',
             'pmssUserConfigWelcomeOnlyPersist($store, $user[\'name\'], $expectedHome, $welcomeMessage, $existing)',
-            'pmssUserConfigPayloadBuild($store, $existing, $user, $presence, $dockerEnabled, $gpuEnabled)',
+            'pmssUserConfigPayloadBuild($store, $existing, $user, array_fill_keys(array_keys($explicitResourceOverrides), true), $dockerEnabled, $gpuEnabled)',
             "pmssPortManagerAssignServicePort(\$user['name'], 'rclone')",
             "pmssWriteUserFile(\$qbittorrentConfigFile, \$qbittorrentConfig, \$user['name'], 0600)",
             "elseif (!pmssQbittorrentThrottleSeedRecord(\$user['name'], \$expectedHome, \$throttle ?? 0))",
@@ -24,9 +26,9 @@ class userConfigCommandContractsTest extends TestCase
             "strpos(\$arg, '--upload-throttle-kib=')" => 'userConfig.php should not keep a manual scan: --upload-throttle-kib',
             'pmssUserConfigCli'.'PersistedResourcePresence' => 'userConfig.php should not keep duplicated resource presence logic',
             "'--cpu-weight=' . \$user['CPUWeight']" => 'userConfig.php should not keep duplicated CPU weight CLI rendering',
-        ]);
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/user/userConfigRuntime.php', [
-            'function pmssUserConfigPayloadBuild(',
+        ], $source);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/user/userConfigRuntime.php', 'function pmssUserConfigPayloadBuild(');
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/user/userConfigServices.php', [
             'function pmssUserConfigApplyCgroupAndDocker(',
             "runStep('Configuring cgroups', pmssBuildCommand('php', \$args));",
             "'Rootless Docker disabled by config for '.\$user['name']",

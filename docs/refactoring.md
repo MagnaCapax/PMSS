@@ -1,5 +1,13 @@
 # Refactoring Guidelines
 
+Account reconfiguration keeps its CLI and `userConfigRuntime.php` include while
+separating validated intent/persistence, optional limit publication and service
+policy (ADR 0321). The CLI retains torrent configuration and guarded restart
+ordering. A single positive-port comparison replaces the one-entry port loop
+and dirty flag; billing defaults share one traversal. Characterization locks
+mode results, persistence/refusal traces, limit failures and command bytes.
+Execution stays on testing machines; devbox checks changed-file PHP syntax only.
+
 Cgroup-v1 blkio readers require unsigned decimal `major:minor` device fields
 before adding Read/Write counters. Malformed device rows use the existing
 omission result and cannot select BFQ ahead of a usable throttle source.

@@ -503,7 +503,7 @@ PHP;
     public function testTerminateUserHandlesUnreadableRtorrentConfig(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/util/userConfig.php', [
-            "'rtorrentPort' => (int) (\$configuration['config']['scgiPort'] ?? 0)",
+            "\$port = (int) (\$configuration['config']['scgiPort'] ?? 0);",
             'failed to persist rTorrent ports',
         ]);
         $this->pmssAssertRepoFileContainsAllStrings('scripts/terminateUser.php', [
