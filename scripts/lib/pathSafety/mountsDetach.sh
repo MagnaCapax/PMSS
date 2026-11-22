@@ -22,6 +22,9 @@ rows=0
 while IFS= read -r mount_row; do
 	read -r mount_id parent_id device mount_root encoded_target details <<< "$mount_row"
 	[[ "$mount_id" =~ ^[0-9]+$ && "$encoded_target" == /* && "$details" == *" - "* ]] || exit 1
+	# A plausible target cannot certify a row with corrupt fixed kernel fields.
+	# Refuse the snapshot before queued detaches or a no-mount purge can proceed.
+	[[ "$parent_id" =~ ^[0-9]+$ && "$device" =~ ^[0-9]+:[0-9]+$ && "$mount_root" == /* ]] || exit 1
 	rows=$((rows + 1))
 	mountTargetDecode "$encoded_target"
 	# Prefix selection is safe only for canonical kernel targets. Never resolve

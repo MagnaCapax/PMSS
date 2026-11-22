@@ -95,6 +95,25 @@ secret permissions, logging/redaction, binds, ports or web endpoints. Devbox
 verification is changed-file PHP/Bash syntax only; fixtures run on the testing
 machine/CI. No live unmount, purge or dry run was executed here.
 
+## Fixed mount field safety follow-up
+
+Snapshot discovery also requires decimal parent IDs, decimal `major:minor`
+device fields and absolute mount roots before considering any target. Previously
+a plausible target could let a malformed fixed field pass discovery and authorize
+detachment or recursive work. The guard rejects the complete snapshot before
+executing queued detaches; valid rows, escaped names, ordering and command bytes
+retain their contracts. It adds no filesystem probes or normalization.
+
+`TerminateUserMountBoundaryTest` covers malformed parent IDs, incomplete device
+pairs and relative mount roots before and after queued descendants, through both
+purge passes, with no unmount and the remote sentinel preserved. The existing
+security analysis applies: CVE-2021-3995 and CVE-2021-3996 concern cross-user FUSE
+unmount authorization, and a wrong unmount target can disrupt another account.
+Primary/service credentials, secret permissions, logging/redaction, binds, ports
+and web endpoints are unchanged. Devbox verification is changed-file PHP/Bash
+syntax only; fixtures run on the testing machine/CI. No live unmount, purge or
+dry run was executed here.
+
 ## References
 - ADRs 0062, 0092, 0115, 0191, 0206, 0282; issue #1278.
 - [GNU rm filesystem boundaries](https://www.gnu.org/software/coreutils/manual/html_node/rm-invocation.html).

@@ -98,6 +98,13 @@ SH
     {
         [$base, $home, $mountinfo, $env] = $this->fixture();
         $snapshots = ['', $this->row($home.'/remote')."invalid\n"];
+        // Corrupt fixed fields must refuse discovery before or after a queued mount.
+        foreach (['25 bad 0:42 / ', '25 -1 0:42 / ', '25 1 bad / ', '25 1 0: / ',
+            '25 1 :42 / ', '25 1 0:42 relative ', '25 1 0:42 - ', '25 1 0:42 ./ '] as $prefix) {
+            $invalid = $prefix.$base.'/outside'." rw - fuse.fixture fixture rw\n";
+            array_push($snapshots, $invalid, $this->row($home.'/remote').$invalid,
+                $invalid.$this->row($home.'/remote'));
+        }
         // Noncanonical targets must refuse the whole snapshot before a queued detach.
         foreach (['/remote/../outside', '/remote/..', '/remote/./child', '/remote/.',
             '//remote', '/remote//child', '/remote/'] as $suffix) {
