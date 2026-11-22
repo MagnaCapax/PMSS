@@ -773,6 +773,11 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
     parsing without execution. Missing, unsafe, mismatched or malformed files
     return false with reason `media-stack-panel-delivery-failed`, preventing an
     update completion marker; provisioning and recreation use this same pass (#953).
+- pmssUserWatchdogProcessRunning(string $username, string $processName): bool
+  - Requires a successful `pgrep` result and at least one normalized positive PID
+    whose `/proc/<pid>/status` does not confirm state `Z`. Zombie-only matches
+    cannot suppress service recovery (#1305). Unavailable or unrecognized status
+    retains the conservative running result to avoid duplicate daemon starts.
 - pmssUserWatchdogLockAcquire(string $path)
   - Acquires one non-blocking watchdog lock and exports its descriptor list so
     the shared service launcher closes those descriptors before child exec.

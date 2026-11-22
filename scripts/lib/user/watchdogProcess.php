@@ -49,10 +49,17 @@ function pmssUserWatchdogProcessPids(string $username, string $processPattern, a
     return array_values($pids);
 }
 
-/** Require both a successful pgrep exit and at least one normalized PID. */
+/** Require successful pgrep and a normalized PID that is not a confirmed zombie. */
 function pmssUserWatchdogProcessRunning(string $username, string $processName): bool
 {
-    return pmssUserWatchdogProcessPids($username, $processName, array(), $exitCode) !== array() && $exitCode === 0;
+    $pids = pmssUserWatchdogProcessPids($username, $processName, array(), $exitCode);
+    if ($exitCode !== 0) return false;
+    foreach ($pids as $pid) {
+        $status = (string) @file_get_contents('/proc/'.$pid.'/status');
+        // pgrep also matches zombies; unknown status retains the conservative running result.
+        if (!preg_match('/^State:\s*Z\b/m', $status)) return true;
+    }
+    return false;
 }
 
 /** Acquire a watchdog lock without leaking its descriptor into service daemons. */
