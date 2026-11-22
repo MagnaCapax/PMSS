@@ -58,7 +58,7 @@ class QuotaFstabOptionsTest extends TestCase
         $messages = $this->ensureQuotaOptions($fstab);
 
         $this->assertEquals($original, (string)file_get_contents($fstab));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Quota options already present'), 'expected skip log');
+        $this->pmssAssertMessagesContain($messages, 'Quota options already present', 'expected skip log');
     }
 
     public function testAddsQuotaOptionsAndCreatesBackup(): void
@@ -79,7 +79,7 @@ class QuotaFstabOptionsTest extends TestCase
         $backups = glob($fstab.'.pmss-backup-*') ?: [];
         $this->assertEquals(1, count($backups), 'expected exactly one backup');
         $this->assertEquals($original, (string)file_get_contents($backups[0]));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Updated quota options'), 'expected update log');
+        $this->pmssAssertMessagesContain($messages, 'Updated quota options', 'expected update log');
     }
 
     public function testDefaultsOnlyLineDropsDefaultsToken(): void
@@ -104,7 +104,7 @@ class QuotaFstabOptionsTest extends TestCase
         $messages = $this->ensureQuotaOptions($fstab);
 
         $this->assertEquals($original, (string)file_get_contents($fstab));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'not found'), 'expected not-found log');
+        $this->pmssAssertMessagesContain($messages, 'not found', 'expected not-found log');
     }
 
     public function testUnreadableFstabSkipsConfiguration(): void
@@ -114,7 +114,7 @@ class QuotaFstabOptionsTest extends TestCase
 
         $messages = $this->ensureQuotaOptions($fstab);
 
-        $this->assertTrue($this->pmssMessagesContain($messages, 'not readable'), 'expected not-readable log');
+        $this->pmssAssertMessagesContain($messages, 'not readable', 'expected not-readable log');
         chmod($fstab, 0600);
     }
 
@@ -148,7 +148,7 @@ class QuotaFstabOptionsTest extends TestCase
         [$removed, $messages] = $this->removeStaleQuotaCheckFiles($dir);
 
         $this->assertEquals(0, $removed);
-        $this->assertTrue($this->pmssMessagesContain($messages, 'No stale files found'), 'expected no-stale log');
+        $this->pmssAssertMessagesContain($messages, 'No stale files found', 'expected no-stale log');
     }
 
     public function testRemoveStaleQuotaCheckFilesDeletesRegularFiles(): void
@@ -161,7 +161,7 @@ class QuotaFstabOptionsTest extends TestCase
 
         $this->assertEquals(1, $removed);
         $this->assertFalse(file_exists($stale), 'expected stale file removed');
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Removed stale file'), 'expected removal log');
+        $this->pmssAssertMessagesContain($messages, 'Removed stale file', 'expected removal log');
     }
 
     public function testRemoveStaleQuotaCheckFilesSkipsMatchedDirectories(): void
@@ -174,7 +174,7 @@ class QuotaFstabOptionsTest extends TestCase
 
         $this->assertEquals(0, $removed);
         $this->assertTrue(is_dir($staleDir), 'expected matched directory to remain');
-        $this->assertTrue($this->pmssMessagesContain($messages, 'skipped unsafe stale quota path'), 'expected unsafe-path log');
+        $this->pmssAssertMessagesContain($messages, 'skipped unsafe stale quota path', 'expected unsafe-path log');
     }
 
     public function testRemoveStaleQuotaCheckFilesRejectsRawControlBytes(): void
@@ -213,7 +213,7 @@ class QuotaFstabOptionsTest extends TestCase
         [$removed, $messages] = $this->removeStaleQuotaCheckFiles('relative/home');
 
         $this->assertEquals(0, $removed);
-        $this->assertTrue($this->pmssMessagesContain($messages, 'refusing unsafe quota cleanup path'), 'expected unsafe mount log');
+        $this->pmssAssertMessagesContain($messages, 'refusing unsafe quota cleanup path', 'expected unsafe mount log');
     }
 
     public function testRemoveStaleQuotaCheckFilesRejectsSymlinkMountPoint(): void
@@ -225,7 +225,7 @@ class QuotaFstabOptionsTest extends TestCase
         [$removed, $messages] = $this->removeStaleQuotaCheckFiles($link);
 
         $this->assertEquals(0, $removed);
-        $this->assertTrue($this->pmssMessagesContain($messages, 'refusing quota cleanup outside stable mount point'), 'expected symlink mount log');
+        $this->pmssAssertMessagesContain($messages, 'refusing quota cleanup outside stable mount point', 'expected symlink mount log');
     }
 
     public function testRemoveStaleQuotaCheckFilesEscapesRemovedPath(): void

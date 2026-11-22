@@ -15,7 +15,7 @@ class KernelHardeningAlgifAeadTest extends KernelHardeningTestCase
         $this->pmssRunKernelHardeningWithCalls('\pmssEnsureAlgifAeadBlacklist', $this->algifEnv($dir), $logs, $calls);
 
         $this->assertEquals(\pmssAlgifAeadBlacklistBody(), file_get_contents($dir.'/modprobe.d/pmss-algif-blacklist.conf'));
-        $this->assertTrue($this->pmssMessagesContain($logs, 'Updated '.$dir.'/modprobe.d/pmss-algif-blacklist.conf'), 'expected blacklist update log');
+        $this->pmssAssertMessagesContain($logs, 'Updated '.$dir.'/modprobe.d/pmss-algif-blacklist.conf', 'expected blacklist update log');
         $this->assertEquals('Unloading Copy Fail algif_aead kernel module', $calls[0][0]);
     }
 
@@ -28,7 +28,7 @@ class KernelHardeningAlgifAeadTest extends KernelHardeningTestCase
 
         $this->pmssRunKernelHardeningWithCalls('\pmssEnsureAlgifAeadBlacklist', $this->algifEnv($dir), $logs, $calls);
 
-        $this->assertTrue($this->pmssMessagesContain($logs, 'Copy Fail algif_aead blacklist already up to date'), 'expected idempotent skip log');
+        $this->pmssAssertMessagesContain($logs, 'Copy Fail algif_aead blacklist already up to date', 'expected idempotent skip log');
         $this->assertEquals(1, count($calls));
     }
 
@@ -42,7 +42,7 @@ class KernelHardeningAlgifAeadTest extends KernelHardeningTestCase
 
         $this->pmssRunKernelHardeningWithCalls('\pmssEnsureAlgifAeadBlacklist', $env, $logs, $calls);
 
-        $this->assertTrue($this->pmssMessagesContain($logs, 'Copy Fail algif_aead blacklist: skipping all mutations'), 'expected dry-run skip log');
+        $this->pmssAssertMessagesContain($logs, 'Copy Fail algif_aead blacklist: skipping all mutations', 'expected dry-run skip log');
         $this->assertTrue(!is_file($dir.'/modprobe.d/pmss-algif-blacklist.conf'), 'expected dry-run to skip file creation');
         $this->assertEquals([], $calls);
     }
@@ -53,11 +53,11 @@ class KernelHardeningAlgifAeadTest extends KernelHardeningTestCase
         $logs = [];
         $env = $this->algifEnv($dir, "CONFIG_CRYPTO_USER_API_AEAD=y\n");
 
-        list($ignored, $stdout) = $this->pmssCaptureStdout(function () use ($env, &$logs): void {
+        [, $stdout] = $this->pmssCaptureStdout(function () use ($env, &$logs): void {
             $this->pmssRunKernelHardeningNoop('\pmssEnsureAlgifAeadBlacklist', $env, $logs);
         });
 
-        $this->assertTrue($this->pmssMessagesContain($logs, 'algif_aead is built into this kernel'), 'expected built-in warning via custom logger');
+        $this->pmssAssertMessagesContain($logs, 'algif_aead is built into this kernel', 'expected built-in warning via custom logger');
         $this->assertStringContainsString(\pmssAlgifAeadBuiltInKernelWarning(), $stdout, 'expected pmssLogStatus warning');
     }
 
@@ -78,7 +78,7 @@ class KernelHardeningAlgifAeadTest extends KernelHardeningTestCase
         );
 
         foreach ($this->dispatcherCases($dir) as $case) {
-            $this->assertTrue($this->pmssMessagesContain($logs, $case['skip']), 'expected skip log for '.$case['name']);
+            $this->pmssAssertMessagesContain($logs, $case['skip'], 'expected skip log for '.$case['name']);
         }
         $this->assertEquals([
             'Unloading Copy Fail algif_aead kernel module',
@@ -102,11 +102,11 @@ class KernelHardeningAlgifAeadTest extends KernelHardeningTestCase
         $this->assertFalse($builtIn['dirtyfrag'], 'expected dirtyfrag to skip builtin probe without builtin_kconfig');
 
         $logs = [];
-        list($ignored, $stdout) = $this->pmssCaptureStdout(function () use ($env, &$logs): void {
+        [, $stdout] = $this->pmssCaptureStdout(function () use ($env, &$logs): void {
             $this->pmssRunKernelHardeningNoop('\pmssApplyKernelHardening', $env, $logs);
         });
 
-        $this->assertTrue($this->pmssMessagesContain($logs, 'algif_aead is built into this kernel'), 'expected copyfail built-in warning');
+        $this->pmssAssertMessagesContain($logs, 'algif_aead is built into this kernel', 'expected copyfail built-in warning');
         $this->assertFalse($this->pmssMessagesContain($logs, 'Dirty Frag is built into this kernel'), 'dirtyfrag has no builtin probe');
         $this->assertStringContainsString(\pmssAlgifAeadBuiltInKernelWarning(), $stdout, 'expected pmssLogStatus warning');
     }

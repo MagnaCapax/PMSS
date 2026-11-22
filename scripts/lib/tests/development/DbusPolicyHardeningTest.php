@@ -136,7 +136,7 @@ class DbusPolicyHardeningTest extends TestCase
         $secondRun = [];
         \pmssEnsureSystemdDbusDisclosureHardening($this->pmssMakeArrayLogger($secondRun));
         foreach (['systemd1 D-Bus enumeration policy', 'logind D-Bus enumeration policy', '/run/systemd/users tmpfiles policy', '/run/systemd/sessions tmpfiles policy'] as $label) {
-            $this->assertTrue($this->pmssMessagesContain($secondRun, $label.' already present and up to date'), 'idempotent skip: '.$label);
+            $this->pmssAssertMessagesContain($secondRun, $label.' already present and up to date', 'idempotent skip: '.$label);
         }
     }
 }

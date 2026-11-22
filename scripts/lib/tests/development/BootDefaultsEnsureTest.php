@@ -180,7 +180,7 @@ class BootDefaultsEnsureTest extends TestCase
             $this->assertSame($expectGrub, $this->pmssFindProfileCommand('Updating GRUB') !== null, $kind.' update-grub');
             if ($kind === 'parent-link' || $kind === 'grub-link') {
                 $this->assertSame($grubBody, file_get_contents($real.'/grub'), $kind.' preserves grub');
-                $this->assertTrue($this->pmssMessagesContain($messages, '[WARN] Unsafe'), $kind.' warning');
+                $this->pmssAssertMessagesContain($messages, '[WARN] Unsafe', $kind.' warning');
             }
             if ($kind === 'parent-link') {
                 $this->assertSame($fstabBody, file_get_contents($real.'/fstab'), 'preserves fstab');
@@ -263,7 +263,7 @@ PHP
             $messages = []; $logger = $this->pmssMakeArrayLogger($messages);
             $dir = $this->pmssMakeTempDir('pmss-fstab-char-'.$case['label'].'-', 0700);
             $this->assertSame($case['expect'], $case['runner']($dir, $logger), 'case '.$case['label'].' fstab');
-            $this->assertTrue($this->pmssMessagesContain($messages, $case['log']), 'case '.$case['label'].' log');
+            $this->pmssAssertMessagesContain($messages, $case['log'], 'case '.$case['label'].' log');
             foreach (['PMSS_HARDEN_TMP_NOEXEC', 'PMSS_HARDEN_TMP_TMPFS', 'PMSS_DRY_RUN'] as $key) putenv($key);
         }
     }
