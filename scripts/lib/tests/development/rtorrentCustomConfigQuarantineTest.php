@@ -116,9 +116,7 @@ class rtorrentCustomConfigQuarantineTest extends TestCase
             "schedule = watch,1,1,\"load_start=~/watch/*.torrent\"\nexecute = sh,-c,echo ok\n");
 
         $messages = [];
-        $logFn = $this->pmssMakeArrayLogger($messages);
-
-        $dst = $this->quarantineCustomConfig('', $logFn);
+        $dst = $this->quarantineCustomConfig('', $this->pmssMakeArrayLogger($messages));
         $this->assertTrue(is_string($dst) && $dst !== '');
         $this->assertTrue(
             in_array('Custom rTorrent config still uses legacy PMSS-migrated directives: schedule, execute', $messages, true),

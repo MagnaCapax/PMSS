@@ -27,8 +27,7 @@ class UpdateHelpersTest extends TestCase
     public function testLoadRepoTemplateMissingLogsAndReturnsEmpty(): void
     {
         $logs = [];
-        $logger = $this->pmssMakeArrayLogger($logs);
-        $data = \pmssLoadRepoTemplate('this-code-name-does-not-exist', $logger);
+        $data = \pmssLoadRepoTemplate('this-code-name-does-not-exist', $this->pmssMakeArrayLogger($logs));
         $this->assertEquals('', $data);
         $this->pmssAssertMessagesContain($logs, 'Repository template missing:');
     }
@@ -36,8 +35,7 @@ class UpdateHelpersTest extends TestCase
     public function testSafeWriteSourcesEmptyContentSkips(): void
     {
         $logs = [];
-        $logger = $this->pmssMakeArrayLogger($logs);
-        $ok = \pmssSafeWriteSources('', 'UnitTest', $logger);
+        $ok = \pmssSafeWriteSources('', 'UnitTest', $this->pmssMakeArrayLogger($logs));
         $this->assertTrue($ok === false);
         $this->pmssAssertMessagesContain($logs, 'Empty repository content');
     }
@@ -45,8 +43,7 @@ class UpdateHelpersTest extends TestCase
     public function testUpdateAptSourcesDebian9UnsupportedLogs(): void
     {
         $logs = [];
-        $logger = $this->pmssMakeArrayLogger($logs);
-        \pmssUpdateAptSources('debian', 9, 'dead', $this->pmssDebianRepoTemplates(), $logger);
+        \pmssUpdateAptSources('debian', 9, 'dead', $this->pmssDebianRepoTemplates(), $this->pmssMakeArrayLogger($logs));
         $this->pmssAssertMessagesContain($logs, 'Unsupported Debian version: 9');
     }
 
@@ -56,10 +53,9 @@ class UpdateHelpersTest extends TestCase
         $content = "deb https://example invalid\n";
         $hash = sha1($content);
         $logs = [];
-        $logger = $this->pmssMakeArrayLogger($logs);
         \pmssUpdateAptSources('debian', 12, $hash, $this->pmssDebianRepoTemplates([
             'bookworm' => $content,
-        ]), $logger);
+        ]), $this->pmssMakeArrayLogger($logs));
         $this->pmssAssertMessagesContain($logs, 'already correct');
         // Important: No destructive call path is taken here
     }
@@ -67,8 +63,7 @@ class UpdateHelpersTest extends TestCase
     public function testUpdateAptSourcesTemplateMissing(): void
     {
         $logs = [];
-        $logger = $this->pmssMakeArrayLogger($logs);
-        \pmssUpdateAptSources('debian', 11, 'hash', $this->pmssDebianRepoTemplates(), $logger);
+        \pmssUpdateAptSources('debian', 11, 'hash', $this->pmssDebianRepoTemplates(), $this->pmssMakeArrayLogger($logs));
         $this->pmssAssertMessagesContain($logs, 'Bullseye template missing');
     }
 
@@ -77,10 +72,9 @@ class UpdateHelpersTest extends TestCase
         $content = "deb https://example-trixie invalid\n";
         $hash = sha1($content);
         $logs = [];
-        $logger = $this->pmssMakeArrayLogger($logs);
         \pmssUpdateAptSources('debian', 13, $hash, $this->pmssDebianRepoTemplates([
             'trixie' => $content,
-        ]), $logger);
+        ]), $this->pmssMakeArrayLogger($logs));
         $this->pmssAssertMessagesContain($logs, 'Trixie');
     }
 

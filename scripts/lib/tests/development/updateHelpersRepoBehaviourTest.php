@@ -101,7 +101,7 @@ class UpdateHelpersRepoBehaviourTest extends TestCase
         $template = "deb http://mirror.example trixie main\n";
         $this->pmssWithRepoTemplates(['trixie' => $template], function () use ($template): void {
             $this->pmssWithTempAptSources('legacy', function (string $target) use ($template): void {
-                [, $logs] = $this->pmssArrayLoggerCapture(function (callable $logger): void {
+                $logs = $this->pmssArrayLoggerMessages(function (callable $logger): void {
                     $this->pmssWithEnv(['PMSS_DRY_RUN' => '1'], function () use ($logger): void {
                         \pmssRefreshRepositories('debian', 13, $logger);
                     });

@@ -99,7 +99,7 @@ class ConfigBackupsServiceGuardTest extends TestCase
         [$sourceRoot, $backupRoot] = $this->pmssConfigBackupsFixtureRoots();
         $source = $this->pmssWriteRelativeFile($sourceRoot, 'etc/nginx/nginx.conf', "worker_processes auto;\n");
 
-        [, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($backupRoot, $source): void {
+        $messages = $this->pmssArrayLoggerMessages(function (callable $logger) use ($backupRoot, $source): void {
             \pmssPruneCriticalConfigBackups('nginx/child', $source, array(
                 'backupRoot' => $backupRoot,
                 'logger' => $logger,
@@ -132,7 +132,7 @@ class ConfigBackupsServiceGuardTest extends TestCase
         [$sourceRoot] = $this->pmssConfigBackupsFixtureRoots();
         $source = $this->pmssWriteRelativeFile($sourceRoot, 'etc/nginx/nginx.conf', "worker_processes auto;\n");
 
-        [, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($source): void {
+        $messages = $this->pmssArrayLoggerMessages(function (callable $logger) use ($source): void {
             \pmssPruneCriticalConfigBackups('nginx', $source, array(
                 'backupRoot' => 'relative-backups',
                 'logger' => $logger,

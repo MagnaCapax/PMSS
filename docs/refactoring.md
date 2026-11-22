@@ -1016,6 +1016,8 @@ RAID scrub fixtures read optional command logs through `pmssReadFileOrEmpty()`
 directly, preserving the empty-string fallback without a local forwarding method.
 App-profile observations and discarded rTorrent logs use the fixed-result
 callback factory, retaining argument-dependent and recording callbacks explicitly.
+Unobserved repository logs use the same no-op callbacks; single-use loggers go
+directly to their consumer. Log-only captures use `pmssArrayLoggerMessages()`.
 
 Torrent-client fixtures, hardware probes, watchdogs, account restart space,
 held-block observations and installer gates use `TestCase::pmssMakeCallbacks()`
