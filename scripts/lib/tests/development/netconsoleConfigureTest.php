@@ -32,7 +32,7 @@ class NetconsoleConfigureTest extends TestCase
             \pmssNetconsoleConfigure($this->pmssMakeArrayLogger($logs));
         });
 
-        $this->assertTrue($this->pmssMessagesContain($logs, 'No netconsole configuration'), 'expected missing-config skip log');
+        $this->pmssAssertMessagesContain($logs, 'No netconsole configuration', 'expected missing-config skip log');
     }
 
     public function testWritesFilesAndReloadsWhenReachable(): void

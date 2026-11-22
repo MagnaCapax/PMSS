@@ -132,7 +132,7 @@ class UserCgroupSliceDropinsTest extends TestCase
         $this->pmssWriteFile($base.'/user-2345.slice.d/99-pmss.conf', 'legacy');
         $this->assertFalse($this->repair($base, 7));
         $this->assertSame(1, $this->reloads);
-        $this->assertTrue($this->pmssMessagesContain($this->messages, 'daemon-reload failed'));
+        $this->pmssAssertMessagesContain($this->messages, 'daemon-reload failed');
     }
 
     public function testDryRunRetainsSourceAndDoesNotReload(): void

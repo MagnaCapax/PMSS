@@ -20,7 +20,7 @@ class KernelHardeningDirtyFragTest extends KernelHardeningTestCase
         );
 
         $this->assertEquals(\pmssDirtyFragBlacklistBody(), file_get_contents($dir.'/modprobe.d/dirtyfrag.conf'));
-        $this->assertTrue($this->pmssMessagesContain($logs, 'Updated '.$dir.'/modprobe.d/dirtyfrag.conf'), 'expected blacklist update log');
+        $this->pmssAssertMessagesContain($logs, 'Updated '.$dir.'/modprobe.d/dirtyfrag.conf', 'expected blacklist update log');
         $this->assertEquals('Unloading Dirty Frag modules (esp4_offload esp6_offload xfrm_interface esp4 esp6 rxrpc ipcomp ipcomp6 espintcp)', $calls[0][0]);
         $this->assertTrue(!is_file($dir.'/runtime/dirtyfrag-modules-loaded'), 'expected runtime flag to stay absent');
     }
@@ -36,7 +36,7 @@ class KernelHardeningDirtyFragTest extends KernelHardeningTestCase
         $flagPath = $dir.'/runtime/dirtyfrag-modules-loaded';
         $this->assertTrue(is_file($flagPath), 'expected runtime flag for pinned modules');
         $this->assertEquals("esp4\t2\nrxrpc\t1\n", file_get_contents($flagPath));
-        $this->assertTrue($this->pmssMessagesContain($logs, 'Dirty Frag runtime flag written'), 'expected runtime flag log');
+        $this->pmssAssertMessagesContain($logs, 'Dirty Frag runtime flag written', 'expected runtime flag log');
     }
 
     public function testWarnsWithoutFlagWhenResidualModulesAreNotPinned(): void
@@ -47,7 +47,7 @@ class KernelHardeningDirtyFragTest extends KernelHardeningTestCase
         $snapshot = "Module                  Size  Used by\nesp6                   20480  0\n";
         $this->pmssRunKernelHardeningNoop('\pmssEnsureDirtyFragBlacklist', $this->dirtyFragEnv($dir, $snapshot), $logs);
 
-        $this->assertTrue($this->pmssMessagesContain($logs, 'Dirty Frag modules still loaded after unload attempt'), 'expected residual module warning');
+        $this->pmssAssertMessagesContain($logs, 'Dirty Frag modules still loaded after unload attempt', 'expected residual module warning');
         $this->assertTrue(!is_file($dir.'/runtime/dirtyfrag-modules-loaded'), 'expected zero-use residual module to avoid runtime flag');
     }
 
@@ -71,7 +71,7 @@ class KernelHardeningDirtyFragTest extends KernelHardeningTestCase
 
         $this->pmssRunKernelHardeningNoop('\pmssEnsureDirtyFragBlacklist', $env, $logs);
 
-        $this->assertTrue($this->pmssMessagesContain($logs, 'Unable to inspect Dirty Frag modules'), 'expected missing snapshot warning');
+        $this->pmssAssertMessagesContain($logs, 'Unable to inspect Dirty Frag modules', 'expected missing snapshot warning');
     }
 
     public function testSkipsAllMutationsInDryRun(): void
@@ -84,7 +84,7 @@ class KernelHardeningDirtyFragTest extends KernelHardeningTestCase
 
         $this->pmssRunKernelHardeningWithCalls('\pmssEnsureDirtyFragBlacklist', $env, $logs, $calls);
 
-        $this->assertTrue($this->pmssMessagesContain($logs, 'Dirty Frag blacklist: skipping all mutations'), 'expected dry-run skip log');
+        $this->pmssAssertMessagesContain($logs, 'Dirty Frag blacklist: skipping all mutations', 'expected dry-run skip log');
         $this->assertTrue(!is_file($dir.'/modprobe.d/dirtyfrag.conf'), 'expected dry-run to skip file creation');
         $this->assertEquals([], $calls);
     }

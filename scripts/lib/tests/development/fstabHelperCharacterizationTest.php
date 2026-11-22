@@ -16,7 +16,7 @@ class FstabHelperCharacterizationTest extends TestCase
             $this->assertSame(null, \pmssFstabLinesRead($link, $logger, 'fstab characterization'));
         });
 
-        $this->assertTrue($this->pmssMessagesContain($messages, 'not a regular file'), 'expected regular-file guard log');
+        $this->pmssAssertMessagesContain($messages, 'not a regular file', 'expected regular-file guard log');
     }
 
     public function testMountEntryReadMatchesRequestedFilesystemType(): void

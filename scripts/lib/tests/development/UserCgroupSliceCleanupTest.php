@@ -101,7 +101,7 @@ class UserCgroupSliceCleanupTest extends TestCase
         $this->assertFalse($this->cleanupSlice($root, false, false, 9));
         $this->assertFalse(file_exists(dirname($file)));
         $this->assertSame(1, $this->reloads);
-        $this->assertTrue($this->pmssMessagesContain($this->messages, 'daemon-reload failed'));
+        $this->pmssAssertMessagesContain($this->messages, 'daemon-reload failed');
     }
 
     public function testUnsafeOneNamespaceStillReloadsSuccessfulCleanupOfOther(): void

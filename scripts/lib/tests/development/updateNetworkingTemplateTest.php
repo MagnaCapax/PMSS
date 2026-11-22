@@ -73,7 +73,7 @@ class UpdateNetworkingTemplateTest extends TestCase
         );
 
         $this->assertFalse(file_exists($target));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'template missing interface token'));
+        $this->pmssAssertMessagesContain($messages, 'template missing interface token');
     }
 
     public function testDefaultRouteInterfaceRejectsUnsafeAndTunnelDevices(): void

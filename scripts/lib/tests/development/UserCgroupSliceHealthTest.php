@@ -111,7 +111,7 @@ class UserCgroupSliceHealthTest extends TestCase
         $this->assertSame("[Slice]\nMemoryMax=512M\nMemoryLimit=512M\n", (string) file_get_contents($file));
         $this->assertTrue(count(glob($file.'.pmss-backup-*') ?: []) > 0);
         $this->assertFalse(\pmssUserCgroupSliceDropinFileRepairBareMemoryMax($link, $logger));
-        $this->assertStringContainsString('Skipping unsafe user slice drop-in target', implode("\n", $messages));
+        $this->pmssAssertMessagesContain($messages, 'Skipping unsafe user slice drop-in target');
     }
 
     public function testDropinFileRepairPreservesFileWhenBackupNamesAreOccupied(): void
@@ -127,6 +127,6 @@ class UserCgroupSliceHealthTest extends TestCase
 
         $this->assertFalse(\pmssUserCgroupSliceDropinFileRepairBareMemoryMax($file, $this->pmssMakeArrayLogger($messages)));
         $this->assertSame($original, file_get_contents($file));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'timestamped backup paths already exist'));
+        $this->pmssAssertMessagesContain($messages, 'timestamped backup paths already exist');
     }
 }
