@@ -92,13 +92,12 @@ PHP;
     {
         $homeDir = $this->tempDir.'/dummy';
         $this->pmssEnsureDir($homeDir);
-        $messages = [];
 
         $this->assertTrue(\pmssCheckGuiEnsureUserDirectory(
             $homeDir.'/www',
             $this->pmssCurrentOwner(),
             'www',
-            $this->pmssMakeArrayLogger($messages),
+            self::pmssMakeCallbacks(['log' => null])['log'],
             $homeDir
         ));
         $this->assertTrue(is_dir($homeDir.'/www'));
@@ -148,13 +147,12 @@ PHP;
             'PMSS_SKEL_DIR' => $skeletonRoot,
             'PMSS_USER_WEB_ROOT_LOCK_DIR' => $this->pmssMakeTempDir('pmss-check-gui-lock-'),
         ]);
-        $messages = [];
 
         $this->assertFalse(\pmssCheckGuiWebRootSentinelsHealthy($homeDir.'/www', $homeDir));
         $this->assertTrue(\pmssCheckGuiWebRootReconcileIfSentinelMissing(
             $user,
             $homeDir,
-            $this->pmssMakeArrayLogger($messages)
+            self::pmssMakeCallbacks(['log' => null])['log']
         ));
         $this->assertEquals('existing panel', file_get_contents($homeDir.'/www/index.php'));
         $this->assertEquals('skeleton rutorrent', file_get_contents($homeDir.'/www/rutorrent/index.html'));
@@ -208,12 +206,11 @@ PHP;
             'PMSS_SKEL_DIR' => $skeletonRoot,
             'PMSS_USER_WEB_ROOT_LOCK_DIR' => $this->pmssMakeTempDir('pmss-check-gui-idempotent-lock-'),
         ]);
-        $messages = [];
 
         $this->assertTrue(\pmssCheckGuiWebRootReconcileIfSentinelMissing(
             $user,
             $homeDir,
-            $this->pmssMakeArrayLogger($messages)
+            self::pmssMakeCallbacks(['log' => null])['log']
         ));
         $before = $this->pmssTreeSnapshot($homeDir);
         $messages = [];
@@ -241,12 +238,11 @@ PHP;
             'PMSS_SKEL_DIR' => $skeletonRoot,
             'PMSS_USER_WEB_ROOT_LOCK_DIR' => $this->pmssMakeTempDir('pmss-check-gui-symlink-lock-'),
         ]);
-        $messages = [];
 
         $this->assertFalse(\pmssCheckGuiWebRootReconcileIfSentinelMissing(
             $user,
             $homeDir,
-            $this->pmssMakeArrayLogger($messages)
+            self::pmssMakeCallbacks(['log' => null])['log']
         ));
         $this->assertSame('outside', file_get_contents($outsideDir.'/sentinel.txt'));
         $this->assertSame($outsideDir, readlink($homeDir.'/www'));
@@ -264,12 +260,11 @@ PHP;
             'PMSS_SKEL_DIR' => $skeletonRoot,
             'PMSS_USER_WEB_ROOT_LOCK_DIR' => $this->pmssMakeTempDir('pmss-check-gui-path-type-lock-'),
         ]);
-        $messages = [];
 
         $this->assertFalse(\pmssCheckGuiWebRootReconcileIfSentinelMissing(
             $user,
             $homeDir,
-            $this->pmssMakeArrayLogger($messages)
+            self::pmssMakeCallbacks(['log' => null])['log']
         ));
         $this->assertSame('not-a-directory', file_get_contents($homeDir.'/www'));
     }
@@ -333,13 +328,12 @@ PHP;
         $file = $this->pmssWriteFile($this->tempDir.'/panel.php', 'panel');
         $directory = $this->pmssEnsureDir($this->tempDir.'/www');
         $user = $this->pmssCurrentOwner();
-        $messages = [];
 
         foreach ([$file, $directory] as $path) {
             $this->assertTrue(\pmssCheckGuiApplyOwnership(
                 $path,
                 $user,
-                $this->pmssMakeArrayLogger($messages)
+                self::pmssMakeCallbacks(['log' => null])['log']
             ));
             clearstatcache(true, $path);
             $this->assertSame(posix_geteuid(), fileowner($path));
@@ -351,13 +345,12 @@ PHP;
         $homeDir = $this->pmssEnsureUserWebHome($this->tempDir, 'dummy');
         $sourceFile = $this->tempDir.'/skel/index.php';
         $this->pmssWriteFile($sourceFile, "<?php echo 'ok';\n");
-        $messages = [];
 
         $this->assertTrue(\pmssCheckGuiRestoreUserIndex(
             $homeDir.'/www/index.php',
             $sourceFile,
             $this->pmssCurrentOwner(),
-            $this->pmssMakeArrayLogger($messages),
+            self::pmssMakeCallbacks(['log' => null])['log'],
             $homeDir
         ));
         $this->assertEquals("<?php echo 'ok';\n", file_get_contents($homeDir.'/www/index.php'));
@@ -373,14 +366,13 @@ PHP;
         $sourceContent = "<?php\nfunction panelHelper(): string { return 'ok'; }\n";
         $this->pmssWriteFile($sourceFile, $sourceContent);
         $this->pmssWriteFile($targetFile, substr($sourceContent, 0, -12));
-        $messages = [];
 
         $this->assertTrue(\pmssCheckGuiRestoreUserFile(
             $targetFile,
             $sourceFile,
             $this->pmssCurrentOwner(),
             'scriptsInc.php',
-            $this->pmssMakeArrayLogger($messages),
+            self::pmssMakeCallbacks(['log' => null])['log'],
             $homeDir
         ));
         $this->assertEquals($sourceContent, file_get_contents($targetFile));
@@ -394,11 +386,10 @@ PHP;
         $sourceContent = $this->pmssReadRepoFile('etc/skel/www/scriptsIncFormat.php');
         $this->pmssWriteFile($sourceFile, $sourceContent);
         $this->pmssWriteFile($targetFile, substr($sourceContent, 0, 50));
-        $messages = array();
 
         $this->assertTrue(\pmssCheckGuiRestoreUserFile(
             $targetFile, $sourceFile, $this->pmssCurrentOwner(), 'scriptsIncFormat.php',
-            $this->pmssMakeArrayLogger($messages), $homeDir
+            self::pmssMakeCallbacks(['log' => null])['log'], $homeDir
         ));
         $this->assertSame($sourceContent, file_get_contents($targetFile));
     }
@@ -562,13 +553,12 @@ PHP;
         $sourceFile = $this->pmssWriteFile($this->tempDir.'/skel/'.$catalog, $sourceContent);
         $part = $this->pmssWriteFile($homeDir.'/www/scriptsIncAppProcess.php',
             $this->pmssReadRepoFile('etc/skel/www/scriptsIncAppProcess.php'));
-        $messages = array();
 
         // Reproduce the mixed delivery: the new app part exists but its catalog does not.
         $this->assertFalse(file_exists($homeDir.'/www/'.$catalog));
         $this->assertTrue(\pmssCheckGuiRestoreUserFile(
             $homeDir.'/www/'.$catalog, $sourceFile, $this->pmssCurrentOwner(), $catalog,
-            $this->pmssMakeArrayLogger($messages), $homeDir
+            self::pmssMakeCallbacks(['log' => null])['log'], $homeDir
         ));
         $this->assertSame($sourceContent, file_get_contents($homeDir.'/www/'.$catalog));
         $result = $this->pmssExecInlinePhp('require '.var_export($part, true).';'
@@ -608,11 +598,10 @@ PHP;
         $sourceContent = "<?php echo 'source';\n";
         $this->pmssWriteFile($sourceFile, $sourceContent);
         $this->pmssWriteFile($targetFile, str_replace('source', 'broken', $sourceContent));
-        $messages = [];
 
         $this->assertTrue(\pmssCheckGuiRestoreUserFile(
             $targetFile, $sourceFile, $this->pmssCurrentOwner(), 'scriptsInc.php',
-            $this->pmssMakeArrayLogger($messages), $homeDir
+            self::pmssMakeCallbacks(['log' => null])['log'], $homeDir
         ));
         $this->assertSame($sourceContent, file_get_contents($targetFile));
     }
@@ -640,11 +629,10 @@ PHP;
         $targetFile = $homeDir.'/www/scriptsInc.php';
         $content = "<?php echo 'existing';\n";
         $this->pmssWriteFile($targetFile, $content);
-        $messages = [];
 
         $this->assertTrue(\pmssCheckGuiRestoreUserFile(
             $targetFile, $this->tempDir.'/skel/missing.php', $this->pmssCurrentOwner(),
-            'scriptsInc.php', $this->pmssMakeArrayLogger($messages), $homeDir
+            'scriptsInc.php', self::pmssMakeCallbacks(['log' => null])['log'], $homeDir
         ));
         $this->assertSame($content, file_get_contents($targetFile));
     }

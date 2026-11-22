@@ -12,7 +12,7 @@ class DbusPolicyHardeningTest extends TestCase
     }
 
     /** Install the complete policy set and return each artifact body by basename. */
-    private function installDisclosureArtifacts(array &$messages): array
+    private function installDisclosureArtifacts(): array
     {
         $dbusDir = $this->pmssMakeTempDir('pmss-dbus-policy-', 0700);
         $tmpfilesDir = $this->pmssMakeTempDir('pmss-tmpfiles-', 0700);
@@ -21,7 +21,7 @@ class DbusPolicyHardeningTest extends TestCase
             'PMSS_TMPFILES_DIR' => $tmpfilesDir,
         ], true);
 
-        \pmssEnsureSystemdDbusDisclosureHardening($this->pmssMakeArrayLogger($messages));
+        \pmssEnsureSystemdDbusDisclosureHardening(self::pmssMakeCallbacks(['log' => null])['log']);
 
         $bodies = [];
         foreach ([$dbusDir, $tmpfilesDir] as $dir) {
@@ -36,8 +36,7 @@ class DbusPolicyHardeningTest extends TestCase
 
     public function testDisclosureHardeningArtifactSnapshot(): void
     {
-        $messages = [];
-        $bodies = $this->installDisclosureArtifacts($messages);
+        $bodies = $this->installDisclosureArtifacts();
         $snapshots = [
             '10-pmss-systemd1-restrict.conf' => [2215, '33127e72e838b6de039066dab788216a5d7792111043bea8f046a5f023eea6ab'],
             '10-pmss-login1-restrict.conf' => [1102, 'bcda38506feaf4553b1afe7bdc7a65fa070f8bc376f8524284af07f7649adc4d'],
@@ -58,8 +57,7 @@ class DbusPolicyHardeningTest extends TestCase
 
     public function testLoginPolicyDeniesDestinationButPreservesSelfQueries(): void
     {
-        $messages = [];
-        $xml = $this->installDisclosureArtifacts($messages)['10-pmss-login1-restrict.conf'];
+        $xml = $this->installDisclosureArtifacts()['10-pmss-login1-restrict.conf'];
         $this->assertStringContainsAllStrings(['<policy context="default">', '<deny send_destination="org.freedesktop.login1"/>'], $xml);
 
         foreach (['GetSessionByPID', 'GetUserByPID'] as $member) {
@@ -73,8 +71,7 @@ class DbusPolicyHardeningTest extends TestCase
 
     public function testSystemdPolicyDeniesOnlyEnumerationMembers(): void
     {
-        $messages = [];
-        $xml = $this->installDisclosureArtifacts($messages)['10-pmss-systemd1-restrict.conf'];
+        $xml = $this->installDisclosureArtifacts()['10-pmss-systemd1-restrict.conf'];
         foreach (['ListUnits', 'ListUnitsByPatterns', 'ListUnitsFiltered', 'ListUnitsByNames', 'GetProcesses', 'GetUnitProcesses', 'Dump', 'DumpByFileDescriptor'] as $member) {
             $this->assertStringContainsString('send_member="'.$member.'"/>', $xml, 'denies enumeration method '.$member);
         }
@@ -86,8 +83,7 @@ class DbusPolicyHardeningTest extends TestCase
 
     public function testManagedDbusPoliciesAreWellFormedXml(): void
     {
-        $messages = [];
-        $bodies = $this->installDisclosureArtifacts($messages);
+        $bodies = $this->installDisclosureArtifacts();
         foreach (['10-pmss-login1-restrict.conf', '10-pmss-systemd1-restrict.conf'] as $basename) {
             $previous = libxml_use_internal_errors(true);
             $document = new \DOMDocument();
@@ -105,8 +101,7 @@ class DbusPolicyHardeningTest extends TestCase
 
     public function testTmpfilesPoliciesRestrictRuntimeDirectories(): void
     {
-        $messages = [];
-        $bodies = $this->installDisclosureArtifacts($messages);
+        $bodies = $this->installDisclosureArtifacts();
         foreach (['users', 'sessions'] as $leaf) {
             $body = $bodies['pmss-run-systemd-'.$leaf.'.conf'];
             $this->assertStringContainsString('d /run/systemd/'.$leaf.' 0750 root root', $body);
@@ -116,8 +111,7 @@ class DbusPolicyHardeningTest extends TestCase
 
     public function testUsersDirectoryStaysReadableForDbus(): void
     {
-        $messages = [];
-        $bodies = $this->installDisclosureArtifacts($messages);
+        $bodies = $this->installDisclosureArtifacts();
         $lines = array_values(array_filter(explode("\n", $bodies['pmss-run-systemd-users.conf']), static function (string $line): bool {
             return $line !== '' && $line[0] !== '#';
         }));
@@ -130,8 +124,7 @@ class DbusPolicyHardeningTest extends TestCase
 
     public function testCompletePolicyInstallIsIdempotent(): void
     {
-        $messages = [];
-        $this->installDisclosureArtifacts($messages);
+        $this->installDisclosureArtifacts();
 
         $secondRun = [];
         \pmssEnsureSystemdDbusDisclosureHardening($this->pmssMakeArrayLogger($secondRun));

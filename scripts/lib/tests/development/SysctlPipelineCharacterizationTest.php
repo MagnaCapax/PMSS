@@ -79,8 +79,7 @@ final class SysctlPipelineCharacterizationTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-sysctl-pipeline-');
         $this->pmssTrackEnvOverrides(['PMSS_CONFIG_DIR' => $root]);
         $this->pmssWriteFile($root.'/hardware.json', '{"peer":{"keep":true},"timestamp":"old"}');
-        $messages = [];
-        \pmssSysctlSummaryWrite($this->pmssMakeArrayLogger($messages), [
+        \pmssSysctlSummaryWrite(self::pmssMakeCallbacks(['log' => null])['log'], [
             'ram_gb' => '64', 'has_swap' => '0', 'swap_is_fast' => 'false',
             'nic_speed_mbps' => '25000', 'nic_speed_gbps' => '10', 'is_vm' => 1,
         ], ['one' => ['z' => 1, 'a' => false], 'ignored' => null, 'two' => ['z' => 2]],

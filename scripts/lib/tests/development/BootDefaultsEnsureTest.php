@@ -15,7 +15,7 @@ class BootDefaultsEnsureTest extends TestCase
     public function testBootDefaultsMatrix(): void
     {
         $option = 'systemd.unified_cgroup_hierarchy=0';
-        $logger = static function (string $message): void { };
+        $logger = self::pmssMakeCallbacks(['log' => null])['log'];
         $cases = [
             ['label' => 'add-hidepid', 'fstab' => "proc /proc proc defaults 0 0\n", 'grub' => 'GRUB_CMDLINE_LINUX_DEFAULT="quiet '.$option.'"', 'expectFstab' => 'hidepid=2', 'expectGrub' => $option],
             ['label' => 'replace-hidepid', 'fstab' => "proc /proc proc defaults,hidepid=1 0 0\n", 'grub' => 'GRUB_CMDLINE_LINUX_DEFAULT="quiet '.$option.'"', 'expectFstab' => 'hidepid=2', 'rejectFstab' => 'hidepid=1'],
@@ -44,7 +44,6 @@ class BootDefaultsEnsureTest extends TestCase
 
     public function testBootDefaultsSupportsSerialConsoleSettings(): void
     {
-        $logger = static function (string $message): void { };
         $dir = $this->pmssMakeTempDir('pmss-boot-defaults-serial-', 0700);
 
         $fstab = $dir.'/fstab';
@@ -52,7 +51,7 @@ class BootDefaultsEnsureTest extends TestCase
         $this->pmssWriteFiles($dir, ['fstab' => "proc /proc proc defaults,hidepid=2 0 0\n", 'grub' => "GRUB_CMDLINE_LINUX_DEFAULT=\"quiet\"\n"]);
 
         \pmssEnsureBootDefaults(
-            $logger,
+            self::pmssMakeCallbacks(['log' => null])['log'],
             $fstab,
             $grub,
             'systemd.unified_cgroup_hierarchy=0',
@@ -90,13 +89,12 @@ class BootDefaultsEnsureTest extends TestCase
 
     public function testBootDefaultsNormalizesExtraGrubInputs(): void
     {
-        $logger = static function (string $message): void { };
         $dir = $this->pmssMakeTempDir('pmss-boot-defaults-normalize-', 0700);
         $fstab = $dir.'/fstab';
         $grub = $dir.'/grub';
         $this->pmssWriteFiles($dir, ['fstab' => "proc /proc proc defaults,hidepid=2 0 0\n", 'grub' => "GRUB_CMDLINE_LINUX_DEFAULT=\"quiet\"\nGRUB_TERMINAL=\"old\"\n"]);
 
-        \pmssEnsureBootDefaults($logger, $fstab, $grub, ' systemd.unified_cgroup_hierarchy=0 ', ['console=tty0', 'console=tty0', '  '], ['GRUB_TERMINAL' => ' console ', 'BAD-KEY' => 'ignored']);
+        \pmssEnsureBootDefaults(self::pmssMakeCallbacks(['log' => null])['log'], $fstab, $grub, ' systemd.unified_cgroup_hierarchy=0 ', ['console=tty0', 'console=tty0', '  '], ['GRUB_TERMINAL' => ' console ', 'BAD-KEY' => 'ignored']);
         $updatedGrub = (string) file_get_contents($grub);
 
         $this->assertStringContainsAndOmitsStrings(['GRUB_CMDLINE_LINUX_DEFAULT="quiet systemd.unified_cgroup_hierarchy=0 console=tty0"', 'GRUB_TERMINAL="console"'], ['BAD-KEY'], $updatedGrub);
@@ -104,7 +102,7 @@ class BootDefaultsEnsureTest extends TestCase
 
     public function testBootDefaultsNormalizesMalformedCmdlineLinesIdempotently(): void
     {
-        $logger = static function (string $message): void { };
+        $logger = self::pmssMakeCallbacks(['log' => null])['log'];
         $dir = $this->pmssMakeTempDir('pmss-boot-defaults-malformed-', 0700);
         $fstab = $dir.'/fstab';
         $grub = $dir.'/grub';

@@ -355,9 +355,8 @@ class SysctlBaselineTest extends TestCase
         $dir = $this->pmssMakeTempDir('pmss-sysctl-summary-map-', 0700);
         $this->pmssTrackEnvOverrides(['PMSS_CONFIG_DIR' => $dir]);
         $this->pmssWriteFile($dir.'/hardware.json', "{\"peer\":\"kept\"}\n");
-        $messages = [];
 
-        \pmssSysctlSummaryWrite($this->pmssMakeArrayLogger($messages), [], [
+        \pmssSysctlSummaryWrite(self::pmssMakeCallbacks(['log' => null])['log'], [], [
             'net' => ['net.core.somaxconn' => 2000],
             'ignored' => 'not-array',
             'vm' => ['vm.swappiness' => '10'],
