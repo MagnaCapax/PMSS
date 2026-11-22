@@ -503,6 +503,14 @@ decisions, failed/short reads and pre-open refusals retain their existing result
 quota recount selection remains unchanged (ADR 0159). `QuotaFixGuardTest` covers
 the stream lifetime with isolated read faults on the testing machine.
 
+Quota header inspection also requires successful stream closure before selecting
+fresh-file recovery (`-c`/`-b`). A failed close retains the non-fresh recount path;
+completed reads retain the existing magic/version, short-read and failed-read
+decisions. `QuotaRecoveryStateInputSafetyTest` covers close refusals, read/close
+exceptions and errors, original throwable identity and combined-fault precedence
+using memory streams and intercepted quota observations. No live recount or dry
+run is executed on the devbox; execution stays on testing machines.
+
 Quota recovery also rejects NUL bytes anywhere in the combined `quotaon -p`
 observation before header inspection or recount planning. A matching off line
 cannot certify corrupted stdout or stderr; the existing empty-command refusal

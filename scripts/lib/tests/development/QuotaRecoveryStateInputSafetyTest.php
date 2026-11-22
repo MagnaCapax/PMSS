@@ -3,9 +3,70 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 
-/** Check quota recovery state corruption without executing commands or reading quota files. */
+/** Check quota observations and header completion without live quota I/O. */
 class QuotaRecoveryStateInputSafetyTest extends TestCase
 {
+    public function testHeaderCompletionGuardsFreshFileRecovery(): void
+    {
+        // Exercise scripts/lib/quota/recovery.php with memory streams and no quota commands.
+        $script = <<<'PHP'
+namespace QuotaHeaderCompletionFixture;
+function is_file($path) { return true; }
+function fopen($path, $mode) { return $GLOBALS['stream'] = \fopen('php://temp', 'w+'); }
+function fread($handle, $length) {
+    if ($GLOBALS['readFailure'] !== null) throw $GLOBALS['readFailure'];
+    return $GLOBALS['header'];
+}
+function fclose($handle) {
+    ++$GLOBALS['closes'];
+    \fclose($handle);
+    if ($GLOBALS['closeFailure'] !== null) throw $GLOBALS['closeFailure'];
+    return $GLOBALS['closed'];
+}
+function pmssQuotaHomeDeclaredTypes(...$args) { return ['user']; }
+function pmssQuotaCommandRun(...$args) {
+    return ['rc' => 0, 'output' => 'user quota on /home (/dev/fixture0) is off'];
+}
+PHP;
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/quota/recovery.php', 'QuotaHeaderCompletionFixture');
+        $script .= <<<'PHP'
+$results = [];
+foreach ([hex2bin('111fc0d900000000'), hex2bin('111fc0d901000000'),
+    hex2bin('111fc0d902000000'), hex2bin('2719c0d900000000'), str_repeat("\0", 8), '', 'short', false] as $header) {
+    foreach ([true, false] as $closed) {
+        foreach (['none', 'read', 'close', 'both'] as $fault) {
+            foreach ([\RuntimeException::class, \Error::class] as $kind) {
+                $GLOBALS['header'] = $header; $GLOBALS['closed'] = $closed; $GLOBALS['closes'] = 0;
+                $GLOBALS['readFailure'] = in_array($fault, ['read', 'both'], true) ? new $kind('read') : null;
+                $GLOBALS['closeFailure'] = in_array($fault, ['close', 'both'], true) ? new $kind('close') : null;
+                $commands = $caught = null;
+                try { $commands = pmssQuotaFixCheckCommands(false, null, null, '/fixture/fstab', '/fixture/quota'); }
+                catch (\Throwable $error) { $caught = $error; }
+                $expectedFailure = $GLOBALS['closeFailure'] ?? $GLOBALS['readFailure'];
+                $results[] = [$commands, $caught === $expectedFailure, $GLOBALS['closes'], is_resource($GLOBALS['stream'])];
+            }
+        }
+    }
+}
+echo json_encode($results);
+PHP;
+        $results = $this->pmssRunInlinePhpJson($script);
+        $index = 0;
+        // Valid v0/v1 headers retain limits; every other completed read retains fresh-file recovery.
+        foreach ([false, false, true, true, true, true, true, true] as $invalid) {
+            foreach ([true, false] as $closed) {
+                foreach (['none', 'read', 'close', 'both'] as $fault) {
+                    foreach ([0, 1] as $kind) {
+                        $expected = $fault === 'none' ? ['quotacheck -vumn'.($closed && $invalid ? 'cb' : '').' /home'] : null;
+                        $this->assertSame([$expected, true, 1, false], $results[$index], 'case '.$index);
+                        ++$index;
+                    }
+                }
+            }
+        }
+        $this->assertSame($index, count($results));
+    }
+
     public function testCorruptObservationsCannotAuthorizeRecoveryOrHeaderReads(): void
     {
         $user = "user quota on /home (/dev/fixture0) is off\n";

@@ -5,8 +5,8 @@ require_once __DIR__.'/state.php';
 /**
  * Whether a quota file exists with a header quotacheck rejects (wrong magic, version above 1, short read).
  *
- * A missing or unopenable file returns false: quotacheck creates a missing file itself and
- * fails on one it cannot open, so neither needs a fresh file.
+ * Missing files are created by quotacheck; unopenable files fail there.
+ * Neither those nor failed stream closes authorize a fresh quota file.
  */
 function pmssQuotaFileHeaderInvalid(string $path, string $type): bool
 {
@@ -19,8 +19,10 @@ function pmssQuotaFileHeaderInvalid(string $path, string $type): bool
         $header = fread($handle, 8);
     } finally {
         // A read exception must release the stream before recovery unwinds.
-        fclose($handle);
+        $closed = fclose($handle);
     }
+    // Incomplete stream closure cannot authorize replacing the quota file with -c.
+    if (!$closed) return false;
     if (!is_string($header) || strlen($header) < 8) {
         return true;
     }
