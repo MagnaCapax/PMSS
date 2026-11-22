@@ -27,7 +27,7 @@ class UpdateHelpersRepoBehaviourTest extends TestCase
         $this->pmssWithTempAptSources('initial', function (string $target) use ($template): void {
             \pmssUpdateAptSources('debian', 10, sha1('initial'), $this->pmssDebianRepoTemplates([
                 'buster' => $template,
-            ]), function (): void {});
+            ]), self::pmssMakeCallbacks(['log' => null])['log']);
             $this->assertEquals($template, file_get_contents($target));
         });
     }
@@ -39,10 +39,10 @@ class UpdateHelpersRepoBehaviourTest extends TestCase
             $second = "deb http://mirror.example bullseye contrib\n";
             \pmssUpdateAptSources('debian', 11, sha1('alpha'), $this->pmssDebianRepoTemplates([
                 'bullseye' => $first,
-            ]), function (): void {});
+            ]), self::pmssMakeCallbacks(['log' => null])['log']);
             \pmssUpdateAptSources('debian', 11, sha1($first), $this->pmssDebianRepoTemplates([
                 'bullseye' => $second,
-            ]), function (): void {});
+            ]), self::pmssMakeCallbacks(['log' => null])['log']);
             $this->assertEquals($second, file_get_contents($target));
             $this->assertEquals($first, file_get_contents($target.'.pmss-backup'));
         });
@@ -62,7 +62,7 @@ class UpdateHelpersRepoBehaviourTest extends TestCase
     public function testUpdateAptSourcesEmptyRepositoriesSkipsWrites(): void
     {
         $this->pmssWithTempAptSources('baseline', function (string $target): void {
-            \pmssUpdateAptSources('debian', 11, sha1('baseline'), $this->pmssDebianRepoTemplates(), function (): void {});
+            \pmssUpdateAptSources('debian', 11, sha1('baseline'), $this->pmssDebianRepoTemplates(), self::pmssMakeCallbacks(['log' => null])['log']);
             $this->assertEquals('baseline', file_get_contents($target));
         });
     }
@@ -89,7 +89,7 @@ class UpdateHelpersRepoBehaviourTest extends TestCase
     {
         $template = "deb http://mirror.example bullseye main\n";
         $this->pmssWithRepoTemplates(['bullseye' => $template], function () use ($template): void {
-            $plan = \pmssRepositoryUpdatePlan('debian', 11, function (): void {});
+            $plan = \pmssRepositoryUpdatePlan('debian', 11, self::pmssMakeCallbacks(['log' => null])['log']);
             $this->assertEquals('update', $plan['mode']);
             $this->assertEquals($template, $plan['templates']['bullseye']);
             $this->assertTrue(array_key_exists('buster', $plan['templates']));

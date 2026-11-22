@@ -35,12 +35,11 @@ class RuntimeTempPrefixSafetyTest extends TestCase
         $prefix = "pmss-prefix-newline-\n";
         $directory = $this->pmssMakeTempDir($prefix);
         $calls = 0;
-        $logger = static function (string $message): void {};
         $runner = static function () use (&$calls): int {
             $calls++;
             return 0;
         };
-        $this->assertSame(1, \pmssRemovePrivateTempDir($directory, $prefix, 'Cleanup fixture', $logger, $runner));
+        $this->assertSame(1, \pmssRemovePrivateTempDir($directory, $prefix, 'Cleanup fixture', self::pmssMakeCallbacks(['log' => null])['log'], $runner));
         $this->assertSame(0, $calls);
         $this->assertTrue(is_dir($directory));
     }

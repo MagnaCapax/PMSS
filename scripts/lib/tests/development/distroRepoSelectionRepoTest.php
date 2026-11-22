@@ -29,7 +29,7 @@ class DistroRepoSelectionRepoTest extends TestCase
     {
         $initial = "deb http://existing bullseye main\n";
         $this->pmssWithTempAptSources($initial, function (string $target) use ($initial): void {
-            \pmssUpdateAptSources('debian', 11, sha1($initial), $this->pmssDebianRepoTemplates(), function (): void {});
+            \pmssUpdateAptSources('debian', 11, sha1($initial), $this->pmssDebianRepoTemplates(), self::pmssMakeCallbacks(['log' => null])['log']);
 
             $this->assertEquals($initial, file_get_contents($target));
             $this->assertTrue(!file_exists($target.'.pmss-backup'));
@@ -43,7 +43,7 @@ class DistroRepoSelectionRepoTest extends TestCase
             $template = "deb http://mirror.example bookworm main\n";
             \pmssUpdateAptSources('debian', 12, '', $this->pmssDebianRepoTemplates([
                 'bookworm' => $template,
-            ]), function (): void {});
+            ]), self::pmssMakeCallbacks(['log' => null])['log']);
 
             $this->assertEquals($template, file_get_contents($target));
             $this->assertTrue(!file_exists($target.'.pmss-backup'));

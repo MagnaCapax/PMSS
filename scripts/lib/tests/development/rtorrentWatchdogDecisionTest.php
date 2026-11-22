@@ -141,15 +141,14 @@ PHP;
         $state = \rtorrentProcessWatchdogStatePaths($this->tempDir, 'fixtur01');
         \rtorrentProcessWriteEscalationState($state['escalation'], 'fixtur01', 6, time() - 3600);
         $attempts = 0;
-        $logger = static function (string $message, bool $force = false): void {};
 
-        $this->pmssCaptureStdout(static function () use ($state, $logger, &$attempts): void {
+        $this->pmssCaptureStdout(static function () use ($state, &$attempts): void {
             \pmssCheckRtorrentHandleEscalatedStartFailure(
                 'fixtur01',
                 $state,
                 6,
                 180,
-                $logger,
+                self::pmssMakeCallbacks(['log' => null])['log'],
                 false,
                 static function (string $user, callable $logCallback, string $startMarker) use (&$attempts): int {
                     $attempts++;
@@ -170,15 +169,14 @@ PHP;
         \rtorrentProcessWriteEscalationState($state['escalation'], 'fixtur01', 6, time());
         $before = (string) file_get_contents($state['escalation']);
         $attempts = 0;
-        $logger = static function (string $message, bool $force = false): void {};
 
-        $this->pmssCaptureStdout(static function () use ($state, $logger, &$attempts): void {
+        $this->pmssCaptureStdout(static function () use ($state, &$attempts): void {
             \pmssCheckRtorrentHandleEscalatedStartFailure(
                 'fixtur01',
                 $state,
                 6,
                 3600,
-                $logger,
+                self::pmssMakeCallbacks(['log' => null])['log'],
                 false,
                 static function (string $user, callable $logCallback, string $startMarker) use (&$attempts): int {
                     $attempts++;
@@ -198,15 +196,14 @@ PHP;
         \rtorrentProcessWriteEscalationState($state['escalation'], 'fixtur01', 6, time() - 3600);
         $before = time();
         $attempts = 0;
-        $logger = static function (string $message, bool $force = false): void {};
 
-        $this->pmssCaptureStdout(static function () use ($state, $logger, &$attempts): void {
+        $this->pmssCaptureStdout(static function () use ($state, &$attempts): void {
             \pmssCheckRtorrentHandleEscalatedStartFailure(
                 'fixtur01',
                 $state,
                 7,
                 180,
-                $logger,
+                self::pmssMakeCallbacks(['log' => null])['log'],
                 false,
                 static function (string $user, callable $logCallback, string $startMarker) use (&$attempts): int {
                     $attempts++;

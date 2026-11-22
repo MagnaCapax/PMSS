@@ -26,7 +26,7 @@ class VnstatConfigSafetyTest extends TestCase
     public function testAbsentSettingsUseLegacyAppendShape(): void
     {
         $path = $this->pmssWriteTempFile('vnstat-append', "Foreign yes\n");
-        $this->assertTrue(\pmssVnstatConfigRefresh($path, static function (string $message): void {}));
+        $this->assertTrue(\pmssVnstatConfigRefresh($path, self::pmssMakeCallbacks(['log' => null])['log']));
         $this->assertSame("Foreign yes\n\nMaxBandwidth 50000\n\nBandwidthDetection 0\n", file_get_contents($path));
     }
 

@@ -100,7 +100,7 @@ class RsyslogRateLimitTest extends TestCase
                 'PMSS_TEST_MODE' => '1',
             ], function (): void {
                 \pmssApplyRsyslogKernelInputRateLimit(
-                    static function (string $message): void {},
+                    self::pmssMakeCallbacks(['log' => null])['log'],
                     static function (string $description, string $command): int {
                         throw new \RuntimeException('validation unavailable');
                     }

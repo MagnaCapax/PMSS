@@ -36,7 +36,7 @@ class I915DisplayPowerTest extends TestCase
     {
         $root = $this->pmssMakeTempDir('pmss-i915-nonintel-', 0700);
         $commands = [];
-        \pmssEnsureI915DisplayPowerStatesOff(static function (): void {}, $root.'/dc.conf', self::pmssMakeCallbacks(['intelDisplay' => false])['intelDisplay'], $this->shellRunner($commands));
+        \pmssEnsureI915DisplayPowerStatesOff(self::pmssMakeCallbacks(['log' => null])['log'], $root.'/dc.conf', self::pmssMakeCallbacks(['intelDisplay' => false])['intelDisplay'], $this->shellRunner($commands));
         $this->assertFalse(file_exists($root.'/dc.conf'));
         $this->assertSame([], $commands);
     }
