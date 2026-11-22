@@ -31,6 +31,28 @@ class UserSliceMemswUsageInputSafetyTest extends TestCase
         }
     }
 
+    public function testMalformedFirstCounterCannotAuthorizeLowering(): void
+    {
+        foreach (['total_rss', 'total_shmem', 'total_swap'] as $key) {
+            foreach (['', ' ', '-5000', '+5000', '5e3', '5000.0', '5000bytes',
+                '5000 junk', '5000 ', ' 5000', "\t5000", "5000\r", "5000\v"] as $value) {
+                // A later usable duplicate must not conceal the malformed observation.
+                foreach ([$key.' '.$value."\n", $key.' '.$value."\n".$key." 1\n"] as $raw) {
+                    $held = \pmssUserSliceMemswAnonPlusSwap($raw);
+                    $this->assertSame(PHP_INT_MAX, $held, bin2hex($raw));
+                    $this->assertSame([], \pmssUserSliceMemswPlan(4096, 8192, 8192, $held)['writes']);
+                    foreach ([[8192, 4096, 4096], [-1, 4096, 4096], [4096, 4096, 4096]] as [$target, $memory, $memsw]) {
+                        $this->assertSame(\pmssUserSliceMemswPlan($target, $memory, $memsw, 0),
+                            \pmssUserSliceMemswPlan($target, $memory, $memsw, $held));
+                    }
+                }
+            }
+            foreach ([$key, $key."\n", $key."\t5000\n", $key."\r\n", $key."\v5000\n"] as $raw) {
+                $this->assertSame(PHP_INT_MAX, \pmssUserSliceMemswAnonPlusSwap($raw), bin2hex($raw));
+            }
+        }
+    }
+
     public function testCorruptionRetainsLoweringRefusalAndOtherPlans(): void
     {
         $held = \pmssUserSliceMemswAnonPlusSwap("total_rss 5000\0\n");
@@ -78,7 +100,9 @@ PHP;
         $script .= 'eval('.var_export('declare(strict_types=1); namespace MemswUsageInputFixture;'.
             substr($source, $start), true).');';
         foreach (["\0total_rss 5000\n", "total_rss 5000\0\n", "total_shmem 5000\0\n",
-            "total_swap 5000\0\n", "total_rss 5000\ncache 0\0\n"] as $raw) {
+            "total_swap 5000\0\n", "total_rss 5000\ncache 0\0\n",
+            "total_rss -5000\n", "total_shmem 5e3\n", "total_swap 5000bytes\n",
+            "total_rss\n", "total_shmem\t5000\n", "total_swap 5000 \ntotal_swap 1\n"] as $raw) {
             foreach (['0', '1'] as $dryRun) {
                 $result = $this->pmssExecInlinePhp($script, [
                     'PMSS_TEST_MEMSW_USAGE' => json_encode($raw), 'PMSS_TEST_MEMSW_DRY_RUN' => $dryRun,

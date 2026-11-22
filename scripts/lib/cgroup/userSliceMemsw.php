@@ -73,7 +73,10 @@ function pmssUserSliceMemswAnonPlusSwap(string $memoryStat): int
     if (strpos($memoryStat, "\0") !== false) return PHP_INT_MAX;
     $sum = 0;
     foreach (['total_rss', 'total_shmem', 'total_swap'] as $key) {
-        $value = preg_match('/^'.$key.' ([0-9]+)$/m', $memoryStat, $m) === 1 ? (int) $m[1] : 0;
+        // Keep missing counters at zero, but never skip a malformed first observation.
+        if (preg_match('/^'.$key.'(?:[^\S\n][^\n]*)?$/m', $memoryStat, $row) !== 1) continue;
+        if (preg_match('/^'.$key.' ([0-9]+)$/D', $row[0], $m) !== 1) return PHP_INT_MAX;
+        $value = (int) $m[1];
         // Saturate before addition so an oversized observation still blocks unsafe lowering.
         if ($value > PHP_INT_MAX - $sum) return PHP_INT_MAX;
         $sum += $value;

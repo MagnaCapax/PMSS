@@ -1013,6 +1013,11 @@ Sub-handlers:
   and write ordering remain unchanged. `UserSliceMemswTest` covers the boundaries.
   NUL-containing observations use the same saturation value before row matching,
   so corrupt counters cannot disappear as missing fields and authorize lowering.
+  A present counter's first row must contain one space and unsigned decimal
+  digits only; missing values, signs, numeric suffixes and malformed whitespace
+  saturate instead of being skipped in favor of zero or a later duplicate.
+  Missing counters, unrelated fields and the first of valid duplicates retain
+  their existing interpretation.
   Raising, infinity rollback and already-converged limits retain their existing
   plans. `UserSliceMemswUsageInputSafetyTest` covers parsing and isolated cron
   refusal, including dry runs, on the testing machine.
