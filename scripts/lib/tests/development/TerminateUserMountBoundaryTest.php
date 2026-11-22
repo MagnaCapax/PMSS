@@ -57,10 +57,10 @@ SH
         $special = $home.'/remote/space 1tab'."\t1line\n1".'\\040$(touch injected);\'quote';
         $this->pmssWriteFile($mountinfo, $this->row($home).$this->row($home.'2/remote')
             .$this->row($home.'/remote').$this->row($special).$this->row($base.'/outside')
-            .$this->row($home.'/remote'));
+            .$this->row($home.'/remote').$this->row($home.'/remote/.hidden..name'));
         $command = 'sh -c '.escapeshellarg('cd '.escapeshellarg($home).' && '.$this->detachCommand($home, $mountinfo));
         $this->assertSame(0, $this->pmssExecShellCommand($command, $env)['rc']);
-        $this->assertSame([$special, $home.'/remote', $home.'/remote', ''],
+        $this->assertSame([$special, $home.'/remote/.hidden..name', $home.'/remote', $home.'/remote', ''],
             explode("\0", file_get_contents($base.'/unmounted')));
         $this->assertFalse(file_exists($home.'/injected'));
     }
@@ -98,6 +98,12 @@ SH
     {
         [$base, $home, $mountinfo, $env] = $this->fixture();
         $snapshots = ['', $this->row($home.'/remote')."invalid\n"];
+        // Noncanonical targets must refuse the whole snapshot before a queued detach.
+        foreach (['/remote/../outside', '/remote/..', '/remote/./child', '/remote/.',
+            '//remote', '/remote//child', '/remote/'] as $suffix) {
+            $snapshots[] = $this->row($home.'/remote').$this->row($home.$suffix);
+            $snapshots[] = $this->row($base.'/outside'.$suffix).$this->row($home.'/remote');
+        }
         // A final fragment must stop both passes, with or without queued mounts.
         foreach (['invalid', '25', '25 1', '25 1 0:42 /',
             '25 1 0:42 / '.$home.'/remote', rtrim($this->row($home.'/remote'), "\n"), ' ', "\t"] as $tail) {
@@ -120,6 +126,7 @@ SH
     public function testNoNestedMountsAndLinkedOrAbsentRootsDoNotUnmount(): void
     {
         [$base, $home, $mountinfo, $env] = $this->fixture();
+        $this->pmssWriteFile($mountinfo, $this->row('/').$this->row($home));
         $command = 'sh -c '.escapeshellarg('cd '.escapeshellarg($home).' && '.$this->detachCommand($home, $mountinfo));
         $this->assertSame(0, $this->pmssExecShellCommand($command, $env)['rc']);
         $wrongRoot = 'sh -c '.escapeshellarg('cd '.escapeshellarg($base).' && '.$this->detachCommand($home, $mountinfo));

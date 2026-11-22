@@ -24,6 +24,12 @@ while IFS= read -r mount_row; do
 	[[ "$mount_id" =~ ^[0-9]+$ && "$encoded_target" == /* && "$details" == *" - "* ]] || exit 1
 	rows=$((rows + 1))
 	mountTargetDecode "$encoded_target"
+	# Prefix selection is safe only for canonical kernel targets. Never resolve
+	# malformed paths here: that could select a mount outside the pinned root.
+	case "$target" in
+		*/./* | */. | */../* | */.. | *//*) exit 1 ;;
+	esac
+	[[ "$target" == / || "$target" != */ ]] || exit 1
 	if [[ "$target" == "$purge_root/"* ]]; then
 		targets+=("$encoded_target")
 	fi

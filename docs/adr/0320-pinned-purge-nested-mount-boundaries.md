@@ -76,6 +76,25 @@ permissions, logs and exposure paths are unchanged. Devbox verification is
 changed-file PHP/Bash syntax only; fixtures run on the testing machine/CI.
 No live unmount, purge or dry run was executed here.
 
+## Canonical mount target safety follow-up
+
+Decoded targets must have no `.` or `..` path components, repeated separators
+or non-root trailing slash before prefix selection. A malformed target refuses
+the complete snapshot, even outside the purge root or after queued descendants.
+It is never normalized or resolved through filesystem probes. Otherwise a
+lexical descendant containing `..` could select an unmount outside the pinned
+root. Canonical targets, dotted filenames, escaped names, sorting and command
+bytes retain their contracts.
+
+`TerminateUserMountBoundaryTest` extends both purge-pass refusal fixtures and
+retains a valid dotted descendant in the ordered-unmount fixture. The existing
+security review applies: CVE-2021-3995 and CVE-2021-3996 concern cross-user FUSE
+unmounts; a wrong target can disrupt another account. This guard reduces that
+path-selection risk without changing account/service credential separation,
+secret permissions, logging/redaction, binds, ports or web endpoints. Devbox
+verification is changed-file PHP/Bash syntax only; fixtures run on the testing
+machine/CI. No live unmount, purge or dry run was executed here.
+
 ## References
 - ADRs 0062, 0092, 0115, 0191, 0206, 0282; issue #1278.
 - [GNU rm filesystem boundaries](https://www.gnu.org/software/coreutils/manual/html_node/rm-invocation.html).
