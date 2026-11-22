@@ -25,7 +25,7 @@ class QuotaFstabRepairTest extends TestCase
         $this->assertStringContainsString('grpjquota=aquota.group', $updated);
         $this->assertFalse(strpos($updated, 'aquota.gro'.$control) !== false, 'expected malformed group quota option removed');
         $this->assertEquals(1, substr_count($updated, 'grpjquota='), 'expected one group quota option');
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Updated quota options'), 'expected update log');
+        $this->pmssAssertMessagesContain($messages, 'Updated quota options', 'expected update log');
     }
 
     public function testDuplicateQuotaKeysCollapseToCanonicalValues(): void

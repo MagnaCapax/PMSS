@@ -39,7 +39,7 @@ class MountNofailOptionTest extends TestCase
             '/home' => 'column value /home must be preserved',
             'ext4' => 'column value ext4 must be preserved',
         ], (string) file_get_contents($fstab));
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Added nofail option'), 'expected an added-nofail log');
+        $this->pmssAssertMessagesContain($messages, 'Added nofail option', 'expected an added-nofail log');
     }
 
     public function testNoChangeWhenNofailPresent(): void
@@ -50,7 +50,7 @@ class MountNofailOptionTest extends TestCase
         $messages = $this->ensureNofail($fstab);
 
         $this->assertEquals($original, (string) file_get_contents($fstab), 'fstab must be untouched when nofail already present');
-        $this->assertTrue($this->pmssMessagesContain($messages, 'already present'), 'expected an already-present skip log');
+        $this->pmssAssertMessagesContain($messages, 'already present', 'expected an already-present skip log');
     }
 
     public function testMountNotFoundIsSafe(): void
@@ -61,6 +61,6 @@ class MountNofailOptionTest extends TestCase
         $messages = $this->ensureNofail($fstab);
 
         $this->assertEquals($original, (string) file_get_contents($fstab), 'fstab untouched when /home absent');
-        $this->assertTrue($this->pmssMessagesContain($messages, 'not found'), 'expected a not-found warning');
+        $this->pmssAssertMessagesContain($messages, 'not found', 'expected a not-found warning');
     }
 }

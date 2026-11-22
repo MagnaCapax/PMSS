@@ -424,6 +424,8 @@ Keep the canonical installer/update details under `docs/install.md` and
 String-only fixture observations reuse `TestCase::pmssMakeArrayLogger()` for
 diagnostics, failed paths, fetched filenames and command traces. Callers retain
 record transformations and callbacks that inspect publication ordering.
+Log substring assertions use `pmssAssertMessagesContain()` for shared search and
+failure reporting, retaining caller-owned fragments and custom diagnostics.
 Ordered cgroup apply steps reuse `pmssMakeStepRunner()`. Fixed statistics, RPC,
 socket, client-link, hardware, quota, account-lookup and incomplete-write probes
 use `pmssMakeCallbacks()` with caller-owned results, including console process

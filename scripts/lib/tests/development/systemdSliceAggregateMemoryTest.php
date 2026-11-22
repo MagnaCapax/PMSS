@@ -68,7 +68,7 @@ class SystemdSliceAggregateMemoryTest extends TestCase
         });
         $path = dirname($fixture['dropDir']).'/user.slice.d/15-pmss-aggregate.conf';
         $this->assertStringContainsString('MemoryMax=22784M', (string) file_get_contents($path));
-        $this->assertTrue($this->pmssLogContains($messages, 'MemTotal=14288M, balloon=10288M, min_free=1024M'), json_encode($messages));
+        $this->pmssAssertMessagesContain($messages, 'MemTotal=14288M, balloon=10288M, min_free=1024M', json_encode($messages));
     }
 
     public function testShippedTemplateRendersSameDropinOnV1AndV2(): void
@@ -77,7 +77,7 @@ class SystemdSliceAggregateMemoryTest extends TestCase
             $run = $this->pmssAggregateRun($mode, 24576);
             $this->assertSame("[Slice]\nMemoryAccounting=yes\nMemoryMax=22784M\n", $run['aggregate'], $mode);
             $this->assertSame(0644, fileperms($run['aggregatePath']) & 0777, $mode.' mode');
-            $this->assertTrue($this->pmssLogContains($run['log'], 'user.slice aggregate MemoryMax=22784M (MemTotal=24576M, balloon=0M, min_free=1024M, mode='.$mode.', ready=yes)'), $mode.' log: '.json_encode($run['log']));
+            $this->pmssAssertMessagesContain($run['log'], 'user.slice aggregate MemoryMax=22784M (MemTotal=24576M, balloon=0M, min_free=1024M, mode='.$mode.', ready=yes)', $mode.' log: '.json_encode($run['log']));
         }
     }
 
@@ -153,7 +153,7 @@ class SystemdSliceAggregateMemoryTest extends TestCase
             \pmssEnsureSystemdSlices($this->pmssMakeArrayLogger($messages));
         });
         $this->assertSame($good, (string) file_get_contents($path), 'tiny host keeps the previous bound');
-        $this->assertTrue($this->pmssLogContains($messages, '[WARN] Skipping user.slice aggregate memory bound: MemTotal 2048M'), json_encode($messages));
+        $this->pmssAssertMessagesContain($messages, '[WARN] Skipping user.slice aggregate memory bound: MemTotal 2048M', json_encode($messages));
 
         $fixture['env']['PMSS_TOTAL_MEM_MIB'] = '24576';
         unlink($fixture['cfgDir'].'/template.cgroup.user-slice.aggregate.conf');
@@ -162,7 +162,7 @@ class SystemdSliceAggregateMemoryTest extends TestCase
             \pmssEnsureSystemdSlices($this->pmssMakeArrayLogger($messages));
         });
         $this->assertSame($good, (string) file_get_contents($path), 'missing template keeps the previous bound');
-        $this->assertTrue($this->pmssLogContains($messages, '[WARN] Unable to read user.slice aggregate template'), json_encode($messages));
+        $this->pmssAssertMessagesContain($messages, '[WARN] Unable to read user.slice aggregate template', json_encode($messages));
     }
 
     public function testSymlinkedParentSliceDirectoryIsRefused(): void
@@ -226,16 +226,5 @@ class SystemdSliceAggregateMemoryTest extends TestCase
             $this->pmssWriteFile($fixture['cfgDir'].'/template.cgroup.user-slice.aggregate.conf', $this->pmssReadRepoFile(self::TEMPLATE));
         }
         return $fixture;
-    }
-
-    /** @param array<int,string> $log */
-    private function pmssLogContains(array $log, string $needle): bool
-    {
-        foreach ($log as $line) {
-            if (strpos($line, $needle) !== false) {
-                return true;
-            }
-        }
-        return false;
     }
 }

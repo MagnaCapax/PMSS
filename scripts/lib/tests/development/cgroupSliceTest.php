@@ -121,9 +121,7 @@ class cgroupSliceTest extends TestCase
         });
 
         $this->assertSame("[Slice]\nTasksMax=4096\n", file_get_contents($target));
-        $this->assertTrue((bool) array_filter($messages, function ($message): bool {
-            return strpos($message, 'Unable to read slice template:') !== false;
-        }));
+        $this->pmssAssertMessagesContain($messages, 'Unable to read slice template:');
     }
 
     public function testTasksMaxDefaultScalesWithHostCapacity(): void

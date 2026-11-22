@@ -136,7 +136,7 @@ class JournaldLimitsTest extends TestCase
         });
 
         $this->assertTrue(!file_exists($realTargetDir.'/pmss-limits.conf'), 'must not write through symlinked journald dir');
-        $this->assertTrue($this->pmssMessagesContain($messages, 'Unable to prepare journald config directory'), 'expected safe-directory warning');
+        $this->pmssAssertMessagesContain($messages, 'Unable to prepare journald config directory', 'expected safe-directory warning');
     }
 
     public function testJournaldLimitsRejectsSymlinkedTargetFile(): void
