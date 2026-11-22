@@ -262,16 +262,6 @@ class MediaStackBootRelaunchTest extends TestCase
         $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/mediaStackInstancesCheck.php', array("}, 'pmssUserWatchdogLockAcquire');"));
     }
 
-    /** Run a shell command through proc_open and read its output to EOF, as passthru() does. */
-    private function pmssRunToEof(string $command): array
-    {
-        $process = proc_open(array('/bin/sh', '-c', $command.' 2>&1'), array(1 => array('pipe', 'w')), $pipes);
-        $this->assertTrue(is_resource($process));
-        $output = (string) stream_get_contents($pipes[1]);
-        fclose($pipes[1]);
-        return array('rc' => proc_close($process), 'output' => $output);
-    }
-
     /** The comma-separated app list a built launch command passes to the installer. */
     private function pmssLaunchedIds(string $command): string
     {
@@ -313,7 +303,12 @@ class MediaStackBootRelaunchTest extends TestCase
 
         // The launch returns at once even though the installer sleeps: nothing keeps its output pipe open.
         $started = microtime(true);
-        $result = $this->pmssRunToEof($command);
+        // Read to EOF through proc_open, as passthru() does.
+        $process = proc_open(array('/bin/sh', '-c', $command.' 2>&1'), array(1 => array('pipe', 'w')), $pipes);
+        $this->assertTrue(is_resource($process));
+        $output = (string) stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
+        $result = array('rc' => proc_close($process), 'output' => $output);
         $this->assertTrue(microtime(true) - $started < 1.5, 'the launch must not wait for the installer');
         $this->assertSame(0, $result['rc'], $result['output']);
         $this->assertSame('', $result['output']);

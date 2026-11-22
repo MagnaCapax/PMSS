@@ -12,15 +12,12 @@ class DynamicIopsLatencyTest extends TestCase
         return ['cgroup' => ['dynamicIops' => $settings + ['mode' => 'enforce']]];
     }
 
-    private function users(): array
-    {
-        return ['fixture' => ['source' => ['quota' => 1000, 'IOWeight' => 100, 'resourceIOPSReadMax' => 100000], 'weight' => 100]];
-    }
-
     /** One cycle: PSI blend 15 alone would give the busy multiplier 2. */
     private function cycle(?float $latency, ?float $previous, ?string $media = 'ssd', float $psi = 15, ?float $reference = 2.0): array
     {
-        return \pmssDynamicIopsAllocate($this->users(), $this->policy(), ['blend' => $psi, 'iowait_blend' => 10,
+        return \pmssDynamicIopsAllocate(
+            ['fixture' => ['source' => ['quota' => 1000, 'IOWeight' => 100, 'resourceIOPSReadMax' => 100000], 'weight' => 100]],
+            $this->policy(), ['blend' => $psi, 'iowait_blend' => 10,
             'latency_ms' => $latency, 'previous_multiplier' => $previous, 'media' => $media,
             'latency_reference_ms' => $reference], 500.0, null, null, false);
     }

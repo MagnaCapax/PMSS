@@ -17,11 +17,6 @@ class UserSliceMemswTest extends TestCase
     private const L = 6715080704;          // 6404 MiB, the ADR 0296 bound on a 7940 MiB guest
     private const UNLIMITED = 9223372036854771712; // what the kernel prints for "no limit"
 
-    private function memsw(int $target, int $memory, int $memsw, int $anon = 0): array
-    {
-        return \pmssUserSliceMemswPlan($target, $memory, $memsw, $anon);
-    }
-
     public function testTargetParse(): void
     {
         foreach ([['infinity', -1], ["6715080704\n", self::L], ['0', null], ['', null], ['[not set]', null], ['-5', null], ['1e9', null]] as [$text, $expected]) {
@@ -31,20 +26,20 @@ class UserSliceMemswTest extends TestCase
 
     public function testFirstRunWritesOnlyTheMemswLimit(): void
     {
-        $this->assertSame([['memory.memsw.limit_in_bytes', (string) self::L]], $this->memsw(self::L, self::L, self::UNLIMITED)['writes']);
+        $this->assertSame([['memory.memsw.limit_in_bytes', (string) self::L]], \pmssUserSliceMemswPlan(self::L, self::L, self::UNLIMITED, 0)['writes']);
     }
 
     public function testNothingToDoWhenBothLimitsAlreadyMatch(): void
     {
-        $this->assertSame([], $this->memsw(self::L, self::L, self::L)['writes']);
-        $this->assertSame([], $this->memsw(-1, self::UNLIMITED, self::UNLIMITED)['writes']);
+        $this->assertSame([], \pmssUserSliceMemswPlan(self::L, self::L, self::L, 0)['writes']);
+        $this->assertSame([], \pmssUserSliceMemswPlan(-1, self::UNLIMITED, self::UNLIMITED, 0)['writes']);
     }
 
     public function testRaisingWritesMemswBeforeMemory(): void
     {
         $this->assertSame(
             [['memory.memsw.limit_in_bytes', (string) (2 * self::L)], ['memory.limit_in_bytes', (string) (2 * self::L)]],
-            $this->memsw(2 * self::L, self::L, self::L)['writes']
+            \pmssUserSliceMemswPlan(2 * self::L, self::L, self::L, 0)['writes']
         );
     }
 
@@ -52,7 +47,7 @@ class UserSliceMemswTest extends TestCase
     {
         $this->assertSame(
             [['memory.limit_in_bytes', (string) self::L], ['memory.memsw.limit_in_bytes', (string) self::L]],
-            $this->memsw(self::L, 2 * self::L, 2 * self::L)['writes']
+            \pmssUserSliceMemswPlan(self::L, 2 * self::L, 2 * self::L, 0)['writes']
         );
     }
 
@@ -60,25 +55,25 @@ class UserSliceMemswTest extends TestCase
     {
         $this->assertSame(
             [['memory.memsw.limit_in_bytes', '-1'], ['memory.limit_in_bytes', '-1']],
-            $this->memsw(-1, self::L, self::L)['writes']
+            \pmssUserSliceMemswPlan(-1, self::L, self::L, 0)['writes']
         );
     }
 
     public function testOnlyTheLimitThatDiffersIsWritten(): void
     {
         // memsw already at the target, memory still lower (systemd's own write refused earlier):
-        $this->assertSame([['memory.limit_in_bytes', (string) self::L]], $this->memsw(self::L, 1073741824, self::L)['writes']);
+        $this->assertSame([['memory.limit_in_bytes', (string) self::L]], \pmssUserSliceMemswPlan(self::L, 1073741824, self::L, 0)['writes']);
     }
 
     public function testTenantsAboveTheBoundBlockOnlyALoweringOfMemsw(): void
     {
-        $held = $this->memsw(self::L, self::L, self::UNLIMITED, self::L + 1);
+        $held = \pmssUserSliceMemswPlan(self::L, self::L, self::UNLIMITED, self::L + 1);
         $this->assertSame([], $held['writes']);
         $this->assertTrue(is_string($held['note']) && $held['note'] !== '');
         // Raising is never blocked: the write cannot reclaim anything.
-        $this->assertSame(2, count($this->memsw(2 * self::L, self::L, self::L, 3 * self::L)['writes']));
+        $this->assertSame(2, count(\pmssUserSliceMemswPlan(2 * self::L, self::L, self::L, 3 * self::L)['writes']));
         // At or below the bound the memsw limit is written.
-        $this->assertSame(1, count($this->memsw(self::L, self::L, self::UNLIMITED, self::L)['writes']));
+        $this->assertSame(1, count(\pmssUserSliceMemswPlan(self::L, self::L, self::UNLIMITED, self::L)['writes']));
     }
 
     public function testAnonymousPlusSwapFromMemoryStat(): void
@@ -111,11 +106,11 @@ class UserSliceMemswTest extends TestCase
     public function testOverflowedUsageRetainsTheExistingLoweringRefusal(): void
     {
         $held = \pmssUserSliceMemswAnonPlusSwap('total_rss '.PHP_INT_MAX."\ntotal_swap 1\n");
-        $plan = $this->memsw(self::L, self::L, self::UNLIMITED, $held);
+        $plan = \pmssUserSliceMemswPlan(self::L, self::L, self::UNLIMITED, $held);
         $this->pmssAssertArraySubsetSame(['writes' => [], 'note' => 'tenants hold '.PHP_INT_MAX
             .' bytes of anonymous memory plus swap, above the bound '.self::L.': memsw limit not written'], $plan);
-        $this->assertSame($this->memsw(-1, self::L, self::L), $this->memsw(-1, self::L, self::L, $held));
-        $this->assertSame($this->memsw(2 * self::L, self::L, self::L), $this->memsw(2 * self::L, self::L, self::L, $held));
+        $this->assertSame(\pmssUserSliceMemswPlan(-1, self::L, self::L, 0), \pmssUserSliceMemswPlan(-1, self::L, self::L, $held));
+        $this->assertSame(\pmssUserSliceMemswPlan(2 * self::L, self::L, self::L, 0), \pmssUserSliceMemswPlan(2 * self::L, self::L, self::L, $held));
     }
 
     public function testWiringContracts(): void

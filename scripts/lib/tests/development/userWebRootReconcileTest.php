@@ -43,7 +43,7 @@ class UserWebRootReconcileTest extends TestCase
         $this->pmssEnsureDir($this->home.'/www');
         $this->pmssWriteFile($this->home.'/.local/share/pmss/rutorrent/share/state.ini', 'durable');
         $messages = [];
-        $this->assertTrue(pmssUserReconcileWebRoot($this->context(), $this->logger($messages)), implode('|', $messages));
+        $this->assertTrue(pmssUserReconcileWebRoot($this->context(), $this->pmssMakeArrayLogger($messages)), implode('|', $messages));
         $this->assertTrue(is_dir($this->home.'/www'));
         $this->assertEquals('panel', file_get_contents($this->home.'/www/index.php'));
         $this->assertSame(posix_geteuid(), fileowner($this->home.'/www/index.php'));
@@ -85,7 +85,7 @@ class UserWebRootReconcileTest extends TestCase
 
         $this->pmssRemoveTree($this->home.'/www');
         $messages = [];
-        $this->assertTrue(pmssUserReconcileWebRoot($this->context(), $this->logger($messages)));
+        $this->assertTrue(pmssUserReconcileWebRoot($this->context(), $this->pmssMakeArrayLogger($messages)));
 
         $after = array_map('file_get_contents', $paths);
         $this->assertSame($before, $after);
@@ -95,10 +95,10 @@ class UserWebRootReconcileTest extends TestCase
     public function testHealthyRootIsIdempotent(): void
     {
         $messages = [];
-        $this->assertTrue(pmssUserReconcileWebRoot($this->context(), $this->logger($messages)), implode('|', $messages));
+        $this->assertTrue(pmssUserReconcileWebRoot($this->context(), $this->pmssMakeArrayLogger($messages)), implode('|', $messages));
         $before = $this->pmssTreeSnapshot($this->home);
         $messages = [];
-        $this->assertTrue(pmssUserReconcileWebRoot($this->context(), $this->logger($messages)));
+        $this->assertTrue(pmssUserReconcileWebRoot($this->context(), $this->pmssMakeArrayLogger($messages)));
         $after = $this->pmssTreeSnapshot($this->home);
         $this->assertSame($before, $after);
         $this->assertFalse($this->pmssMessagesContain($messages, 'Restored complete web root'));
@@ -116,7 +116,7 @@ class UserWebRootReconcileTest extends TestCase
         [$outsideContent] = $this->pmssCreateSymlinkedFileOrSkip(
             $outside.'/secret.txt', $this->skeleton.'/unsafe.php', 'must-not-change');
         $messages = [];
-        $this->assertTrue(pmssUserReconcileWebRoot($this->context(), $this->logger($messages)));
+        $this->assertTrue(pmssUserReconcileWebRoot($this->context(), $this->pmssMakeArrayLogger($messages)));
         $this->assertEquals('customer-panel', file_get_contents($this->home.'/www/index.php'));
         $this->assertEquals('customer-data', file_get_contents($this->home.'/www/customer.txt'));
         $this->assertEquals('customer-path', file_get_contents($this->home.'/www/managed-dir'));
@@ -137,7 +137,7 @@ class UserWebRootReconcileTest extends TestCase
         $this->pmssWriteFiles($this->home.'/www', ['existing/customer.php' => 'customer', 'index.php' => 'customer-panel']);
 
         $messages = [];
-        $this->assertTrue(pmssUserReconcileWebRoot($this->context(), $this->logger($messages)));
+        $this->assertTrue(pmssUserReconcileWebRoot($this->context(), $this->pmssMakeArrayLogger($messages)));
         $this->assertSame('customer', file_get_contents($this->home.'/www/existing/customer.php'));
         $this->assertSame('customer-panel', file_get_contents($this->home.'/www/index.php'));
         $this->assertSame('managed-existing', file_get_contents($this->home.'/www/existing/new/managed.php'));
@@ -155,7 +155,7 @@ class UserWebRootReconcileTest extends TestCase
         chmod($this->home.'/www/managed', 0700);
 
         $messages = [];
-        $this->assertTrue(pmssUserReconcileWebRoot($this->context(), $this->logger($messages)));
+        $this->assertTrue(pmssUserReconcileWebRoot($this->context(), $this->pmssMakeArrayLogger($messages)));
         $this->assertSame(0700, fileperms($this->home.'/www/managed') & 07777);
         $this->assertSame('customer', file_get_contents($this->home.'/www/managed/customer.txt'));
         $this->assertSame('managed', file_get_contents($this->home.'/www/managed/nested/new.php'));
@@ -168,7 +168,7 @@ class UserWebRootReconcileTest extends TestCase
         $this->pmssWriteFile($this->home.'/www/linked/customer.txt', 'customer');
 
         $messages = [];
-        $this->assertTrue(pmssUserReconcileWebRoot($this->context(), $this->logger($messages)));
+        $this->assertTrue(pmssUserReconcileWebRoot($this->context(), $this->pmssMakeArrayLogger($messages)));
         $this->assertSame('customer', file_get_contents($this->home.'/www/linked/customer.txt'));
         $this->assertFalse(file_exists($this->home.'/www/linked/secret.txt'));
         $this->pmssAssertMessagesContain($messages, 'Refusing unsafe skeleton symlink: linked');
@@ -182,7 +182,7 @@ class UserWebRootReconcileTest extends TestCase
         $this->pmssCreateSymlinkOrSkip($outside, $this->home.'/www/rutorrent');
 
         $messages = [];
-        $this->assertTrue(pmssUserReconcileWebRoot($this->context(), $this->logger($messages)));
+        $this->assertTrue(pmssUserReconcileWebRoot($this->context(), $this->pmssMakeArrayLogger($messages)));
         $this->assertSame('customer-panel', file_get_contents($this->home.'/www/index.php'));
         $this->assertSame('outside-content', file_get_contents($outside.'/keep.txt'));
         $this->assertFalse(file_exists($outside.'/index.html'));
@@ -213,12 +213,12 @@ class UserWebRootReconcileTest extends TestCase
             $this->assertFalse(pmssUserWebRootReconcileTreeIsSafe($this->skeleton, $this->home, false));
             $this->assertFalse(pmssUserWebRootReconcileApplyOwnership($blocked, $this->user));
             $messages = [];
-            $this->assertFalse(pmssUserReconcileWebRoot($this->context(), $this->logger($messages)));
+            $this->assertFalse(pmssUserReconcileWebRoot($this->context(), $this->pmssMakeArrayLogger($messages)));
             $this->assertFalse(is_dir($this->home.'/www'));
 
             $this->pmssWriteFile($this->home.'/www/customer.php', 'customer');
             $messages = [];
-            $this->assertFalse(pmssUserReconcileWebRoot($this->context(), $this->logger($messages)));
+            $this->assertFalse(pmssUserReconcileWebRoot($this->context(), $this->pmssMakeArrayLogger($messages)));
             $this->assertSame('customer', file_get_contents($this->home.'/www/customer.php'));
             $this->assertFalse(file_exists($this->home.'/www/blocked/managed.php'));
             $this->assertStringContainsString('reason=restore-failed', $this->pmssReconcileSummary($messages));
@@ -235,7 +235,7 @@ class UserWebRootReconcileTest extends TestCase
         $this->assertTrue(is_resource($handle));
         try {
             $messages = [];
-            $this->assertFalse(pmssUserReconcileWebRoot($this->context(), $this->logger($messages)));
+            $this->assertFalse(pmssUserReconcileWebRoot($this->context(), $this->pmssMakeArrayLogger($messages)));
             $this->assertFalse(is_dir($this->home.'/www'));
             $this->pmssAssertMessagesContain($messages, 'per-user lock is busy');
         } finally {
@@ -243,7 +243,6 @@ class UserWebRootReconcileTest extends TestCase
         }
     }
     private function context(): array { return $this->pmssUserHomeContext($this->homeRoot, $this->user); }
-    private function logger(array &$messages): callable { return $this->pmssMakeArrayLogger($messages); }
 
     private function pmssReconcileSummary(array $messages): string
     {

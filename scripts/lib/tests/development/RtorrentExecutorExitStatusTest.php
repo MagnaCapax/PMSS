@@ -6,7 +6,7 @@ require_once __DIR__.'/../common/TestCase.php';
 /** Verify rTorrent executor exit codes, signal attribution and inherited output with private children. */
 final class RtorrentExecutorExitStatusTest extends TestCase
 {
-    private function executorFragment(): string
+    private function script(string $command, string $shims = ''): string
     {
         $source = $this->pmssReadRepoFile('etc/skel/.rtorrentExecute.php');
         $start = strpos($source, '  $rtorrentRc = -1;');
@@ -14,15 +14,10 @@ final class RtorrentExecutorExitStatusTest extends TestCase
         $this->assertTrue($start !== false && $end !== false && $end > $start);
         $this->assertSame(1, preg_match('/^  writeLog\(\'rtorrent exited .*$/m', $source, $log));
         // Run only the production launch/status/log fragment, never the executor's cleanup or restart loop.
-        return substr($source, $start, $end - $start)."\n".$log[0];
-    }
-
-    private function script(string $command, string $shims = ''): string
-    {
         return 'namespace PMSS\\ExecutorExitFixture; '.$shims."\n"
             .'function writeLog($message) { $GLOBALS["log"] = $message; }'."\n"
             .'$rtorrentCommand = '.var_export($command, true).';'."\n"
-            .$this->executorFragment()."\n"
+            .substr($source, $start, $end - $start)."\n".$log[0]."\n"
             .'echo json_encode([$rtorrentRc, $rtorrentSignal, $GLOBALS["log"]]);';
     }
 
