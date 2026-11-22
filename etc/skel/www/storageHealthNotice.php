@@ -7,9 +7,23 @@
  * @license GPL-3.0-only
  */
 require_once __DIR__.'/scriptsInc.php';
-if (!function_exists('pmssWelcomeRequireLocalHelpers') || !pmssWelcomeRequireLocalHelpers(array(
+$pmssStorageFiles = array(
     'storageHealthRaidDisplay.php', 'storageHealthRaid.php', 'storageHealthPressure.php', 'storageHealthDisplay.php',
-))) return;
+);
+if (function_exists('pmssWelcomeRequireLocalHelpers')) {
+    if (!pmssWelcomeRequireLocalHelpers($pmssStorageFiles)) return;
+} else {
+    // Older delivered loaders only have the checked single-file API; preflight the whole group first.
+    if (!function_exists('pmssWelcomeRequireLocalHelper')) return;
+    foreach ($pmssStorageFiles as $pmssStorageFile) {
+        $pmssStoragePath = __DIR__.'/'.$pmssStorageFile;
+        if (!is_file($pmssStoragePath) || is_link($pmssStoragePath) || !is_readable($pmssStoragePath)) return;
+    }
+    foreach ($pmssStorageFiles as $pmssStorageFile) {
+        if (!pmssWelcomeRequireLocalHelper($pmssStorageFile)) return;
+    }
+}
+unset($pmssStorageFiles, $pmssStorageFile, $pmssStoragePath);
 if (!function_exists('pmssStorageHealthNoticeHtmlRead')) {
     /** Prefer the specific /home RAID explanation over a generic pressure alert. */
     function pmssStorageHealthNoticeHtmlRead(

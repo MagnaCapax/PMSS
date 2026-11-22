@@ -144,6 +144,10 @@ Keep the canonical installer/update details under `docs/install.md` and
   and checks original throwables and cleanup order on the testing machine.
 - **etc/skel/www/scriptsIncFiles.php** preflights complete local helper groups before loading them in order.
   Statistics, storage notices and memory status share this loader; incomplete deliveries retain their unavailable fallbacks.
+  Facades paired with an older Files part preflight every local sibling before
+  using its checked single-file API (#1254). Missing, linked or unreadable siblings
+  still leave the whole group unavailable; no new delivered dependency is required
+  (ADR 0322).
 - **etc/skel/www/configureTorrentClientsVersion.php** owns switch-lock acquisition
   until a successful return transfers the stream to its caller. A thrown `flock()`
   closes the stream; busy locks still close before the unchanged refusal is built.

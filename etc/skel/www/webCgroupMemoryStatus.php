@@ -19,6 +19,20 @@
  * @license GPL-3.0-only
  */
 require_once __DIR__.'/scriptsInc.php';
-if (!function_exists('pmssWelcomeRequireLocalHelpers') || !pmssWelcomeRequireLocalHelpers(array(
+$pmssMemoryFiles = array(
     'webCgroupMemorySource.php', 'webCgroupMemoryPolicy.php', 'webCgroupMemoryRead.php', 'welcomeMemory.php',
-))) return;
+);
+if (function_exists('pmssWelcomeRequireLocalHelpers')) {
+    if (!pmssWelcomeRequireLocalHelpers($pmssMemoryFiles)) return;
+} else {
+    // Older delivered loaders only have the checked single-file API; preflight the whole group first.
+    if (!function_exists('pmssWelcomeRequireLocalHelper')) return;
+    foreach ($pmssMemoryFiles as $pmssMemoryFile) {
+        $pmssMemoryPath = __DIR__.'/'.$pmssMemoryFile;
+        if (!is_file($pmssMemoryPath) || is_link($pmssMemoryPath) || !is_readable($pmssMemoryPath)) return;
+    }
+    foreach ($pmssMemoryFiles as $pmssMemoryFile) {
+        if (!pmssWelcomeRequireLocalHelper($pmssMemoryFile)) return;
+    }
+}
+unset($pmssMemoryFiles, $pmssMemoryFile, $pmssMemoryPath);
