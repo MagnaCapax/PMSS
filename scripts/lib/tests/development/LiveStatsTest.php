@@ -46,7 +46,7 @@ class LiveStatsTest extends TestCase
         foreach ([0, -1] as $capacity) {
             $html = \pmssStatsLiveCell(500.0, 50.0, ' Mbit/s', $capacity);
             $this->assertStringNotContainsString('class="live-bar"', $html);
-            $this->assertStringContainsAllStrings(['node 500 Mbit/s', 'you 50 Mbit/s'], $html);
+            $this->assertStringContainsAllStrings(['Capacity not sampled yet', 'node 500 Mbit/s', 'you 50 Mbit/s'], $html);
         }
         // Old rings have no capacity fields, so the optional argument must also hide the bar.
         $this->assertStringNotContainsString('class="live-bar"', \pmssStatsLiveCell(5.0, 0.5, ' Mbit/s'));

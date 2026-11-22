@@ -21,14 +21,16 @@ function file_get_contents($path) { return json_encode(['samples' => $GLOBALS['r
 PHP
             .$load.<<<'PHP'
 $results = [];
-foreach (['known', 'unknown', 'old-ring', 'no-own-samples', 'collecting'] as $case) {
+foreach (['known', 'unknown', 'old-ring', 'latest-missing', 'latest-zero',
+    'inbound-unknown', 'outbound-unknown', 'no-own-samples', 'collecting'] as $case) {
     $node = $mine = [];
     foreach ([1000, 1300] as $t) {
         $sample = ['t' => $t, 'dt' => 300, 'cb' => 300, 'ct' => 600,
             'mu' => 500, 'mt' => 1000, 'tx' => 3750000, 'rx' => 1875000];
-        if ($case !== 'old-ring') {
-            $sample += ['tx_capacity' => $case === 'unknown' ? 0 : 1000,
-                'rx_capacity' => $case === 'unknown' ? 0 : 1000];
+        if ($case !== 'old-ring' && !($case === 'latest-missing' && $t === 1300)) {
+            $unknown = $case === 'unknown' || ($case === 'latest-zero' && $t === 1300);
+            $sample += ['tx_capacity' => $unknown || $case === 'outbound-unknown' ? 0 : 1000,
+                'rx_capacity' => $unknown || $case === 'inbound-unknown' ? 0 : 1000];
         }
         $node[] = $sample;
         $mine[] = ['t' => $t, 'cpu' => 60, 'mem' => 100, 'tx' => 375000, 'rx' => 0];
@@ -53,9 +55,18 @@ PHP
                 '<th>Network out</th>', '<th>Network in</th>',
                 'Thin lines show the node total and your own usage for each row over the last 24 hours.',
                 'node</span> = whole server', 'you</span> = your own usage.'], $html);
-            // Unknown network capacity still hides just the network lines.
-            $this->assertSame(in_array($case, ['unknown', 'old-ring'], true) ? 4 : 8,
-                substr_count($html, '<polyline'));
+            // Each unknown direction gets three cell notices and one trend notice.
+            $unknown = ['unknown' => 2, 'old-ring' => 2, 'latest-missing' => 2,
+                'latest-zero' => 2, 'inbound-unknown' => 1, 'outbound-unknown' => 1][$case] ?? 0;
+            $this->assertSame(4 * $unknown, substr_count($html, 'Capacity not sampled yet'), $case);
+            $this->assertSame(12 - 3 * $unknown, substr_count($html, 'class="live-bar"'), $case);
+            $this->assertSame(8 - 2 * $unknown, substr_count($html, '<polyline'), $case);
+            foreach (['out', 'in'] as $direction) {
+                preg_match('~<tr><th>Network '.$direction.'</th>(.*?)</tr>~', $html, $row);
+                $this->assertStringContainsString('node 0.1 Mbit/s', $row[1]);
+                $this->assertSame($unknown === 2 || $case === ($direction === 'in' ? 'inbound-unknown' : 'outbound-unknown'),
+                    strpos($row[1], 'Capacity not sampled yet') !== false, $case.' '.$direction);
+            }
         }
     }
 }

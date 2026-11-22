@@ -54,7 +54,11 @@ the configured interface's shaping rate. The guessed `getLinkSpeed()` fallback
 is not a capacity. Bars and the 24 h trend use the latest sample's capacity
 as their fixed scale, with fills clipped at 100%. Unknown capacity, including
 older samples without these fields, leaves the numbers visible and hides the
-network bars and trend lines (Refs #1141).
+network bars and trend lines (Refs #1141). Each affected average cell and trend
+cell displays "Capacity not sampled yet" instead of an unexplained blank; numeric
+rates remain visible. This applies independently to each direction, including
+undetected inbound speed and a latest sample without capacity after earlier
+samples carried it. No older capacity or guessed scale is substituted (Refs #1253).
 
 Privacy rule: a customer sees the node total and their own numbers, never
 another customer's samples. Ring files are not placed in `/home/<user>` so a

@@ -103,24 +103,24 @@ if (!function_exists('pmssStatsLiveRender')) {
             echo '<td>'.pmssStatsLiveSvg($series[$m[0]], $max).'</td></tr>';
         }
         echo '</table><div class="memory-pressure-note"><span class="live-k-node">&#9632; node</span> = whole server &nbsp; '
-            .'<span class="live-k-you">&#9632; you</span> = your own usage. Thin lines show the node total and your own usage for each row over the last 24 hours. Averages of 5-minute samples; you only see the node total and your own numbers. Network bars and trends use the latest sampled capacity; hidden when unknown.</div></div>';
+            .'<span class="live-k-you">&#9632; you</span> = your own usage. Thin lines show the node total and your own usage for each row over the last 24 hours. Averages of 5-minute samples; you only see the node total and your own numbers. Network bars and trends use the latest sampled capacity; a notice appears when capacity is unknown.</div></div>';
     }
 }
 
 if (!function_exists('pmssStatsLiveCell')) {
-    /** Table cell: capacity-scaled node bar (you inside node), or just values when unknown. */
+    /** Table cell: capacity-scaled node bar (you inside node), or a notice and values when unknown. */
     function pmssStatsLiveCell($node, $you, $unit, $capacity = 0) {
         $fmt = function ($v) use ($unit) { return number_format($v, $v < 10 ? 1 : 0, '.', '').$unit; };
         $max = $unit === '%' ? 100 : $capacity;
         $bar = $max > 0 ? '<div class="live-bar"><span class="live-node" style="width:'.($unit === '%' ? round($node) : round(min(100, $node / $max * 100), 2)).'%"><span class="live-you" style="width:'
-            .round($node > 0 ? min(100, $you / $node * 100) : 0).'%"></span></span></div>' : '';
+            .round($node > 0 ? min(100, $you / $node * 100) : 0).'%"></span></span></div>' : '<div class="live-txt">Capacity not sampled yet</div>';
         return '<td>'.$bar.'<div class="live-txt"><span class="live-k-node">node '
             .$fmt($node).'</span> &middot; <span class="live-k-you">you '.$fmt($you).'</span></div></td>';
     }
 }
 
 if (!function_exists('pmssStatsLiveSvg')) {
-    /** Two-line trend scaled to capacity; no lines when capacity is unknown. */
+    /** Two-line trend scaled to capacity; a notice without lines when capacity is unknown. */
     function pmssStatsLiveSvg(array $points, $max) {
         $n = count($points);
         $lines = '';
@@ -129,6 +129,7 @@ if (!function_exists('pmssStatsLiveSvg')) {
             foreach ($points as $x => $p) $c[] = round($x * 300 / ($n - 1), 1).','.round(38 - min(1, $p[$i] / $max) * 36, 1);
             $lines .= '<polyline class="'.$class.'" points="'.implode(' ', $c).'"/>';
         }
-        return '<svg class="live-svg" viewBox="0 0 300 40" preserveAspectRatio="none" role="img">'.$lines.'</svg>';
+        return $max <= 0 ? '<div class="live-txt">Capacity not sampled yet</div>'
+            : '<svg class="live-svg" viewBox="0 0 300 40" preserveAspectRatio="none" role="img">'.$lines.'</svg>';
     }
 }
