@@ -2,6 +2,41 @@
 /** Ordered host and per-account diagnostic probe definitions. @license GPL-3.0-only */
 declare(strict_types=1);
 
+/**
+ * Build the md write-path probe: per array stripe cache and inflight counters, plus each member's inflight.
+ * Plain sysfs reads (the md show handlers take only spinlocks, so a stalled array cannot block them); an
+ * absent attribute is null (raid0/1/10 have no stripe cache). One sample shows where writes queue; telling
+ * a stall from a busy array needs two samples seconds apart, taken by the consumer. The walk root is
+ * PMSS_AGENT_DIAGNOSTICS_SYSFS_BLOCK_PATH (default /sys/block), as the mdstat read has its own override.
+ */
+function pmssAgentDiagnosticsMdWritePathCommand(): string
+{
+    $probe = <<<'PHP'
+$root = getenv("PMSS_AGENT_DIAGNOSTICS_SYSFS_BLOCK_PATH") ?: "/sys/block";
+$count = static function ($path) {
+    $raw = @file_get_contents($path);
+    return is_string($raw) && ctype_digit(trim($raw)) ? (int) trim($raw) : null;
+};
+$inflight = static function ($path) {
+    $raw = @file_get_contents($path);
+    return is_string($raw) && preg_match("/^\s*([0-9]+)\s+([0-9]+)\s*$/", $raw, $m) === 1
+        ? ["read" => (int) $m[1], "write" => (int) $m[2]] : null;
+};
+$arrays = new stdClass();
+foreach (glob($root."/md[0-9]*", GLOB_ONLYDIR) ?: [] as $md) {
+    $members = new stdClass();
+    foreach (glob($md."/slaves/*", GLOB_ONLYDIR) ?: [] as $member) {
+        $members->{basename($member)} = $inflight($member."/inflight");
+    }
+    $arrays->{basename($md)} = ["stripe_cache_size" => $count($md."/md/stripe_cache_size"),
+        "stripe_cache_active" => $count($md."/md/stripe_cache_active"),
+        "inflight" => $inflight($md."/inflight"), "members" => $members];
+}
+echo json_encode($arrays), "\n";
+PHP;
+    return 'php -r '.escapeshellarg($probe);
+}
+
 /** Build the stable ordered section spec for the diagnostics payload. */
 function pmssAgentDiagnosticsSectionSpecs(string $user = ''): array
 {
@@ -11,6 +46,7 @@ function pmssAgentDiagnosticsSectionSpecs(string $user = ''): array
             'df' => ['type' => 'command', 'command' => 'df -h', 'format' => 'lines'],
             'df_inodes' => ['type' => 'command', 'command' => 'df -i', 'format' => 'lines'],
             'mdstat' => ['type' => 'file', 'env' => 'PMSS_AGENT_DIAGNOSTICS_MDSTAT_PATH', 'path' => '/proc/mdstat'],
+            'md_write_path' => ['type' => 'command', 'command' => pmssAgentDiagnosticsMdWritePathCommand(), 'format' => 'json'],
             'fstab' => ['type' => 'file', 'env' => 'PMSS_AGENT_DIAGNOSTICS_FSTAB_PATH', 'path' => '/etc/fstab'],
         ],
         'services' => [

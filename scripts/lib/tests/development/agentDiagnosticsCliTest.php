@@ -301,6 +301,40 @@ final class agentDiagnosticsCliTest extends TestCase
         }
     }
 
+    public function testMdWritePathReadsStripeCacheAndInflightPerArrayAndMember(): void
+    {
+        $sys = $this->pmssMakeNamedTempDir('pmss-agent-sysblock-');
+        $spec = \pmssAgentDiagnosticsSectionSpecs()['storage']['md_write_path'];
+        $collect = function () use ($sys, $spec) {
+            $result = null;
+            $this->pmssWithEnv(['PMSS_AGENT_DIAGNOSTICS_SYSFS_BLOCK_PATH' => $sys], function () use (&$result, $spec): void {
+                $result = \pmssAgentDiagnosticsSpecCollect($spec);
+            });
+            return $result;
+        };
+        // No md arrays at all: an empty, benign result rather than an error.
+        $this->assertSame([], $collect());
+        $this->pmssWriteFiles($sys, [
+            // RAID5: stripe cache attributes, array inflight and two members (reads writes, padded as sysfs prints them).
+            'md0/md/stripe_cache_size' => "4096\n", 'md0/md/stripe_cache_active' => "7841\n",
+            'md0/inflight' => "       0      104\n",
+            'md0/slaves/sda1/inflight' => "       0        0\n", 'md0/slaves/sdb1/inflight' => "       2        3\n",
+            // RAID1: no stripe cache files; one member without an inflight attribute.
+            'md1/inflight' => "0 0\n", 'md1/slaves/sdc1/dev' => "8:33\n",
+            // Not an md array: ignored.
+            'sda/inflight' => "9 9\n",
+        ]);
+        $idle = ['read' => 0, 'write' => 0];
+        $this->assertSame([
+            'md0' => ['stripe_cache_size' => 4096, 'stripe_cache_active' => 7841, 'inflight' => ['read' => 0, 'write' => 104],
+                'members' => ['sda1' => $idle, 'sdb1' => ['read' => 2, 'write' => 3]]],
+            'md1' => ['stripe_cache_size' => null, 'stripe_cache_active' => null, 'inflight' => $idle, 'members' => ['sdc1' => null]],
+        ], $collect());
+        // Malformed attribute text reads as absent, never as a number.
+        $this->pmssWriteFiles($sys, ['md0/md/stripe_cache_active' => "12abc\n", 'md0/inflight' => "1\n"]);
+        $this->pmssAssertArraySubsetSame(['stripe_cache_active' => null, 'inflight' => null], $collect()['md0']);
+    }
+
     private function makeScriptRoot(bool $brokenCheckUsers = false): string
     {
         $root = $this->pmssMakeNamedTempDir('pmss-agent-root-');
