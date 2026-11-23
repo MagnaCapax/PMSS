@@ -51,7 +51,7 @@ function pmssTorrentClientsTransmissionWebInstall(array $entry, string $root, ar
     if (!@mkdir($stage, 0700)) return false;
     $preserve = false;
     $download = $ops['download'] ?? static function (string $url, string $path): bool {
-        return runStep('Downloading Transmission web client', pmssBuildCommand('wget', ['-q', '-O', $path, $url])) === 0;
+        return runStep('Downloading Transmission web client', pmssBuildCommand('wget', ['-q', '--timeout=60', '--tries=3', '-O', $path, $url])) === 0;
     };
     $list = $ops['list'] ?? 'pmssTorrentClientsTransmissionWebArchiveList';
     $extract = $ops['extract'] ?? static function (string $archive, string $stage): bool {

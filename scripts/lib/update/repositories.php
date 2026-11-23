@@ -49,8 +49,8 @@ require_once __DIR__.'/runtime/commands.php';
 
         $keyUrl = 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xC10E11090EC0E438';
         $fetchCmd = pmssCommandPath('wget') !== ''
-            ? sprintf('wget -qO %s %s', escapeshellarg($tmpPath), escapeshellarg($keyUrl))
-            : sprintf('curl -fsSL -o %s %s', escapeshellarg($tmpPath), escapeshellarg($keyUrl));
+            ? sprintf('wget -q --timeout=60 --tries=3 -O %s %s', escapeshellarg($tmpPath), escapeshellarg($keyUrl))
+            : sprintf('curl -fsSL --connect-timeout 60 --speed-time 60 --speed-limit 1 -o %s %s', escapeshellarg($tmpPath), escapeshellarg($keyUrl));
 
         if (runStep('Fetching MediaArea repository key', $fetchCmd) !== 0) {
             @unlink($tmpPath);

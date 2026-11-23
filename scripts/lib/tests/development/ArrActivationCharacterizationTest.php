@@ -9,7 +9,7 @@ class ArrActivationCharacterizationTest extends TestCase
     /** Lock every activation boundary against in-memory dependency traces. */
     public function testActivationPreservesCommandsDiagnosticsAndCleanup(): void
     {
-        $download = ['command', "curl -sSL --fail -o '/fixture/work/bundle.tar.gz' 'https://example.invalid/bundle'"];
+        $download = ['command', "curl -sSL --fail --connect-timeout 60 --speed-time 60 --speed-limit 1 -o '/fixture/work/bundle.tar.gz' 'https://example.invalid/bundle'"];
         $extract = ['command', "umask 022 && tar --no-same-owner --no-same-permissions -xzf '/fixture/work/bundle.tar.gz' -C '/fixture/work'"];
         $guard = ['guard', '/fixture/work', 'radarr-', '/fixture/work/Package', '/fixture/install'];
         $remove = ['remove', '/fixture/install'];

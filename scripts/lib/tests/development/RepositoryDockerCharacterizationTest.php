@@ -33,7 +33,7 @@ class RepositoryDockerCharacterizationTest extends TestCase
         $this->assertSame([['log', '[WARN] Skipping Docker repository setup: unknown suite']], $result['events']);
         $result = $this->fixture(['missingKey' => true, 'fetchRc' => 1]);
         $this->assertSame([
-            ['step', 'Fetching Docker repository key', "curl -fsSL 'https://download.docker.com/linux/debian/gpg' | gpg --dearmor -o '/keys/docker.gpg'"],
+            ['step', 'Fetching Docker repository key', "curl -fsSL --connect-timeout 60 --speed-time 60 --speed-limit 1 'https://download.docker.com/linux/debian/gpg' | gpg --dearmor -o '/keys/docker.gpg'"],
             ['unlink', '/keys/docker.gpg'], ['log', '[WARN] Docker key fetch failed; proceeding without writing docker.sources'],
         ], $result['events']);
     }
@@ -54,7 +54,7 @@ class RepositoryDockerCharacterizationTest extends TestCase
     {
         $result = $this->fixture(['missingKey' => true, 'fetchRc' => 0]);
         $this->assertSame([
-            ['step', 'Fetching Docker repository key', "curl -fsSL 'https://download.docker.com/linux/debian/gpg' | gpg --dearmor -o '/keys/docker.gpg'"],
+            ['step', 'Fetching Docker repository key', "curl -fsSL --connect-timeout 60 --speed-time 60 --speed-limit 1 'https://download.docker.com/linux/debian/gpg' | gpg --dearmor -o '/keys/docker.gpg'"],
             ['step', 'Setting permissions on Docker repository key', "chmod 0644 '/keys/docker.gpg'"],
             ['architecture'],
         ], array_slice($result['events'], 0, 3));

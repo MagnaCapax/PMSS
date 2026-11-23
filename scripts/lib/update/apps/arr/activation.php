@@ -24,7 +24,7 @@ function pmssArrReleaseActivate(array $config, string $app, string $downloadUrl,
     if ($workDir === null) { $log('Failed to create temporary workspace'); return false; }
     $archivePath = $workDir.'/'.$assetName; $extractPath = $workDir.'/'.$config['extract_dir']; $installPath = $config['install_path'];
     try {
-        if (runCommand(sprintf('curl -sSL --fail -o %s %s', escapeshellarg($archivePath), escapeshellarg($downloadUrl))) !== 0 || !is_file($archivePath)) {
+        if (runCommand(sprintf('curl -sSL --fail --connect-timeout 60 --speed-time 60 --speed-limit 1 -o %s %s', escapeshellarg($archivePath), escapeshellarg($downloadUrl))) !== 0 || !is_file($archivePath)) {
             $log('Download failed; keeping existing installation'); return false;
         }
         if (runCommand(sprintf('umask 022 && tar --no-same-owner --no-same-permissions -xzf %s -C %s', escapeshellarg($archivePath), escapeshellarg($workDir))) !== 0 || !is_dir($extractPath)) {

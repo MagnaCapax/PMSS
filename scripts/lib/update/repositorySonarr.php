@@ -68,7 +68,7 @@ function pmssEnsureSonarrKey(): void
         if ($dryRun) {
             runStep('Fetching Sonarr repository key', 'true');
         } else {
-            $fetch = sprintf('curl -fsSL %s | gpg --dearmor -o %s', escapeshellarg('https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xEBFF6B99D9B78493'), escapeshellarg($keyPath));
+            $fetch = sprintf('curl -fsSL --connect-timeout 60 --speed-time 60 --speed-limit 1 %s | gpg --dearmor -o %s', escapeshellarg('https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xEBFF6B99D9B78493'), escapeshellarg($keyPath));
             if (runStep('Fetching Sonarr repository key', $fetch) !== 0) {
                 @unlink($keyPath);
                 logmsg('[WARN] Failed to fetch Sonarr key; Sonarr apt repo may remain unsigned');

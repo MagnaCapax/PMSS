@@ -14,7 +14,7 @@ function pmssEnsureDockerRepository(): void
     if (!is_dir($keyringDir)) { runStep('Ensuring apt keyring directory exists', sprintf('install -m 0755 -d %s', escapeshellarg($keyringDir))); }
 
     if (!is_file($keyringPath)) {
-        $fetchCmd = sprintf('curl -fsSL %s | gpg --dearmor -o %s', escapeshellarg('https://download.docker.com/linux/debian/gpg'), escapeshellarg($keyringPath));
+        $fetchCmd = sprintf('curl -fsSL --connect-timeout 60 --speed-time 60 --speed-limit 1 %s | gpg --dearmor -o %s', escapeshellarg('https://download.docker.com/linux/debian/gpg'), escapeshellarg($keyringPath));
         if (runStep('Fetching Docker repository key', $fetchCmd) === 0) {
             runStep('Setting permissions on Docker repository key', sprintf('chmod 0644 %s', escapeshellarg($keyringPath)));
         } else {
