@@ -126,6 +126,25 @@ function pmssMediaStackWatchdogLogTransition(string $username, string $app, stri
 }
 
 /**
+ * Tell whether an account carries a media-stack install marker.
+ *
+ * Jellyfin's network.xml marks an install that has Jellyfin. An install that skipped Jellyfin
+ * (no usable FFmpeg 4.4+) never gets it, yet the installer always writes its alias block into
+ * ~/.bashrc.custom, so that block marks those. The alias file is account-editable and read as
+ * root: it must be a single regular file (no symlink), is read bounded, and only the block's
+ * title is looked for. A forged marker can only make the watchdog observe the account's own apps.
+ */
+function pmssMediaStackWatchdogAccountInstalled(string $home): bool
+{
+    if (is_file($home.'/.config/jellyfin/config/network.xml')) {
+        return true;
+    }
+    $aliases = pmssReadRegularFileContentsVerified($home.'/.bashrc.custom', null, 1048576);
+
+    return $aliases !== null && strpos($aliases, 'PMSS Media stack aliases') !== false;
+}
+
+/**
  * Observe one installed account and publish its current app states.
  *
  * $boot is the injectable boot context (bootId, uptime, now, launcher); null reads the host's.
@@ -136,7 +155,7 @@ function pmssMediaStackWatchdogRunUser(string $username, string $homeRoot = '/ho
         return null;
     }
     $home = rtrim($homeRoot, '/').'/'.$username;
-    if (!is_dir($home) || !is_file($home.'/.config/jellyfin/config/network.xml')) {
+    if (!is_dir($home) || !pmssMediaStackWatchdogAccountInstalled($home)) {
         return null;
     }
     $apps = pmssMediaStackWatchdogExpectedApps($home);
