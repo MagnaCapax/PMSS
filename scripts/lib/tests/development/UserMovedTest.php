@@ -86,6 +86,15 @@ class UserMovedTest extends TestCase
         $this->assertSame([false, true, false, false, true, true], $this->pmssRunInlinePhpJson($script));
     }
 
+    public function testTransmissionWatchdogParksMovedAccountsBeforeAnyStartLogic(): void
+    {
+        // The parked check must precede every launch decision and stop a leftover daemon.
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/cron/transmissionInstancesCheck.php', [
+            "if (pmssUserServicesParked(\$user)) { pmssUserWatchdogTerminateProcesses(\$user, ['transmission-daemon']); continue; }",
+            'pmssUserWatchdogBackoffActive(', 'pmssLighttpdTransmissionSelected(', 'pmssUserWatchdogCommandRun(',
+        ]);
+    }
+
     public function testLifecyclePersistsBeforeStopAndClearDoesNotStartAnything(): void
     {
         $this->store();

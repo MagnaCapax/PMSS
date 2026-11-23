@@ -11,9 +11,11 @@ $pmssCheckTransmissionLock = pmssCronLockAcquire('checkTransmissionInstances',
 $users = pmssListManagedUsersFromResult(pmssListManagedUsersResult());
 if ($users === null) exit(1);
 foreach ($users as $user) {
+    // Parked accounts (suspended or moved): stop a leftover daemon without a log line on every 2-minute run.
+    if (pmssUserServicesParked($user)) { pmssUserWatchdogTerminateProcesses($user, ['transmission-daemon']); continue; }
     if (pmssUserWatchdogBackoffActive($user, 'transmission')) continue;
     $home = '/home/'.$user;
-    if (pmssUserWebRootUnavailable($user) || !pmssLighttpdTransmissionSelected($user, $home)) continue;
+    if (!pmssLighttpdTransmissionSelected($user, $home)) continue;
     if (!pmssTransmissionAccountEnabled($home)) continue;
     // A process and its socket are checked before settings or launch are touched.
     if (pmssTorrentClientLauncherLivenessPids($user, 'transmission') !== []) continue;
