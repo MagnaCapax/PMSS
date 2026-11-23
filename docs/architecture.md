@@ -309,6 +309,11 @@ Keep the canonical installer/update details under `docs/install.md` and
   before either launch, using the existing empty-list failure result. Valid
   command bytes, listing order and member pairing remain unchanged;
   `ArchiveListingCommandSafetyTest` intercepts execution on the testing machine.
+  Installed-version markers likewise use a nonblocking, inode-verified regular
+  file open. Failed, incomplete or substituted reads cannot certify a version;
+  acquired streams close on refusals and exceptions. Marker whitespace trimming,
+  hard links and binary symlinks retain their behavior. `PinnedVersionMarkerSafetyTest`
+  covers acquisition and cleanup faults on the testing machine.
 - **scripts/lib/torrentClients/** – Versioned torrent-client store and identity predicates, converged on every normal update (ADR 0163). Account links seed the installed rTorrent catalog default only when neither a default entry nor a prior-switch `lastRun` record exists, the custom rc is absent or matches the current skeleton, and all three ruTorrent compatibility markers are present in regular non-symlink files (ADR 0146). rTorrent defaults to 0.16.25; jesec 0.9.8-r16 is offered again. qBittorrent and Deluge retain system defaults, and Transmission stays opt-in. Configure offers projection-listed qBittorrent, Deluge, Transmission and rTorrent versions through password-guarded per-account switches; the customer-side helpers repoint under a per-client lock, restart, and restore the previous selection on failure (ADRs 0106, 0119 and 0130). The qBittorrent and Deluge Apps toggles and their watchdog launches honor the selected version and the switch lock; without a selection link, the toggles retain their system launch commands. The rTorrent executor resolves a published store selection on each restart and otherwise retains its system launch command. After three consecutive runs under 20 seconds of the same store command, it keeps using the system build until the resolved command changes (ADR 0146). Its picker reuses the existing customer restart consumer.
 - **scripts/lib/trackerCleaner.php** – Cron-facing facade for the tracker cleaner. The `trackerCleaner/` modules own selection policy, logs, guarded backups, and the bounded run separately (ADR 0076).
 - **scripts/lib/user/scheduledConfigBackup.php** retains the scheduled-backup queue,

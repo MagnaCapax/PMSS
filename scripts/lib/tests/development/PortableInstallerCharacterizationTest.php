@@ -99,6 +99,14 @@ function php_uname($mode) { return $GLOBALS['state']['architecture']; }
 function is_file($path) { return $GLOBALS['state']['binary']; }
 function is_link($path) { return $GLOBALS['state']['markerLink']; }
 function file_get_contents($path) { return $GLOBALS['state']['version']; }
+function pmssRegularFileOpenVerified($path, $stat = null, &$opened = null) {
+    if (is_link($path)) return false;
+    $bytes = file_get_contents($path);
+    $opened = ['mode' => 0100644, 'size' => strlen($bytes)];
+    $handle = fopen('php://memory', 'w+');
+    fwrite($handle, $bytes); rewind($handle);
+    return $handle;
+}
 function logmsg($message) { $GLOBALS['result']['logs'][] = $message; }
 function pmssPathTargetIsSafe(...$arguments) {
     $GLOBALS['result']['guards'][] = $arguments;

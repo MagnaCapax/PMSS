@@ -27,7 +27,20 @@ function pmssPinnedRemoteVersionMatches(string $binary, string $marker, string $
     // Warning suppression cannot turn invalid path arguments into a failed read.
     if ($binary === '' || $marker === ''
         || strpos($binary, "\0") !== false || strpos($marker, "\0") !== false) return false;
-    return is_file($binary) && !is_link($marker) && trim((string) @file_get_contents($marker)) === $version;
+    if (!is_file($binary)) return false;
+    // The shared nonblocking open rejects symlinks, special files and substituted inodes.
+    $handle = pmssRegularFileOpenVerified($marker, null, $opened);
+    if ($handle === false) return false;
+    try {
+        if ((($opened['mode'] ?? 0) & 0170000) !== 0100000) return false;
+        $contents = @stream_get_contents($handle);
+        // A failed or incomplete read must never certify an installed version.
+        $matches = is_string($contents) && strlen($contents) === ($opened['size'] ?? null)
+            && trim($contents) === $version;
+    } finally {
+        $closed = @fclose($handle);
+    }
+    return $closed && $matches;
 }
 
 /** Publish a version only through a safe regular marker path after installation. */
