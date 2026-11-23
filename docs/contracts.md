@@ -408,6 +408,10 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
     timeout keeps its completed samples plus one censored 60000 ms sample, so
     it reads slow instead of null. `$keep` adds `-k` (reuse `ioping.tmp` in a
     directory target); the host statistics probe passes it (ADR 0274).
+- pmssSystemStatsIopingMs(string $path): string
+  - Formats the host-stats ioping latency as `<n.n>ms`, or `na` when the probe yields
+    nothing. Under `PMSS_TEST_MODE` it returns `na` without launching ioping, so the
+    collector stays hermetic and as fast as its shortened sampling window.
 - pmssSystemStatsHostPressureSnapshotWrite(string $path, array $stats, ?int $timestamp=null): bool
   - Atomically writes a mode-0644 customer-readable JSON snapshot containing
     only timestamp, five-minute full I/O PSI, and `/home` ioping latency.

@@ -25,8 +25,19 @@ function pmssSystemStatsTopMemoryProcesses(?callable $runner = null): string
 /** Read one PSI file and degrade missing/unreadable hosts to `na`. */
 function pmssSystemStatsPsiRead(string $path): string { return is_readable($path) ? pmssSystemStatsPsiFromRaw(pmssReadRegularFileContents($path)) : 'na'; }
 
-/** Format optional representative ioping latency for the stats log. */
-function pmssSystemStatsIopingMs(string $path): string { $value = is_dir($path) ? pmssIopingMedianMs($path, true) : null; return $value === null ? 'na' : number_format($value, 1, '.', '').'ms'; }
+/**
+ * Format optional representative ioping latency for the stats log.
+ *
+ * PMSS_TEST_MODE reports `na` without probing: a real ioping run can last up to its 12 s work time per
+ * target, so a hermetic test of the collector must never touch the disk (same switch that shortens the
+ * collector's sampling window). Production never sets the flag and keeps the bounded probe of ADR 0274.
+ */
+function pmssSystemStatsIopingMs(string $path): string
+{
+    if (pmssTestModeEnabled()) return 'na';
+    $value = is_dir($path) ? pmssIopingMedianMs($path, true) : null;
+    return $value === null ? 'na' : number_format($value, 1, '.', '').'ms';
+}
 
 /**
  * Read the jbd2 journal counters of the filesystem mounted at /home as the `jbd2_home` field.
