@@ -184,6 +184,14 @@ class UserRutorrentCompatPatchTest extends TestCase
         $this->assertSame($chosen, file_get_contents($target));
     }
 
+    public function testSkeletonHddquotaTooltipLabelsTheBurstCeilingAsTemporary(): void
+    {
+        // The tooltip is the only burst signal below the soft limit; it must not read as available space.
+        $this->pmssAssertRepoFileContainsString('etc/skel/www/rutorrent/plugins/hddquota/init.js', 'Temporary burst ceiling: ');
+        $this->pmssAssertRepoFileContainsString('etc/skel/www/rutorrent/plugins/hddquota/init.js', 'time-limited, not extra space');
+        $this->assertStringNotContainsString(' Burst limit: ', $this->pmssReadRepoFile('etc/skel/www/rutorrent/plugins/hddquota/init.js'));
+    }
+
     public function testSkeletonHddquotaActionReturnsInt(): void
     {
         $this->pmssAssertRepoFileContainsString('etc/skel/www/rutorrent/plugins/hddquota/action.php', 'return (int) $field;');

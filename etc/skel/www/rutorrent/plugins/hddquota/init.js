@@ -26,7 +26,7 @@ plugin.setValue = function( full, free, hardLimit ) {
 		visibility: !percent ? "hidden" : "visible"
     } );
     
-    $("#meter-disk-td").attr("title", humanReadableFree + "/" + theConverter.bytes(full) + " Burst limit: " + theConverter.bytes(hardLimit));
+    $("#meter-disk-td").attr("title", humanReadableFree + "/" + theConverter.bytes(full) + " Temporary burst ceiling: " + theConverter.bytes(hardLimit) + " (time-limited, not extra space)");
     
 	$("#meter-disk-text").text(percent+'%').css({
         "font-weight": (percent > 100) ? "bold" : "normal"
