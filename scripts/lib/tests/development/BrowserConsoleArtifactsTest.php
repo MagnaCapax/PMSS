@@ -109,6 +109,15 @@ class BrowserConsoleArtifactsTest extends TestCase
             'Press ⏎ to Reconnect', 'window.location.reload()']);
     }
 
+    public function testEphemeralLabelSaysClosingTheTabStopsRunningPrograms(): void
+    {
+        // The ephemeral session ends with the tab (ttyd --once, SIGHUP to the shell): a
+        // long job that cleans up only at exit leaves its scratch behind and counts against quota.
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/console.php', [
+            'closing or reloading the tab stops running programs', 'long jobs', 'Persistent (tmux)',
+        ]);
+    }
+
     public function testProxyBlockUsesLoopbackSocketUpgrade(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('etc/seedbox/config/template.lighttpd', ['^/user-##username/console/', 'console.sock', '"upgrade" => "enable"']);
