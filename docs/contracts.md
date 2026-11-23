@@ -1666,6 +1666,12 @@ Automation often invokes these utilities; below are expected inputs and effects.
     root-copy failure still permits display publication. Event fields, account-log
     messages, fallback bytes and exception propagation retain their previous behavior.
     See ADR 0254 and `QuotaSnapshotRefreshCharacterizationTest`.
+  - The per-account refresher rechecks the existing managed-username validator
+    before constructing paths or launching a probe (ADR 0005). Invalid names log
+    one fixed refusal without echoing the input or opening account logs, then
+    return true so the sweep continues; false remains reserved for timeouts.
+    `QuotaRefreshUsernameSafetyTest` covers rejected names, unchanged valid-account
+    traces and sweep continuation with intercepted I/O on the testing machine.
   - Shared quota capture rejects NUL-containing stdout before per-line trimming.
     Corrupt responses return no lines and rc 2 unless an existing failure code is
     greater than 1; expired calls retain their timeout code and flag. Valid text,

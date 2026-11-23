@@ -53,7 +53,7 @@ function pmssUserLifecycleContextLog($domain, $action, $user, $context) { record
 function pmssUserLog($user, $message) { record(['userlog', $user, $message]); }
 PHP;
         $scenario += ['report' => ['rc' => 0, 'lines' => self::LINES, 'timed_out' => false]];
-        $script = 'require '.var_export($this->pmssRepoPath('scripts/lib/quotaSnapshot.php'), true).';'
+        $script = 'require '.var_export($this->pmssRepoPath('scripts/lib/quota/snapshotRefresh.php'), true).';'
             .'eval('.var_export($stubs.$source, true).');'
             .'$GLOBALS["scenario"] = '.var_export($scenario, true).'; $GLOBALS["trace"] = [];'
             .'$log = static function ($message) { \PMSS\QuotaSnapshotFixture\record(["log", $message]); };'

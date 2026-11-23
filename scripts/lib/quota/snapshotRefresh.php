@@ -17,6 +17,11 @@ function pmssQuotaSnapshotRefreshUserLog(
 /** Refresh one managed account; false means a timed-out probe must stop the sweep. */
 function pmssQuotaSnapshotRefreshUser(string $thisUser, callable $log): bool
 {
+    // Recheck the account boundary before paths, shell arguments or account logs.
+    if (!pmssValidateUsername($thisUser)) {
+        $log('Refusing quota refresh: invalid username');
+        return true;
+    }
     // #TODO Check that quota is working.
     // Require the exact home before any snapshot read, command or publication.
     $expectedHome = "/home/{$thisUser}";
