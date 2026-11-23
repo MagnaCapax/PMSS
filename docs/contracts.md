@@ -378,6 +378,7 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
     their existing behavior.
 
 - runCommand(string $cmd, bool $verbose=false, ?callable $logger=null, bool $inheritTty=false, array $skipExitCodes=[]): int
+  - `pmssCommandWithTimeout(int $seconds, callable $callback, array $arguments=[])` scopes updater command deadlines and restores the exact prior override (including unset/empty) on return or throwable; callers retain their policies and command runners.
   - Spawns `/bin/bash -lc <cmd>` via `proc_open`, streams stdout/stderr, returns rc.
   - Exposes `$GLOBALS['PMSS_LAST_COMMAND_OUTPUT']` with `stdout`/`stderr`.
   - Timeout: defaults to 1200s; apt/dpkg commands are floored to 1200s. `PMSS_COMMAND_TIMEOUT` overrides but cannot reduce apt/dpkg below 1200s.

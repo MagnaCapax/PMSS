@@ -49,21 +49,24 @@ class DistUpgradeAptResultTest extends TestCase
     public function testAptStepsGetTheirOwnDeadlineAndRestoreTheCallersOne(): void
     {
         foreach ([
-            // [PMSS_DIST_UPGRADE_APT_TIMEOUT, caller's PMSS_COMMAND_TIMEOUT, deadline seen by the command]
-            'default two hours, caller unset' => [null, null, '7200'],
-            'default two hours, caller set' => [null, '900', '7200'],
-            'override' => ['14400', '900', '14400'],
-            'no deadline' => ['0', null, '0'],
-        ] as $scenario => [$aptTimeout, $callerTimeout, $seen]) {
-            $run = $this->runLockedCommand($aptTimeout, $callerTimeout, false);
-            $this->assertSame(['rc' => 0, 'seen' => $seen, 'after' => $callerTimeout ?? 'unset'], $run, $scenario);
+            // [apt override, caller override, active deadline, throwable class or null]
+            'default two hours, caller unset' => [null, null, '7200', null],
+            'default two hours, caller set' => [null, '900', '7200', null],
+            'override' => ['14400', '900', '14400', null],
+            'leading zeroes, zero caller' => ['014400', '0', '14400', null],
+            'no deadline' => ['0', null, '0', null],
+            'empty caller' => [null, '', '7200', null],
+            'invalid override' => ['invalid', null, '7200', null],
+            'exception' => [null, '900', '7200', \RuntimeException::class],
+            'error' => [null, null, '7200', \Error::class],
+        ] as $scenario => [$aptTimeout, $callerTimeout, $seen, $throw]) {
+            $run = $this->runLockedCommand($aptTimeout, $callerTimeout, $throw);
+            $this->assertSame(['rc' => $throw ?? 0, 'seen' => $seen, 'after' => $callerTimeout ?? 'unset'], $run, $scenario);
         }
-        // A step that throws still restores the caller's deadline.
-        $this->assertSame(['rc' => 'threw', 'seen' => '7200', 'after' => '900'], $this->runLockedCommand(null, '900', true));
     }
 
-    /** Run the real locked-command wrapper with a runCommand stub that records the deadline it sees. */
-    private function runLockedCommand(?string $aptTimeout, ?string $callerTimeout, bool $throw): array
+    /** Exercise scripts/lib/runtime/commandEnvironment.php through the locked wrapper with a recording runner. */
+    private function runLockedCommand(?string $aptTimeout, ?string $callerTimeout, ?string $throw): array
     {
         $script = 'namespace DistUpgradeAptDeadline;'
             .($aptTimeout === null ? 'putenv("PMSS_DIST_UPGRADE_APT_TIMEOUT");' : 'putenv("PMSS_DIST_UPGRADE_APT_TIMEOUT='.$aptTimeout.'");')
@@ -71,11 +74,11 @@ class DistUpgradeAptResultTest extends TestCase
             .'$GLOBALS["seen"] = null; $GLOBALS["throw"] = '.var_export($throw, true).';'
             .'function pmssEnvReadDigits($key) { return (($v = getenv($key)) !== false && ctype_digit($v)) ? (int) $v : null; }'
             .'function pmssDistUpgradeWaitForLocksOrLog($message) { return true; }'
-            .'function runCommand($command, $verbose, $logger, $tty) { $GLOBALS["seen"] = (string) getenv("PMSS_COMMAND_TIMEOUT"); if ($GLOBALS["throw"]) { throw new \RuntimeException("x"); } return 0; }';
-        foreach (['pmssDistUpgradeAptTimeoutSeconds', 'pmssDistUpgradeRunLockedCommand'] as $name) {
-            $script .= \pmssTestingFunctionExport($name, 'DistUpgradeAptDeadline');
+            .'function runCommand($command, $verbose, $logger, $tty) { $GLOBALS["seen"] = (string) getenv("PMSS_COMMAND_TIMEOUT"); if ($class = $GLOBALS["throw"]) { throw new $class("x"); } return 0; }';
+        foreach (['pmssCommandWithTimeout', 'pmssDistUpgradeAptTimeoutSeconds', 'pmssDistUpgradeRunLockedCommand'] as $name) {
+            $script .= \pmssTestingFunctionExport($name, 'DistUpgradeAptDeadline', ["'runCommand'" => var_export('DistUpgradeAptDeadline\\runCommand', true)]);
         }
-        $script .= 'try { $rc = pmssDistUpgradeRunLockedCommand("apt-get full-upgrade", "lock"); } catch (\RuntimeException $e) { $rc = "threw"; }'
+        $script .= 'try { $rc = pmssDistUpgradeRunLockedCommand("apt-get full-upgrade", "lock"); } catch (\Throwable $e) { $rc = get_class($e); }'
             .'$after = getenv("PMSS_COMMAND_TIMEOUT");'
             .'echo json_encode(["rc" => $rc, "seen" => $GLOBALS["seen"], "after" => $after === false ? "unset" : $after]);';
         return $this->pmssRunInlinePhpJson($script);

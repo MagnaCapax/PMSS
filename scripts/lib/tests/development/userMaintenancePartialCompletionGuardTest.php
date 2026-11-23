@@ -76,7 +76,7 @@ PHP,
             'pmssUpdateStep2HandleUserMaintenanceSummary($userMaintenanceSummary);',
         ]);
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/users/permissions.php', [
-            'PMSS_USER_PERMISSIONS_TIMEOUT', 'PMSS_COMMAND_TIMEOUT', "'-c3'", 'RuntimeException',
+            'PMSS_USER_PERMISSIONS_TIMEOUT', 'pmssCommandWithTimeout', "'-c3'", 'RuntimeException',
         ]);
     }
 }

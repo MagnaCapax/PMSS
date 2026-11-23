@@ -72,15 +72,11 @@ function pmssStorageBenchmarkPostInstallRun(?callable $logger = null, ?callable 
 
     $run = $runner ?: 'runStep';
     $devices = $deviceCounter === null ? count(pmssStorageHealthDiskInventoryRead()) : (int) $deviceCounter();
-    $previousTimeout = getenv('PMSS_COMMAND_TIMEOUT');
-    putenv('PMSS_COMMAND_TIMEOUT='.(string) pmssStorageBenchmarkPostInstallTimeoutSeconds($devices));
-    try {
-        $rc = (int) $run('Running post-install idle storage benchmark', pmssBuildCommand('php', [
+    $rc = (int) pmssCommandWithTimeout(pmssStorageBenchmarkPostInstallTimeoutSeconds($devices), $run, [
+        'Running post-install idle storage benchmark', pmssBuildCommand('php', [
             '/scripts/util/storageBenchmark.php', '--require-idle', '--devices', '--label=post-install',
-        ]));
-    } finally {
-        putenv($previousTimeout === false ? 'PMSS_COMMAND_TIMEOUT' : 'PMSS_COMMAND_TIMEOUT='.$previousTimeout);
-    }
+        ]),
+    ]);
     // Mirror captured stdout into the update log so WARN lines persist.
     $stdout = (string) ($GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? '');
     $lines = preg_split('/\R/', trim($stdout));

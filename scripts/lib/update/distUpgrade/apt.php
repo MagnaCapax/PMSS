@@ -66,13 +66,7 @@ function pmssDistUpgradeRunLockedCommand(string $command, string $lockMessage, b
         return null;
     }
 
-    $previousTimeout = getenv('PMSS_COMMAND_TIMEOUT');
-    putenv('PMSS_COMMAND_TIMEOUT='.(string) pmssDistUpgradeAptTimeoutSeconds());
-    try {
-        return runCommand($command, true, null, $inheritTty);
-    } finally {
-        putenv($previousTimeout === false ? 'PMSS_COMMAND_TIMEOUT' : 'PMSS_COMMAND_TIMEOUT='.$previousTimeout);
-    }
+    return pmssCommandWithTimeout(pmssDistUpgradeAptTimeoutSeconds(), 'runCommand', [$command, true, null, $inheritTty]);
 }
 
 function pmssExecuteUpgrade(): bool

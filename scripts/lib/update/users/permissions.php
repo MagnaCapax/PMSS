@@ -16,19 +16,13 @@ function pmssUserRefreshPermissions(array $ctx): void
     [$user, $home] = pmssUserContextIdentity($ctx);
 
     $timeoutSeconds = pmssEnvReadDigits('PMSS_USER_PERMISSIONS_TIMEOUT') ?: 900;
-    $previousTimeout = getenv('PMSS_COMMAND_TIMEOUT');
     $permissionsCommand = pmssBuildCommand('/scripts/util/userPermissions.php', [$user]);
     $ionicePath = is_executable('/usr/bin/ionice') ? '/usr/bin/ionice' : (is_executable('/bin/ionice') ? '/bin/ionice' : '');
     if ($ionicePath !== '') {
         $permissionsCommand = pmssBuildCommand($ionicePath, ['-c3', '/scripts/util/userPermissions.php', $user]);
     }
 
-    putenv('PMSS_COMMAND_TIMEOUT='.(string) $timeoutSeconds);
-    try {
-        $rc = runUserStep($user, 'Refreshing user permissions', $permissionsCommand);
-    } finally {
-        putenv($previousTimeout === false ? 'PMSS_COMMAND_TIMEOUT' : 'PMSS_COMMAND_TIMEOUT='.$previousTimeout);
-    }
+    $rc = pmssCommandWithTimeout($timeoutSeconds, 'runUserStep', [$user, 'Refreshing user permissions', $permissionsCommand]);
 
     if ($rc === 124) {
         pmssUserLog($user, sprintf('[WARN] userPermissions timed out after %ds', $timeoutSeconds));

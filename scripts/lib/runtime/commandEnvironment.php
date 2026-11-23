@@ -1,6 +1,18 @@
 <?php
 /** Shell invocation and unattended package-command environment. */
 
+/** Run one operation under a temporary deadline, restoring unset and empty overrides too. */
+function pmssCommandWithTimeout(int $seconds, callable $callback, array $arguments = [])
+{
+    $previousTimeout = getenv('PMSS_COMMAND_TIMEOUT');
+    putenv('PMSS_COMMAND_TIMEOUT='.(string) $seconds);
+    try {
+        return $callback(...$arguments);
+    } finally {
+        putenv($previousTimeout === false ? 'PMSS_COMMAND_TIMEOUT' : 'PMSS_COMMAND_TIMEOUT='.$previousTimeout);
+    }
+}
+
 /**
  * Return the environment every apt/dpkg command must inherit.
  *
