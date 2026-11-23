@@ -314,6 +314,13 @@ order; probe commands still pass through the same guarded lock builder.
 Severity/device ordering, model truncation, metric defaults and JSON bytes remain
 unchanged, covered by the storage-health characterization tests.
 
+Storage-health free-space probes reject non-string, empty, NUL-containing and
+option-shaped mount selectors before command capture. Rejected selectors use the
+existing `space_unreadable` record and leave later mounts eligible for collection.
+Valid selectors retain command bytes, timeout, mount-device checks and metrics.
+`StorageHealthSpaceInputSafetyTest` covers these boundaries with injected callbacks;
+execution stays on testing machines, with changed-file PHP syntax checks on the devbox.
+
 qBittorrent throttle predicates read the selected build's value directly, and
 successful stopped convergence clears its own deferred notice. These operations
 have no separate single-caller adapters. The operator's trimmed integer reader

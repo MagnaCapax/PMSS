@@ -75,7 +75,10 @@ function pmssStorageHealthSnapshotSpace(string $timestamp, array $mounts = ['/ho
             $entries[] = $entry;
             continue;
         }
-        $result = $capture('stat -f -c '.escapeshellarg('%S %b %f %a %c %d').' '.escapeshellarg($mount), 15);
+        // Shell quoting cannot make an option into an operand or accept NUL bytes.
+        $result = is_string($mount) && $mount !== '' && $mount[0] !== '-' && strpos($mount, "\0") === false
+            ? $capture('stat -f -c '.escapeshellarg('%S %b %f %a %c %d').' '.escapeshellarg($mount), 15)
+            : ['rc' => 1];
         $metrics = (int) ($result['rc'] ?? 1) === 0 ? pmssStorageHealthSpaceParse((string) ($result['stdout'] ?? '')) : null;
         if ($metrics === null) {
             $entry['severity'] = 'warn';
