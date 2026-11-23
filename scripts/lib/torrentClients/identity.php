@@ -120,3 +120,21 @@ function pmssTorrentClientNativeStop(string $user, string $client, int $signal =
     }
     return $stopped;
 }
+
+/**
+ * SIGTERM the account's native client, wait up to about ten seconds for it to exit, then SIGKILL any left.
+ * A client killed mid-write loses its in-flight data, and one that is still exiting can rewrite its config
+ * after the caller edits it, so callers that edit config next use this instead of a bare SIGKILL.
+ *
+ * @param array{stop?:callable,remaining?:callable,pause?:callable,attempts?:int} $ops
+ */
+function pmssTorrentClientNativeStopWithGrace(string $user, string $client, array $ops = []): void
+{
+    $stop = $ops['stop'] ?? static function (int $signal) use ($user, $client): int { return pmssTorrentClientNativeStop($user, $client, $signal); };
+    $remaining = $ops['remaining'] ?? static function () use ($user, $client): array { return pmssTorrentClientNativeStopPids($user, $client); };
+    $pause = $ops['pause'] ?? static function (): void { usleep(200000); };
+    $attempts = $ops['attempts'] ?? 50;
+    $stop(15);
+    for ($i = 0; $i < $attempts && $remaining() !== []; $i++) $pause();
+    if ($remaining() !== []) $stop(9);
+}

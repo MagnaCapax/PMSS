@@ -142,7 +142,7 @@ function pmssQbittorrentPortEnsure(string $user, string $home, ?int $assignedPor
         return true;
     }
 
-    pmssTorrentClientNativeStop($user, 'qbittorrent', 9);
+    pmssTorrentClientNativeStopWithGrace($user, 'qbittorrent');
 
     return pmssQbittorrentConfigMutate(
         $user,
