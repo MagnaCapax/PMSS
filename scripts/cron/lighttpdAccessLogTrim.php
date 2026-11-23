@@ -1,7 +1,7 @@
 #!/usr/bin/env php
 <?php
 /**
- * Trim oversized per-user lighttpd access logs in place.
+ * Trim oversized or aged per-user lighttpd access logs in place (size cap and 30-day retention cap, ADR 0337).
  *
  * @license GPL-3.0-only
  * @author PMSS Team
@@ -22,7 +22,9 @@ foreach (pmssManagedHomeUsersList() as $thisUser) {
     $result = pmssLighttpdAccessLogTrimFile($logPath, $thresholdBytes);
     if (($result['status'] ?? '') === 'trimmed') {
         $trimmed++;
-        $logger->msg("Trimmed oversized lighttpd access log for {$thisUser} ({$result['sizeBefore']} bytes)");
+        $logger->msg(($result['reason'] ?? '') === 'age'
+            ? "Trimmed aged lighttpd access log for {$thisUser} (oldest entry past the retention cap, {$result['sizeBefore']} bytes)"
+            : "Trimmed oversized lighttpd access log for {$thisUser} ({$result['sizeBefore']} bytes)");
         continue;
     }
     if (($result['status'] ?? '') === 'error') {

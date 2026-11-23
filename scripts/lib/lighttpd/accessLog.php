@@ -11,12 +11,37 @@ if (!defined('PMSS_LIGHTTPD_ACCESS_LOG_THRESHOLD_BYTES')) {
     define('PMSS_LIGHTTPD_ACCESS_LOG_THRESHOLD_BYTES', 100 * 1024 * 1024);
 }
 
+if (!defined('PMSS_LIGHTTPD_ACCESS_LOG_MAX_AGE_SECONDS')) {
+    // Privacy retention cap (ADR 0337): the log holds visitor addresses and request paths.
+    define('PMSS_LIGHTTPD_ACCESS_LOG_MAX_AGE_SECONDS', 30 * 86400);
+}
+
 /**
- * Truncate a regular lighttpd access log in place once it exceeds the limit.
+ * True when the oldest entry of a locked access log is older than the retention cap.
+ *
+ * The first line is the oldest entry (the log is append-only), so its own timestamp bounds retention even while
+ * the log is still being written; a first line without the default `[dd/Mon/yyyy:HH:MM:SS +zzzz]` stamp falls
+ * back to the file mtime. An empty log or a disabled cap is never stale.
+ *
+ * @param resource $handle Locked handle positioned anywhere; it is rewound to the start.
+ * @param array<string, int> $handleStat fstat() of the same handle.
+ */
+function pmssLighttpdAccessLogIsStale($handle, array $handleStat, ?int $maxAgeSeconds, ?int $now = null): bool
+{
+    if ($maxAgeSeconds === null || $maxAgeSeconds <= 0 || (int) ($handleStat['size'] ?? 0) === 0) return false;
+    $line = @fseek($handle, 0) === 0 ? @fgets($handle, 4096) : false;
+    $stamp = is_string($line) && preg_match('~\[(\d{2}/[A-Za-z]{3}/\d{4}:\d{2}:\d{2}:\d{2} [+-]\d{4})\]~', $line, $match) === 1
+        ? \DateTime::createFromFormat('d/M/Y:H:i:s O', $match[1]) : false;
+    $oldest = $stamp !== false ? $stamp->getTimestamp() : (int) ($handleStat['mtime'] ?? 0);
+    return $oldest < ($now ?? time()) - $maxAgeSeconds;
+}
+
+/**
+ * Truncate a regular lighttpd access log in place once it exceeds the size limit or its oldest entry exceeds the age cap.
  *
  * @return array<string, int|string>
  */
-function pmssLighttpdAccessLogTrimFile(string $path, int $thresholdBytes): array
+function pmssLighttpdAccessLogTrimFile(string $path, int $thresholdBytes, ?int $maxAgeSeconds = PMSS_LIGHTTPD_ACCESS_LOG_MAX_AGE_SECONDS, ?int $now = null): array
 {
     if ($thresholdBytes < 0 || !pmssUserFilePathIsSafe($path) || !pmssRegularFilePathIsReadable($path)) {
         return ['status' => 'skip', 'reason' => 'unsafe_target'];
@@ -31,6 +56,7 @@ function pmssLighttpdAccessLogTrimFile(string $path, int $thresholdBytes): array
     if (!is_resource($handle)) return ['status' => 'error', 'reason' => 'open_failed'];
     $result = null;
     $sizeBefore = null;
+    $aged = false;
     try {
         if (!@flock($handle, LOCK_EX | LOCK_NB)) {
             $result = ['status' => 'skip', 'reason' => 'lock_busy'];
@@ -40,14 +66,15 @@ function pmssLighttpdAccessLogTrimFile(string $path, int $thresholdBytes): array
                 $result = ['status' => 'skip', 'reason' => 'path_changed'];
             } elseif (($handleStat['nlink'] ?? 1) !== 1) {
                 $result = ['status' => 'skip', 'reason' => 'multiple_links'];
-            } elseif (($sizeBefore = (int) ($handleStat['size'] ?? 0)) <= $thresholdBytes) {
+            } elseif (($sizeBefore = (int) ($handleStat['size'] ?? 0)) <= $thresholdBytes
+                && !($aged = pmssLighttpdAccessLogIsStale($handle, $handleStat, $maxAgeSeconds, $now))) {
                 $result = ['status' => 'skip', 'reason' => 'below_threshold', 'sizeBefore' => $sizeBefore];
             } elseif (!@ftruncate($handle, 0)) {
                 $result = ['status' => 'error', 'reason' => 'truncate_failed', 'sizeBefore' => $sizeBefore];
             } elseif (!@fflush($handle)) {
                 $result = ['status' => 'error', 'reason' => 'flush_failed', 'sizeBefore' => $sizeBefore];
             } else {
-                $result = ['status' => 'trimmed', 'sizeBefore' => $sizeBefore];
+                $result = ['status' => 'trimmed', 'sizeBefore' => $sizeBefore] + ($aged ? ['reason' => 'age'] : []);
             }
         }
     } finally {

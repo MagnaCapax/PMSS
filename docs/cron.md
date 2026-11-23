@@ -76,8 +76,9 @@ append logs to `/var/log/pmss/<script>.log`. Highlights include:
 - `checkLighttpdInstances.php` – Confirm each user’s lighttpd/php-cgi pair and probe the php-cgi sockets that should exist immediately after startup. An `ECONNREFUSED` probe does not count as a failure when strict `ss -xln` evidence shows enough live account socket listeners on different indices; other socket-probe failures must persist across consecutive watchdog runs before the stack is restarted. After a restart, the same bounded listener-coverage reader verifies that php-cgi returned and emits a distinct `restart_attempted_still_down` or `restart_attempted_unverified` signal without triggering another restart. The same three-cycle gate consumes newly appended nginx upstream evidence: a response header clears the state (including application-level 502s), while repeated no-header 502s restart lighttpd once and regenerate its managed config only if the transport failure continues.
 - `lighttpdAccessLogTrim.php` – Truncate `~/.lighttpd/access.log` in place once
   it exceeds 100 MiB so long-lived reverse-proxied web UIs do not silently
-  consume user quota. The root cron template runs it hourly and logs trims to
-  `/var/log/pmss/lighttpdAccessLogTrim.log`.
+  consume user quota, or once its oldest entry is older than 30 days so visitor
+  addresses are not kept indefinitely (ADR 0337). The root cron template runs it
+  hourly and logs trims to `/var/log/pmss/lighttpdAccessLogTrim.log`.
 - `checkQbittorrentInstances.php` – Restart qBittorrent if processes exit.
   Reconcile WebUI settings (ADR 0102) before the stopped-config and restart
   steps. A changed file causes one bounded native-daemon stop; the existing

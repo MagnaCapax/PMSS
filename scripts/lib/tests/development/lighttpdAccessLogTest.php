@@ -170,6 +170,86 @@ PHP;
         $this->pmssAssertArraySubsetSame(['status' => 'skip', 'reason' => 'unsafe_target'], $result);
     }
 
+    /** Entry stamped 2026-01-01 00:00:00 UTC (epoch 1767225600) in lighttpd's default access-log format. */
+    private function pmssAccessLogLine(string $stamp = '01/Jan/2026:00:00:00 +0000'): string
+    {
+        return '203.0.113.7 example.invalid user1 ['.$stamp.'] "GET /user-user1/ HTTP/1.1" 200 512 "-" "agent"'."\n";
+    }
+
+    public function testRetentionCapIsThirtyDays(): void
+    {
+        $this->assertEquals(30 * 86400, \PMSS_LIGHTTPD_ACCESS_LOG_MAX_AGE_SECONDS);
+    }
+
+    public function testTrimFileUsesTheOldestEntryNotTheMtimeForTheAgeCap(): void
+    {
+        // A log that is still appended to always has a fresh mtime; its first line is what bounds retention.
+        $cap = 30 * 86400;
+        foreach ([
+            // [first-line stamp, now, expected status, final size]
+            ['01/Jan/2026:00:00:00 +0000', 1767225600 + $cap, 'skip', null],
+            ['01/Jan/2026:00:00:00 +0000', 1767225600 + $cap + 1, 'trimmed', 0],
+            ['01/Jan/2026:02:00:00 +0200', 1767225600 + $cap + 1, 'trimmed', 0],
+            ['01/Jan/2026:02:00:00 +0200', 1767225600 + $cap, 'skip', null],
+        ] as [$stamp, $now, $status, $finalSize]) {
+            $path = $this->tempDir.'/fixtur01/.lighttpd/access.log';
+            $this->pmssWriteFile($path, $this->pmssAccessLogLine($stamp).$this->pmssAccessLogLine('20/Feb/2026:00:00:00 +0000'));
+            clearstatcache();
+            $size = filesize($path);
+
+            $result = \pmssLighttpdAccessLogTrimFile($path, 1024 * 1024, $cap, $now);
+
+            $this->assertSame($status, $result['status'], $stamp.' at '.$now);
+            $this->assertSame($finalSize ?? $size, filesize($path), $stamp.' at '.$now);
+            if ($status === 'trimmed') $this->pmssAssertArraySubsetSame(['reason' => 'age', 'sizeBefore' => $size], $result);
+        }
+    }
+
+    public function testTrimFileFallsBackToMtimeWhenTheFirstLineHasNoTimestamp(): void
+    {
+        $path = $this->tempDir.'/fixtur01/.lighttpd/access.log';
+        $this->pmssWriteFile($path, "custom format line without a stamp\n");
+        touch($path, time() - 40 * 86400);
+        $this->pmssAssertArraySubsetSame(['status' => 'trimmed', 'reason' => 'age'], \pmssLighttpdAccessLogTrimFile($path, 1024 * 1024));
+        clearstatcache();
+        $this->assertEquals(0, filesize($path));
+
+        $this->pmssWriteFile($path, "custom format line without a stamp\n");
+        $this->pmssAssertArraySubsetSame(['status' => 'skip', 'reason' => 'below_threshold'], \pmssLighttpdAccessLogTrimFile($path, 1024 * 1024));
+        clearstatcache();
+        $this->assertTrue(filesize($path) > 0);
+    }
+
+    public function testAgeCapDisabledEmptyLogAndSizeCapKeepTheirOwnBehaviour(): void
+    {
+        $path = $this->tempDir.'/fixtur01/.lighttpd/access.log';
+        $this->pmssWriteFile($path, $this->pmssAccessLogLine());
+        // A null cap turns the age rule off; the oldest entry alone never trims.
+        $this->pmssAssertArraySubsetSame(['status' => 'skip', 'reason' => 'below_threshold'], \pmssLighttpdAccessLogTrimFile($path, 1024 * 1024, null, 1767225600 + 400 * 86400));
+        // An empty log has nothing to age, whatever its mtime.
+        $this->pmssWriteFile($path, '');
+        touch($path, 1000);
+        $this->pmssAssertArraySubsetSame(['status' => 'skip', 'reason' => 'below_threshold'], \pmssLighttpdAccessLogTrimFile($path, 1024 * 1024));
+        // Over the size cap the trim is a size trim, with no age reason.
+        $this->pmssWriteFile($path, $this->pmssAccessLogLine().str_repeat('x', 128));
+        $result = \pmssLighttpdAccessLogTrimFile($path, 64);
+        $this->assertSame('trimmed', $result['status']);
+        $this->assertFalse(isset($result['reason']));
+    }
+
+    public function testAgeCapStillRefusesSymlinkedLog(): void
+    {
+        // The issue's secondary finding: an old log behind a symlink is skipped, never truncated through the link.
+        $realPath = $this->pmssWriteFile($this->tempDir.'/real-access.log', $this->pmssAccessLogLine());
+        $linkPath = $this->tempDir.'/fixtur01/.lighttpd/access.log';
+        $this->pmssWriteSymlinks($this->tempDir, ['fixtur01/.lighttpd/access.log' => $realPath]);
+
+        $result = \pmssLighttpdAccessLogTrimFile($linkPath, 1024 * 1024, 86400, 1767225600 + 400 * 86400);
+
+        $this->pmssAssertArraySubsetSame(['status' => 'skip', 'reason' => 'unsafe_target'], $result);
+        $this->assertTrue(filesize($realPath) > 0);
+    }
+
     public function testCronWiringSchedulesAndUsesSharedTrimHelper(): void
     {
         $this->pmssAssertRepoFileContainsString(
