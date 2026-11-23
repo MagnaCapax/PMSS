@@ -185,7 +185,8 @@ class UpdateAppInstallerContractsTest extends TestCase
             'function pmssRunPinnedRemoteArchiveStep(',
             'function pmssRunPinnedRemoteArchiveStep(string $label, string $url, string $expectedSha256, string $archiveName, string $sourceDir, string $description, array $postExtractCommands, string $workDir = \'/root/compile\'): bool',
             "substr(\$archiveName, -7) === '.tar.xz' ? '-xJf' : '-xzf'",
-            "'tar '.\$tarMode",
+            "'umask 022'",
+            "'tar --no-same-owner --no-same-permissions '.\$tarMode",
         ]);
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/update/apps/remoteBinary/artifact.php', [
             'function pmssPinnedRemoteArtifactTempFileUse(',
