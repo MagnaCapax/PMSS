@@ -414,6 +414,29 @@ SH
         }, ['PMSS_TEST_WGET_FILE' => $archivePath]);
     }
 
+    public function testRunPinnedRemoteArchiveStepExtractsWithoutArchiveOwnerOrModes(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-remote-archive-', 0700);
+        $archiveRoot = $root.'/archive-root';
+        $this->pmssWriteFile($archiveRoot.'/source/payload.txt', 'archive-ok');
+        $archivePath = $root.'/archive.tar.gz';
+        $this->pmssCreateTarGzArchive($archivePath, $archiveRoot, ['source'], '', '2>&1');
+
+        $this->withFakeDownloadBody('', function ($root, $commandLog, $dpkgCapture, $body, $expectedSha256): void {
+            // A recording tar in front of the real one: root extraction must never keep archive uids or modes.
+            $this->pmssWriteExecutableFiles($root.'/bin', ['tar' => "#!/bin/sh\nprintf 'tar %s\\n' \"\$*\" >> \"\${PMSS_TEST_COMMAND_LOG}\"\nexec /bin/tar \"\$@\"\n"]);
+
+            $this->assertTrue($this->runDemoArchiveStep($expectedSha256, $root.'/compile'));
+
+            $tarLine = '';
+            foreach (explode("\n", $this->pmssReadFileOrEmpty($commandLog)) as $line) {
+                if (strpos($line, 'tar ') === 0) $tarLine = $line;
+            }
+            $this->assertStringContainsAllStrings(['--no-same-owner --no-same-permissions -xzf archive.tar.gz'], $tarLine);
+            $this->assertEquals('archive-ok', (string) @file_get_contents($root.'/compile/source/payload.txt'));
+        }, ['PMSS_TEST_WGET_FILE' => $archivePath]);
+    }
+
     public function testInstallPinnedRemoteBinarySkipsDownloadWhenChecksumAlreadyMatches(): void
     {
         $this->withFakeDownloadBody('new-payload', function ($root, $commandLog, $dpkgCapture, $body, $expectedSha256): void {

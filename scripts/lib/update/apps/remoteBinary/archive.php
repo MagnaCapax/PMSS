@@ -78,10 +78,13 @@ function pmssRunPinnedRemoteArchiveStep(string $label, string $url, string $expe
     }
 
     return pmssPinnedRemoteArtifactTempFileUse($label, $url, $expectedSha256, static function (string $archivePath) use ($archiveName, $sourceDir, $description, $postExtractCommands, $workDir): bool {
-        $tarMode = substr($archiveName, -7) === '.tar.xz' ? '-xJf' : '-xzf';
-        $commands = ['set -e', 'mkdir -p '.escapeshellarg($workDir), 'cd '.escapeshellarg($workDir),
+        // Options precede the archive operand so POSIXLY_CORRECT cannot turn them into member names.
+        $tarMode = '--no-same-owner --no-same-permissions '.(substr($archiveName, -7) === '.tar.xz' ? '-xJf' : '-xzf');
+        // Root extracts: members must not keep archive uids (a tenant uid in a shared /tmp tree) or modes.
+        $commands = ['set -e', 'umask 022', 'mkdir -p '.escapeshellarg($workDir), 'cd '.escapeshellarg($workDir),
             'rm -rf '.escapeshellarg($sourceDir).' '.escapeshellarg($archiveName),
-            'cp '.escapeshellarg($archivePath).' '.escapeshellarg($archiveName), 'tar '.$tarMode.' '.escapeshellarg($archiveName)];
+            'cp '.escapeshellarg($archivePath).' '.escapeshellarg($archiveName),
+            'tar '.$tarMode.' '.escapeshellarg($archiveName)];
         foreach ($postExtractCommands as $command) {
             $commands[] = $command;
         }
