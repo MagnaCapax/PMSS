@@ -274,6 +274,13 @@ switch($mode)
 		$result = makeSimpleCall(array("d.erase"), $hash);
 		break;
 	}
+	case "updatetracker":	/**/
+	{
+		// rTorrent 0.16 refuses a client-built d.tracker_announce on the untrusted connection.
+		// The command is fixed here; the hash stays an escaped parameter.
+		$result = makeSimpleCall(array("d.tracker_announce"), $hash);
+		break;
+	}
 	case "dsetprio":	/**/
 	{
 		$req = new rXMLRPCRequest();

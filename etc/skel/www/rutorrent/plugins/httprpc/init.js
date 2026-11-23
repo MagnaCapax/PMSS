@@ -225,6 +225,13 @@ rTorrentStub.prototype.remove = function()
 	this.getCommon("remove");
 }
 
+// getCommon() falls back to plugin["orig"+cmd], so the stored name keeps the lower-case mode name.
+plugin.origupdatetracker = rTorrentStub.prototype.updateTracker;
+rTorrentStub.prototype.updateTracker = function()
+{
+	this.getCommon("updatetracker");
+}
+
 plugin.origdsetprio = rTorrentStub.prototype.dsetprio;
 rTorrentStub.prototype.dsetprio = function()
 {

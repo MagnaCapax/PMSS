@@ -61,5 +61,30 @@ PHP, <<<'PHP'
 	        	$result = array();
 PHP
         ],
-    ]);
+    ], pmssUserRutorrentRpcUpdateTrackerPatches());
+}
+
+/**
+ * Route "Update tracker" through a trusted handler fixed on the server (rTorrent 0.16 refuses the browser-built call).
+ *
+ * Anchored on the Remove handler, which is identical in every legacy copy. The mode name matches the
+ * one later ruTorrent releases use, so a ruTorrent upgrade replaces these files without a conflict.
+ *
+ * @return array<int, array{0:string,1:string,2:string}> Exact ordered compatibility edits.
+ */
+function pmssUserRutorrentRpcUpdateTrackerPatches(): array
+{
+    $removeCase = "\tcase \"remove\":\t/**/\n\t{\n\t\t\$result = makeSimpleCall(array(\"d.erase\"), \$hash);\n\t\tbreak;\n\t}";
+    $removeStub = "plugin.origremove = rTorrentStub.prototype.remove;\n"
+        ."rTorrentStub.prototype.remove = function()\n{\n\tthis.getCommon(\"remove\");\n}\n";
+    return [
+        ['plugins/httprpc/action.php', $removeCase, $removeCase."\n\tcase \"updatetracker\":\t/**/\n\t{\n"
+            ."\t\t// rTorrent 0.16 refuses a client-built d.tracker_announce on the untrusted connection.\n"
+            ."\t\t// The command is fixed here; the hash stays an escaped parameter.\n"
+            ."\t\t\$result = makeSimpleCall(array(\"d.tracker_announce\"), \$hash);\n\t\tbreak;\n\t}"],
+        ['plugins/httprpc/init.js', $removeStub, $removeStub."\n"
+            ."// getCommon() falls back to plugin[\"orig\"+cmd], so the stored name keeps the lower-case mode name.\n"
+            ."plugin.origupdatetracker = rTorrentStub.prototype.updateTracker;\n"
+            ."rTorrentStub.prototype.updateTracker = function()\n{\n\tthis.getCommon(\"updatetracker\");\n}\n"],
+    ];
 }

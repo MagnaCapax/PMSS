@@ -9,8 +9,8 @@ class UserRutorrentCompatPatchTest extends TestCase
     {
         $patches = \pmssUserRutorrentRpcCompatibilityPatches();
         // Captured from the original catalog on a testing machine; includes whitespace and order.
-        $this->assertSame('955ad78521f90482daa7d964facd91db356b0aea6b2adfbf69fbc55afc672441', hash('sha256', serialize($patches)));
-        $this->assertSame(18, count($patches));
+        $this->assertSame('38e5bb6f8397524bde6725f46456816c4e6dff49d0db3550caac545963c5bdc2', hash('sha256', serialize($patches)));
+        $this->assertSame(20, count($patches));
     }
 
     public function testCompatibilityPatchesLegacyTargets(): void
