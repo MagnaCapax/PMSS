@@ -111,15 +111,15 @@ function pmssUserWatchdogProcStartTime(string $procRoot, string $pid): ?int
     if (strpos($procRoot, "\0") !== false || (pmssUnsignedDecimalIntParse($pid) ?? 0) < 1) return null;
     $bootRaw = (string) @file_get_contents($procRoot.'/stat');
     // Corruption anywhere in either observation cannot certify a kernel start time.
-    $boot = strpos($bootRaw, "\0") === false && preg_match('/^btime\s+(\d+)$/m', $bootRaw, $m) === 1
+    $boot = strpos($bootRaw, "\0") === false && preg_match('/^btime[ \t]+(\d+)$/m', $bootRaw, $m) === 1
         ? pmssUnsignedDecimalIntParse($m[1]) : null;
     $stat = (string) @file_get_contents($procRoot.'/'.$pid.'/stat');
     // Require the requested PID and a parenthesised command before trusting the field offsets.
     $close = strpos($stat, "\0") === false && preg_match('/\A([0-9]+) \(/', $stat, $m) === 1
         && pmssUnsignedDecimalIntParse($m[1]) === pmssUnsignedDecimalIntParse($pid)
         ? strrpos($stat, ')') : false;
-    // Fields after the parenthesised command name start at field 3, so field 22 is index 19.
-    $fields = $close === false ? array() : pmssConfigLineColumns(substr($stat, $close + 1), 0, []);
+    // Field 3 must follow ") "; fields after the command put field 22 at index 19.
+    $fields = $close === false || substr($stat, $close, 2) !== ') ' ? array() : pmssConfigLineColumns(substr($stat, $close + 1), 0, []);
     $ticks = isset($fields[19]) ? pmssUnsignedDecimalIntParse($fields[19]) : null;
     $seconds = $ticks === null ? null : intdiv($ticks, 100);
     // Unrepresentable kernel fields or sums retain the existing inode-time fallback.

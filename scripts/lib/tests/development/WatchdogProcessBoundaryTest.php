@@ -74,6 +74,8 @@ class WatchdogProcessBoundaryTest extends TestCase
             ['1000', PHP_INT_MAX.'0'], ['1000', '000'.PHP_INT_MAX.'0'],
             [(string) PHP_INT_MAX, '100'], [(string) (PHP_INT_MAX - 1), '200'],
             ['invalid', '100'], ['1000', '-1'], ['1000', 'invalid'], ['1000', ''],
+            ["\n1000", '100'], ["\r1000", '100'], ["\v1000", '100'],
+            ["\f1000", '100'], ["\t\n1000", '100'],
         ] as [$boot, $ticks]) {
             $proc = $this->procFixture($boot, $ticks);
             $this->assertSame(1234567890, pmssUserWatchdogProcStartTime($proc, '77'));
@@ -83,7 +85,7 @@ class WatchdogProcessBoundaryTest extends TestCase
     public function testRepresentableKernelTimesPreserveTickTruncationAndBounds(): void
     {
         foreach ([
-            ['1000', '12345', 1123], ['0001000', '00012345', 1123],
+            ['1000', '12345', 1123], ['0001000', '00012345', 1123], ["\t1000", '100', 1001],
             ['0', '0', 0], ['1000', '99', 1000], ['1000', '100', 1001],
             [(string) PHP_INT_MAX, '0', PHP_INT_MAX],
             [(string) (PHP_INT_MAX - 1), '100', PHP_INT_MAX],
@@ -123,6 +125,8 @@ class WatchdogProcessBoundaryTest extends TestCase
             ['(worker)', 1234567890], ['77 worker)', 1234567890],
             ['77 (worker', 1234567890], ["77\t(worker)", 1234567890],
             ["junk\n77 (worker)", 1234567890], ['-77 (worker)', 1234567890],
+            ["77 (worker)\t", 1234567890], ["77 (worker)\n", 1234567890],
+            ["77 (worker)\r", 1234567890], ['77 (worker)S', 1234567890],
         ] as [$header, $expected]) {
             // Keep a complete, valid numeric tail so only the header decides the fallback.
             $this->pmssWriteFile($proc.'/77/stat', $header.$tail);

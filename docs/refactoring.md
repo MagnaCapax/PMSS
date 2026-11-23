@@ -376,6 +376,12 @@ tick truncation, timestamp bounds and read order remain unchanged (ADR 0211).
 fixtures; execution stays on testing machines, with changed-file PHP syntax checks
 on the devbox.
 
+Boot-time fields require horizontal whitespace after `btime`, and process-stat
+fields require a space after the command's final closing parenthesis. Malformed
+separators use the same inode-time fallback before field offsets are trusted.
+The boundary fixture covers vertical whitespace, attached suffixes, and valid
+horizontal tabs while retaining command names containing spaces or parentheses.
+
 Media-stack port discovery rejects NUL-containing home/configuration paths before
 filesystem probes and NUL-containing configuration bytes before port matching.
 These observations retain the existing null/empty-array fallbacks; valid paths,
