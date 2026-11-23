@@ -1075,10 +1075,10 @@ libzvbi-common					install
 libzvbi0:amd64					install
 lighttpd					install
 lighttpd-mod-deflate				install
-lighttpd-mod-magnet				install
 lighttpd-mod-openssl				install
 lighttpd-mod-webdav				install
 lighttpd-modules-ldap				install
+lighttpd-modules-lua				install
 lighttpd-modules-mysql				install
 links						install
 linux-base					install
