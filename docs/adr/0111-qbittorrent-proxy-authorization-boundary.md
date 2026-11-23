@@ -179,3 +179,17 @@ creates its database at the catalog's `credentialStore` path and, after forcing
 a repair on the started instance (for example by changing `scryer.pw` to mode
 0644), the saved Login remains byte-identical and still signs in before the
 owner changes it in-app (ADR 0101).
+
+## Copyparty and qui: measured, no Bearer (2026-11-23, Refs #1260)
+
+The `bearerAuthorization` flag is only for a client with a measured Bearer use,
+and the Scryer row alone carries it. A source read of the pinned releases
+(Copyparty 1.20.26, qui 1.32.0; no browser capture) found both web clients
+cookie-only. Copyparty's upload scripts set only `Content-Type` and `X-Up2k-*`
+headers, its session is the `cppwd` cookie, and the server parses `Authorization`
+as Basic in `HttpCli.run()` (first 100 KB of `httpcli.py` read; no `bearer` string there). qui's `web/src/lib/api.ts` sets no `Authorization` header and
+sends cookies (`credentials: "include"`); its API clients use `X-API-Key`.
+Neither row gets the flag: it would drop the panel gate on that route and leave
+the app's own login as the only barrier. Re-run this check on a pin bump of
+either app, and before any change here run a post-sign-in request at the panel
+address on the new pin.
