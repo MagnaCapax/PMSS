@@ -77,6 +77,27 @@ foreach ($users as $user) {
     if (is_link($home.'/.rtorrentDisable') || is_file($home.'/.rtorrentDisable')) {
         $targets = rtorrentProcessKillManagedPids($user, SIGTERM);
         pmssCheckRtorrentLogBoth($user, "rtorrent disabled by user (.rtorrentDisable); cleanup signal requested (signal=TERM targets={$targets})", $debug);
+        // The panel route needs the rc even while rTorrent stays off (GH#1138): repair it, start nothing.
+        $repair = pmssCheckRtorrentOptOutRepair(
+            $user,
+            $home,
+            $stateDir,
+            static function (string $repairUser, string $repairHome) use ($debug): bool {
+                return pmssCheckRtorrentRecoverMissingConfig($repairUser, $repairHome, $debug);
+            },
+            static function (string $repairUser): bool {
+                $route = pmssUserWatchdogCommandRun(
+                    pmssBuildCommand('/scripts/util/createNginxConfig.php', ['--user', $repairUser, '--reload']),
+                    120,
+                    $repairUser,
+                    'rtorrent'
+                );
+                return !$route['timed_out'] && $route['rc'] === 0;
+            }
+        );
+        if ($repair !== 'healthy' && $repair !== 'throttled') {
+            pmssCheckRtorrentLogBoth($user, "rtorrent disabled; panel route repair: {$repair}", $debug);
+        }
         continue;
     }
     if (pmssUserWatchdogBackoffActive($user, 'rtorrent')) continue;

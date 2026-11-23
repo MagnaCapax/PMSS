@@ -154,4 +154,5 @@ function pmssCheckRtorrentRecoverMissingConfig(string $user, string $home, bool 
     return true;
 }
 
+require_once __DIR__.'/watchdogOptOutRepair.php';
 require_once __DIR__.'/watchdogProcessFlow.php';
