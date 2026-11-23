@@ -1,7 +1,7 @@
 # ADR 0337: Per-user lighttpd access log retention cap
 
 Date: 2026-11-23
-Category: privacy
+Category: data
 
 ## Status
 Accepted
