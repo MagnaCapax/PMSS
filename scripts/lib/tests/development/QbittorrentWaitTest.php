@@ -10,13 +10,12 @@ final class QbittorrentWaitTest extends TestCase
 {
     public function testConfigureStopUsesItsFullBudgetWithoutSleepingOrSignallingARealPid(): void
     {
-        $pauses = 0; $signals = [];
+        $pauses = []; $signals = [];
         $this->assertFalse(\pmssConfigureTorrentClientStop('/fixture/t', [
             'signal' => static function ($pid, $signal) use (&$signals): bool { $signals[] = [$pid, $signal]; return true; },
-            'pause' => static function () use (&$pauses): void { $pauses++; },
-        ] + self::pmssMakeCallbacks(['pids' => [101]])));
+        ] + self::pmssMakeCallbacks(['pause' => null], $pauses) + self::pmssMakeCallbacks(['pids' => [101]])));
         $this->assertSame([[101, 15]], $signals);
-        $this->assertSame(600, $pauses);
+        $this->assertSame(600, count($pauses));
     }
 
     public function testUnsafeStopWaitsForExitAfterTheForceSignalWithoutSleeping(): void
@@ -50,27 +49,26 @@ final class QbittorrentWaitTest extends TestCase
 
     public function testSlowStartExhaustsTheProductionObservationBudgetWithoutStopping(): void
     {
-        $pauses = 0;
+        $pauses = [];
         $this->assertTrue(\pmssQbittorrentFrontendSocketWait('/fixture/t', [
             'build' => '5.2.4',
-            'pause' => static function () use (&$pauses): void { $pauses++; },
             'stop' => static function (): void { throw new \RuntimeException('Healthy slow start stopped'); },
             'notice' => static function (): void { throw new \RuntimeException('Inconclusive observation reported'); },
-        ] + self::pmssMakeCallbacks(['read' => '23456', 'pids' => [101], 'listeners' => []])));
-        $this->assertSame(199, $pauses);
+        ] + self::pmssMakeCallbacks(['pause' => null], $pauses)
+            + self::pmssMakeCallbacks(['read' => '23456', 'pids' => [101], 'listeners' => []])));
+        $this->assertSame(199, count($pauses));
     }
 
     public function testBothThrottleWritersExhaustTheShutdownBudgetWithoutRealPauses(): void
     {
         foreach (['pmssQbittorrentThrottleAccount', 'pmssQbittorrentFrontendThrottleAccount'] as $apply) {
-            $home = $this->pmssMakeTrackedHomeRoot('pmss-qbt-virtual-throttle-').'/alice';
-            $pauses = 0; $notice = '';
+            $home = $this->pmssMakeTrackedHomeRoot('pmss-qbt-virtual-throttle-').'/fixtur01';
+            $pauses = []; $notice = '';
             $this->assertSame(null, $apply($home, 500, true, [
-                'pause' => static function () use (&$pauses): void { $pauses++; },
                 'notice' => static function ($home, $text) use (&$notice): void { $notice = $text; },
                 'restore' => static function (): void { throw new \RuntimeException('Still-running config restored'); },
-            ] + self::pmssMakeCallbacks(['accountPids' => [101]])));
-            $this->assertSame(600, $pauses);
+            ] + self::pmssMakeCallbacks(['pause' => null], $pauses) + self::pmssMakeCallbacks(['accountPids' => [101]])));
+            $this->assertSame(600, count($pauses));
             $this->assertStringContainsString('still running', $notice);
         }
     }

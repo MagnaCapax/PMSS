@@ -14,13 +14,13 @@ final class QbittorrentRefusalTest extends TemporaryHomeRootTestCase
         $this->assertTrue(\pmssQbittorrentFrontendRefuse($home));
         $marker = $home.'/.config/pmss/torrentClients/qbittorrent.refused';
         $this->assertSame(0600, fileperms($marker) & 0777);
-        $restores = 0;
-        $ops = ['restore' => static function () use (&$restores): bool { $restores++; return true; }];
+        $restores = [];
+        $ops = self::pmssMakeCallbacks(['restore' => true], $restores);
         for ($cycle = 0; $cycle < 3; $cycle++) {
             $this->assertTrue(\pmssQbittorrentAccountWatchdog($home, false, $ops));
             $this->assertFalse(\pmssTorrentClientResolverLaunch($home, 'qbittorrent', false, ['system' => true]));
         }
-        $this->assertSame(3, $restores);
+        $this->assertSame(['restore', 'restore', 'restore'], $restores);
         $this->pmssWriteFile($home.'/.qbittorrentPort', '23456');
         $path = $this->pmssWriteFile($home.'/.config/qBittorrent/qBittorrent.conf', "[Meta]\nMigrationVersion=12\n[WebUI]\nPort=8080\n");
         $release = ['build' => '5.3.0'] + self::pmssMakeCallbacks(['accountPids' => []]);

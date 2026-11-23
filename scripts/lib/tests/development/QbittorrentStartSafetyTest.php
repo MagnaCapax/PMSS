@@ -29,11 +29,11 @@ final class QbittorrentStartSafetyTest extends TestCase
     {
         $home = $this->pmssMakeTempDir('pmss-qbt-selected-');
         $this->pmssWriteSymlinks($home, ['bin/qbittorrent/default' => 'custom']);
-        $restores = 0;
-        $this->assertFalse(\pmssTorrentClientResolverLaunch($home, 'qbittorrent', false, [
-            'restore' => static function () use (&$restores): bool { $restores++; return false; },
-        ] + self::pmssMakeCallbacks(['resolve' => '/must-not-be-executed', 'accountPids' => [], 'notice' => null])));
-        $this->assertSame(1, $restores);
+        $restores = [];
+        $this->assertFalse(\pmssTorrentClientResolverLaunch($home, 'qbittorrent', false,
+            self::pmssMakeCallbacks(['restore' => false], $restores)
+                + self::pmssMakeCallbacks(['resolve' => '/must-not-be-executed', 'accountPids' => [], 'notice' => null])));
+        $this->assertSame(['restore'], $restores);
     }
 
     public function testCommonStartRestoresLaunchesThenChecksSocket(): void
@@ -79,13 +79,13 @@ final class QbittorrentStartSafetyTest extends TestCase
     {
         $home = $this->pmssMakeTempDir('pmss-qbt-switch-refuse-');
         $this->pmssEnsureDir($home.'/bin/qbittorrent');
-        $starts = 0;
+        $starts = [];
         $result = \pmssConfigureTorrentClientSwitch($home, ['client' => 'qbittorrent', 'version' => '5.2.4'], [
             'versions' => ['5.2.4' => ['kind' => 'static']],
-            'start' => static function () use (&$starts): bool { $starts++; return true; },
-        ] + self::pmssMakeCallbacks(['backup' => ['ok' => true], 'stop' => true, 'repoint' => true, 'restore' => false]));
+        ] + self::pmssMakeCallbacks(['start' => true], $starts)
+            + self::pmssMakeCallbacks(['backup' => ['ok' => true], 'stop' => true, 'repoint' => true, 'restore' => false]));
         $this->assertFalse($result['ok']);
-        $this->assertSame(0, $starts);
+        $this->assertSame([], $starts);
         $this->assertStringContainsString('manual recovery', file_get_contents($home.'/.config/pmss/torrentClients/qbittorrent.notice'));
     }
 

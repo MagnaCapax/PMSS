@@ -107,11 +107,10 @@ final class QbittorrentSocketTest extends TestCase
             'pids' => static function () use (&$polls): array { return ++$polls > 3 ? [101] : []; },
         ] + self::pmssMakeCallbacks(['read' => '23456', 'listeners' => [['address' => '0100007F', 'port' => 23456]], 'pause' => null]);
         $this->assertTrue(\pmssQbittorrentFrontendSocketWait('/fixture/t', $ops));
-        $pauses = 0;
-        $this->assertFalse(\pmssQbittorrentFrontendSocketWait('/fixture/t', ['appearAttempts' => 5,
-            'pause' => static function () use (&$pauses): void { $pauses++; },
-        ] + self::pmssMakeCallbacks(['pids' => []]) + $ops));
-        $this->assertSame(4, $pauses);
+        $pauses = [];
+        $this->assertFalse(\pmssQbittorrentFrontendSocketWait('/fixture/t', ['appearAttempts' => 5]
+            + self::pmssMakeCallbacks(['pause' => null], $pauses) + self::pmssMakeCallbacks(['pids' => []]) + $ops));
+        $this->assertSame(4, count($pauses));
     }
 
     public function testConfiguredWebUiAndPeer8080AreAllowedForBothSectionLayouts(): void

@@ -77,13 +77,13 @@ final class TorrentClientsCuratedDelugeTest extends TestCase
     {
         $this->host('Python 3.9.2', 'bullseye', function (): void {
             $root = $this->pmssMakeTempDir('pmss-deluge-skip-');
-            $calls = 0;
+            $calls = [];
             foreach ($this->entries() as $entry) {
                 $this->assertFalse(\pmssTorrentClientsDelugeVenvCompatible($entry));
                 $this->assertFalse(\pmssTorrentClientsDelugeVenvInstall($entry,
-                    $root.'/clients/deluge/'.$entry['version'], ['install' => static function () use (&$calls): void { $calls++; }]));
+                    $root.'/clients/deluge/'.$entry['version'], self::pmssMakeCallbacks(['install' => null], $calls)));
             }
-            $this->assertSame(0, $calls);
+            $this->assertSame([], $calls);
             $results = \pmssTorrentClientsStoreConverge($this->entries(), ['root' => $root.'/clients']
                 + self::pmssMakeCallbacks(['free' => 10 * 1024 * 1024 * 1024, 'size' => 0, 'log' => null]));
             $this->assertSame(array_fill_keys(['deluge/2.0.5', 'deluge/2.1.1', 'deluge/2.2.0'], 'failed'), $results);
