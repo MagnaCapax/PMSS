@@ -47,7 +47,6 @@ PHP;
             'PMSS_TEST_CODEX_CAPTURE' => $this->tempDir.'/assistant.json',
             'PMSS_TEST_CODEX_RC' => '0',
             'PMSS_AGENTIC_DEFAULT_AGENT' => 'codex',
-            'PMSS_CODEX_NO_SANDBOX' => '0',
             'PMSS_CODEX_RUN_EVENT_LOG' => '',
             'PMSS_REFACTOR_CLAIMS_DIR' => $this->tempDir.'/claims',
         ];

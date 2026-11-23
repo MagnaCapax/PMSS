@@ -33,7 +33,6 @@ Exec placeholders:
 
 Environment:
   PMSS_CODEX_RUN_DEBUG=1  Enable bash -x tracing
-  PMSS_CODEX_NO_SANDBOX=1  Skip automatic sandbox selection
   PMSS_CODEX_DANGER_FAIL  Fail if dangerous diff patterns are detected (1=fail)
   PMSS_CODEX_RUN_EVENT_LOG  Default event log path (overridden by --event-log)
   TMPDIR                 Temp directory root for prompt output

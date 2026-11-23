@@ -122,6 +122,19 @@ class CodexLaunchersTest extends CodexLauncherTestCase
         }
     }
 
+    public function testRemovedNoSandboxSwitchCannotLeaveCodexReadOnly(): void
+    {
+        // PMSS_CODEX_NO_SANDBOX=1 used to drop the sandbox_mode config, and Codex then defaulted to read-only.
+        $result = $this->launch('codex-run.sh', ['run', '--prompt', 'fixture', '--exec', 'codex exec'], ['PMSS_CODEX_NO_SANDBOX' => '1']);
+        $this->assertSame(0, $result['rc'], $result['output']);
+        $args = $this->pmssReadJsonArrayFile($this->tempDir.'/assistant.json')['args'];
+        $this->assertTrue(in_array('sandbox_mode="danger-full-access"', $args, true), 'sandbox_mode must still be injected');
+        $this->assertStringNotContainsString('sandbox disabled', $result['output']);
+        foreach (['development/lib/codex-exec.sh', 'development/lib/codex-run-options.sh'] as $file) {
+            $this->assertStringNotContainsString('PMSS_CODEX_NO_SANDBOX', $this->pmssReadRepoFile($file), $file);
+        }
+    }
+
     public function testRefactorLaunchesWithoutExtraArgsAndNormalizesYolo(): void
     {
         foreach ([[], ['--yolo'], ['--ask-for-approval', 'never']] as $extra) {
