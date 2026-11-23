@@ -17,19 +17,16 @@ const PMSS_RCLONE_SHA256 = '231841f8d8029ae6cfca932b601b3b50d0e2c3c2cb9da3166293
 
 function pmssRcloneInstallCommand(string $version, string $archivePath, string $workDir): string
 {
-    $sourceDir = 'rclone-v'.$version.'-linux-amd64';
-    $commands = [
+    return implode(' && ', [
         'set -e',
         'cd '.escapeshellarg($workDir),
         pmssBuildCommand('unzip', ['-q', $archivePath]),
-        'cd '.escapeshellarg($sourceDir),
+        'cd '.escapeshellarg('rclone-v'.$version.'-linux-amd64'),
         pmssBuildCommand('install', ['-m', '0755', '-o', 'root', '-g', 'root', 'rclone', '/usr/bin/rclone']),
         pmssBuildCommand('mkdir', ['-p', '/usr/local/share/man/man1']),
         pmssBuildCommand('install', ['-m', '0644', 'rclone.1', '/usr/local/share/man/man1/rclone.1']),
         pmssBuildCommand('mandb'),
-    ];
-
-    return implode(' && ', $commands);
+    ]);
 }
 
 function pmssRcloneInstallFromZip(string $version, string $sha256): void
@@ -65,18 +62,16 @@ function pmssRcloneUpdate(): void
         if (pmssEnvFlagEnabled('PMSS_RCLONE_FETCH_LATEST')) {
             logmsg('[INFO] PMSS_RCLONE_FETCH_LATEST is no longer supported; using the pinned rclone '.PMSS_RCLONE_VERSION);
         }
-        $rcloneVersion = PMSS_RCLONE_VERSION;
-        $rcloneSha256 = PMSS_RCLONE_SHA256;
         $currentRclone = file_exists('/usr/bin/rclone')
             ? pmssAppVersionProbeMatch(['/usr/bin/rclone version 2>/dev/null', '/usr/bin/rclone -V 2>/dev/null'], '/rclone v?(\d+\.\d+\.\d+)/i', 1)
             : null;
-        $mismatched = $currentRclone !== null && $currentRclone !== $rcloneVersion;
+        $mismatched = $currentRclone !== null && $currentRclone !== PMSS_RCLONE_VERSION;
         if ($mismatched && !pmssPathTargetIsSafe('/usr/bin/rclone', false, true)) {
             logmsg('[WARN] Unable to replace mismatched rclone binary; leaving existing install in place');
         } elseif ($mismatched || !file_exists('/usr/bin/rclone')) {
             // install(1) replaces the old binary only after the zip passed its checksum,
             // so a failed or refused download leaves the current rclone in place.
-            pmssRcloneInstallFromZip($rcloneVersion, $rcloneSha256);
+            pmssRcloneInstallFromZip(PMSS_RCLONE_VERSION, PMSS_RCLONE_SHA256);
         }
     }
 

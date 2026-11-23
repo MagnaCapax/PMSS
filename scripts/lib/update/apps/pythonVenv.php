@@ -40,20 +40,17 @@ function pmssPythonVenvEnsure(
 ): string
 {
     $log = $logger ?: 'logMessage';
-    if (!pmssPythonVenvBaseInputsAreSafe($venvDir, $label, $log)) {
-        return '';
-    }
+    if (!pmssPythonVenvBaseInputsAreSafe($venvDir, $label, $log)) return '';
 
     $python = pmssCommandPath('python3');
     if ($python === '') {
         $log($missingPythonMessage ?? '[WARN] Skipping '.$label.' setup: python3 missing');
         return '';
     }
-    if (!is_dir($venvDir)) {
-        if (runStep('Creating '.$label.' virtualenv', pmssBuildCommand($python, ['-m', 'venv', $venvDir])) !== 0) {
-            $log('[WARN] '.$label.' virtualenv creation failed; skipping setup');
-            return '';
-        }
+    if (!is_dir($venvDir)
+        && runStep('Creating '.$label.' virtualenv', pmssBuildCommand($python, ['-m', 'venv', $venvDir])) !== 0) {
+        $log('[WARN] '.$label.' virtualenv creation failed; skipping setup');
+        return '';
     }
 
     $pythonBin = rtrim($venvDir, '/').'/bin/python';
@@ -131,8 +128,7 @@ function pmssPythonVenvInstallCli(
         $normalizedInstallSteps[] = [$description, $args];
     }
 
-    $venvPython = pmssPythonVenvEnsure($venvDir, $label, $log, $missingPythonMessage);
-    if ($venvPython === '') {
+    if (($venvPython = pmssPythonVenvEnsure($venvDir, $label, $log, $missingPythonMessage)) === '') {
         return;
     }
     $pipInstallPrefix = pmssBuildCommand($venvPython, ['-m', 'pip', 'install', '--upgrade']);
@@ -147,9 +143,8 @@ function pmssPythonVenvInstallCli(
         if (!pmssEnvFlagEnabled('PMSS_DRY_RUN')) $log($missingCliMessage);
         return;
     }
-    if (!is_link($linkPath) || readlink($linkPath) !== $cliBin) {
-        if (runStep('Linking '.$label.' CLI', pmssBuildCommand('ln', ['-sf', $cliBin, $linkPath])) !== 0) {
-            $log('[WARN] '.$label.' CLI link publication failed');
-        }
+    if ((!is_link($linkPath) || readlink($linkPath) !== $cliBin)
+        && runStep('Linking '.$label.' CLI', pmssBuildCommand('ln', ['-sf', $cliBin, $linkPath])) !== 0) {
+        $log('[WARN] '.$label.' CLI link publication failed');
     }
 }

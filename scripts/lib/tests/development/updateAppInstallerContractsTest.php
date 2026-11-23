@@ -208,7 +208,7 @@ class UpdateAppInstallerContractsTest extends TestCase
         $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/update/apps/vnstat.php', [
             "require_once '/scripts/lib/networkInfo.php';",
             "require_once __DIR__.'/vnstatConfig.php';",
-            "pmssNetworkInterfaceNameNormalize((string) \$link)",
+            "pmssNetworkInterfaceNameNormalize((string) (\$link ?? ''))",
             "runStep('Installing vnstat'",
             "aptCmd('install -y vnstat')",
             "runStep('Updating vnstat interface database'",

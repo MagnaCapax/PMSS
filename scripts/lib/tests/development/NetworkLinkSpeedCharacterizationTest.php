@@ -10,7 +10,7 @@ class NetworkLinkSpeedCharacterizationTest extends TestCase
     {
         foreach ([
             'scripts/cron/liveStatsLog.php' => "pmssNetworkInterfaceNameNormalize((string) (\$network['interface'] ?? 'eth0'))",
-            'scripts/lib/update/apps/vnstat.php' => 'pmssNetworkInterfaceNameNormalize((string) $link)',
+            'scripts/lib/update/apps/vnstat.php' => "pmssNetworkInterfaceNameNormalize((string) (\$link ?? ''))",
         ] as $path => $normalization) {
             $this->pmssAssertRepoFileContainsAllStrings($path, [$normalization]);
         }

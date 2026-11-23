@@ -25,9 +25,16 @@ class VnstatConfigSafetyTest extends TestCase
 
     public function testAbsentSettingsUseLegacyAppendShape(): void
     {
-        $path = $this->pmssWriteTempFile('vnstat-append', "Foreign yes\n");
-        $this->assertTrue(\pmssVnstatConfigRefresh($path, self::pmssMakeCallbacks(['log' => null])['log']));
-        $this->assertSame("Foreign yes\n\nMaxBandwidth 50000\n\nBandwidthDetection 0\n", file_get_contents($path));
+        foreach ([
+            "Foreign yes\n" => "Foreign yes\n\nMaxBandwidth 50000\n\nBandwidthDetection 0\n",
+            'MaxBandwidth 1000' => "MaxBandwidth 50000\nBandwidthDetection 0\n",
+            'BandwidthDetection 1' => "BandwidthDetection 0\nMaxBandwidth 50000\n",
+            'MaxBandwidth invalid' => "MaxBandwidth invalid\nMaxBandwidth 50000\n\nBandwidthDetection 0\n",
+        ] as $input => $expected) {
+            $path = $this->pmssWriteTempFile('vnstat-append', $input);
+            $this->assertTrue(\pmssVnstatConfigRefresh($path, self::pmssMakeCallbacks(['log' => null])['log']));
+            $this->assertSame($expected, file_get_contents($path));
+        }
     }
 
     public function testSymlinkAndMissingTargetsAreRejected(): void

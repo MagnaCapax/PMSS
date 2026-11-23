@@ -19,10 +19,10 @@ function pmssVnstatConfigRefresh(string $path, callable $log, ?callable $replace
     $config = str_replace('RateUnit 1', 'RateUnit 0', $config);
     // The shipped MaxBandwidth default can discard real traffic on fast links.
     // Keep the established 50 Gbit ceiling and disable unreliable speed detection.
-    $config = preg_replace('/^MaxBandwidth\s+\d+/m', 'MaxBandwidth 50000', $config, -1, $mbCount);
-    if ($mbCount === 0) { $config .= "\nMaxBandwidth 50000\n"; }
-    $config = preg_replace('/^BandwidthDetection\s+\d+/m', 'BandwidthDetection 0', $config, -1, $bdCount);
-    if ($bdCount === 0) { $config .= "\nBandwidthDetection 0\n"; }
+    foreach (['MaxBandwidth' => 'MaxBandwidth 50000', 'BandwidthDetection' => 'BandwidthDetection 0'] as $setting => $line) {
+        $config = preg_replace('/^'.$setting.'\s+\d+/m', $line, $config, -1, $count);
+        if ($count === 0) { $config .= "\n".$line."\n"; }
+    }
 
     // Atomic replacement keeps the old config available if staging is incomplete.
     if (!($replace ?? 'pmssReplaceUserFilePreservingMetadata')($path, $config)) {
