@@ -41,7 +41,7 @@ $replacements = [
     '##LINK##'  => $interface,
 ];
 
-$commands = networkSetupFirewallCommands($monitoringCommands);
+$commands = networkSetupFirewallCommands($monitoringCommands, networkSetupDropsPrivateSources($networkConfig));
 
 // Ensure kernel forwarding remains enabled for tenant networks.
 if (@file_put_contents('/proc/sys/net/ipv4/ip_forward', '1') === false) {

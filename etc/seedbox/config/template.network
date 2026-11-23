@@ -3,6 +3,11 @@
 return array(
     'interface' => '##INTERFACE##',
     'speed' => '1000',
+    # true (default): drop traffic arriving on the uplink from private and shared address space
+    # (100.64.0.0/10, 172.16.0.0/12, 192.168.0.0/16), correct on a public datacenter uplink.
+    # Set false on a NAT, home-LAN or private-bridge install, where your own traffic arrives from those ranges.
+    # Other bogon drops (0/8, 127/8, 169.254/16, documentation, multicast) stay either way.
+    'dropPrivateSources' => true,
     'throttle' => array(
       'min' => 50,
       'max' => 100,

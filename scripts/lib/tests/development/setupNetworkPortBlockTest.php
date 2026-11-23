@@ -24,7 +24,7 @@ class SetupNetworkPortBlockTest extends TestCase
             "@file_put_contents('/proc/sys/net/ipv4/ip_forward', '1') === false",
             "logMessage('setupNetwork: unable to enable IPv4 forwarding')",
             'networkSetupUplinkRead($networkConfig)',
-            'networkSetupFirewallCommands($monitoringCommands)',
+            'networkSetupFirewallCommands($monitoringCommands, networkSetupDropsPrivateSources($networkConfig))',
         ]);
     }
 }
