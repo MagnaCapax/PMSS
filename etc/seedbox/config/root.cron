@@ -69,6 +69,8 @@ MAILTO=""
 */30 * * * *   root    /scripts/cron/processSnapshot.php >/dev/null 2>&1
 0 6,18 * * *   root    /scripts/cron/storageHealthSnapshot.php >> /var/log/pmss/storageHealthSnapshot.log 2>&1
 0 6,18 * * *   root    /usr/bin/php /scripts/cron/logPolicyHealthSnapshot.php >> /var/log/pmss/storageHealthSnapshot.log 2>&1
+# Hourly /home and / free-space record only (no device probes): a filling array is visible hours before ENOSPC
+13 * * * *   root    /scripts/cron/storageHealthSnapshot.php --space-only >> /var/log/pmss/storageHealthSnapshot.log 2>&1
 43 3 * * *   root    /scripts/cron/scheduledConfigBackup.php >> /var/log/pmss/scheduledConfigBackup.log 2>&1
 7 * * * *   root    sleep 45; /scripts/cron/trafficLimits.php >> /var/log/pmss/trafficLimits.log 2>&1
 14 * * * *   root    /scripts/cron/usageAlertsNotify.php >> /var/log/pmss/usageAlerts.log 2>&1

@@ -122,7 +122,12 @@ append logs to `/var/log/pmss/<script>.log`. Highlights include:
   policy retains the JSONL plus the cron wrapper log. The wrapper registers the
   collector under its own CLI entrypoint identity; requiring the guarded util
   alone does not run collection. `StorageHealthCronTest` exercises the started
-  wrapper with stubbed probes on the testing machine.
+  wrapper with stubbed probes on the testing machine. Every snapshot also
+  appends a `kind: fs` free-space record for `/home` and `/` (free bytes, free
+  percent, inode free percent; `warn` below 10% free, `fail` below 3%, `/home`
+  read only when it is its own mount). An hourly `--space-only` run records just
+  those two entries, so a filling array shows up hours before accounts get
+  ENOSPC; `storageHealth.php` lists them under "Filesystem space".
 - `processSnapshot.php` – Append process tree snapshots for postmortem analysis (root-only log at `/var/log/pmss/process-snapshot.log`).
 - `systemStatsLog.php` – Record host PSI, ioping, load, memory, and disk-busy
   metrics every five minutes. It also atomically refreshes the narrow mode-0644

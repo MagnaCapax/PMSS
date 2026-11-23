@@ -22,15 +22,15 @@ function pmssStorageHealthReportInt($value, string $suffix = ''): string
     return is_int($value) ? $value.$suffix : '-';
 }
 
-/** @param array<int, array<string, mixed>> $disks @param array<int, array<string, mixed>> $raid */
-function pmssStorageHealthPrintTable(array $disks, array $raid, string $timestamp, string $jsonPath): void
+/** @param array<int, array<string, mixed>> $disks @param array<int, array<string, mixed>> $raid @param array<int, array<string, mixed>> $fs */
+function pmssStorageHealthPrintTable(array $disks, array $raid, string $timestamp, string $jsonPath, array $fs = []): void
 {
     $header = "Storage health (latest snapshot {$timestamp})";
     echo $header.PHP_EOL;
     echo str_repeat('=', strlen($header)).PHP_EOL.PHP_EOL;
 
     $counts = ['ok' => 0, 'warn' => 0, 'fail' => 0];
-    foreach (array_merge($disks, $raid) as $entry) {
+    foreach (array_merge($disks, $raid, $fs) as $entry) {
         $severity = (string) ($entry['severity'] ?? 'warn');
         $counts[isset($counts[$severity]) ? $severity : 'warn']++;
     }
@@ -76,6 +76,21 @@ function pmssStorageHealthPrintTable(array $disks, array $raid, string $timestam
             if (!empty($entry['message'])) {
                 echo '     '.$entry['message'].PHP_EOL;
             }
+        }
+        echo PHP_EOL;
+    }
+
+    if (!empty($fs)) {
+        echo "Filesystem space\n----------------\n";
+        printf("%-4s %-4s %-7s %-10s %-7s %-7s %s\n", 'MARK', 'SEV', 'MOUNT', 'FREE', 'FREE%', 'INODE%', 'FLAGS');
+        echo str_repeat('-', 60).PHP_EOL;
+        foreach ($fs as $entry) {
+            $sev = (string) ($entry['severity'] ?? 'warn');
+            $m = is_array($entry['metrics'] ?? null) ? $entry['metrics'] : [];
+            printf("%-4s %-4s %-7s %-10s %-7s %-7s %s\n", pmssStorageHealthColor($sev, PMSS_STORAGE_HEALTH_SEVERITY_DISPLAY[$sev]['mark'] ?? '?'), strtoupper($sev),
+                (string) ($entry['device'] ?? ''), isset($m['free_bytes']) ? round($m['free_bytes'] / 1e9, 1).' GB' : '-',
+                isset($m['free_percent']) ? $m['free_percent'].'%' : '-', isset($m['inode_free_percent']) ? $m['inode_free_percent'].'%' : '-',
+                is_array($entry['flags'] ?? null) ? implode(',', $entry['flags']) : '');
         }
         echo PHP_EOL;
     }

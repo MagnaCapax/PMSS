@@ -11,4 +11,4 @@
  */
 
 require_once __DIR__.'/storageHealth/common.php';
-pmssRequireRelativeFiles(__DIR__, ['storageHealth/smart.php', 'storageHealth/nvme.php', 'storageHealth/raid.php']);
+pmssRequireRelativeFiles(__DIR__, ['storageHealth/smart.php', 'storageHealth/nvme.php', 'storageHealth/raid.php', 'storageHealth/space.php']);

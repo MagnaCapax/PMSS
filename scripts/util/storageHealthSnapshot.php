@@ -14,9 +14,10 @@ require_once __DIR__.'/../lib/cli/optionParser.php';
 function pmssStorageHealthSnapshotMain(array $argv): int
 {
     $logPath = '/var/log/pmss/storage-health.jsonl';
-    if (($parsed = pmssParseCliTokensOrHelp($argv, "\nStorage health snapshot (SMART/NVMe + mdadm) to JSONL\nUsage: storageHealthSnapshot.php [--json <path>] [--quiet]\n\n  --json <path>   JSON Lines output (default /var/log/pmss/storage-health.jsonl)\n  --quiet         Suppress the success message (cron-friendly)\n\n")) === null) return 0;
+    if (($parsed = pmssParseCliTokensOrHelp($argv, "\nStorage health snapshot (SMART/NVMe + mdadm + /home and / free space) to JSONL\nUsage: storageHealthSnapshot.php [--json <path>] [--space-only] [--quiet]\n\n  --json <path>   JSON Lines output (default /var/log/pmss/storage-health.jsonl)\n  --space-only    Record only the /home and / free-space entries (cheap, for frequent cron runs)\n  --quiet         Suppress the success message (cron-friendly)\n\n")) === null) return 0;
 
     $quiet = pmssCliOptionPresent($parsed, 'quiet');
+    $spaceOnly = pmssCliOptionPresent($parsed, 'space-only');
     $logPath = pmssCliOptionString($parsed, 'json', null, $logPath) ?? $logPath;
 
     $logDir = dirname($logPath);
@@ -31,17 +32,20 @@ function pmssStorageHealthSnapshotMain(array $argv): int
     }
 
     $timestamp = date('c');
-    $last = pmssStorageHealthReadLastEntries($logPath);
-
     $snapshotEntries = [];
-    $disks = pmssStorageHealthDiskInventoryRead();
-    foreach ($disks as $disk) {
-        $snapshotEntries[] = pmssStorageHealthSnapshotSmart($disk, $last, $timestamp);
-        if (is_array($nvme = pmssStorageHealthSnapshotNvme($disk, $last, $timestamp))) {
-            $snapshotEntries[] = $nvme;
+    // Disk and array probes are slow and device-touching; the frequent space-only run skips them.
+    if (!$spaceOnly) {
+        $last = pmssStorageHealthReadLastEntries($logPath);
+        $disks = pmssStorageHealthDiskInventoryRead();
+        foreach ($disks as $disk) {
+            $snapshotEntries[] = pmssStorageHealthSnapshotSmart($disk, $last, $timestamp);
+            if (is_array($nvme = pmssStorageHealthSnapshotNvme($disk, $last, $timestamp))) {
+                $snapshotEntries[] = $nvme;
+            }
         }
+        $snapshotEntries = array_merge($snapshotEntries, pmssStorageHealthSnapshotRaid($timestamp));
     }
-    $snapshotEntries = array_merge($snapshotEntries, pmssStorageHealthSnapshotRaid($timestamp));
+    $snapshotEntries = array_merge($snapshotEntries, pmssStorageHealthSnapshotSpace($timestamp));
     foreach ($snapshotEntries as $entry) {
         if (!pmssJsonLineAppend($logPath, $entry)) {
             return pmssCliReturnWithStderr("Failed to write storage health snapshot to {$logPath}\n");

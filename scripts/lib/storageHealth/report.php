@@ -89,14 +89,18 @@ function pmssStorageHealthReportMain(array $argv): int
     // Retain encounter order per kind and include unknown kinds in the latest timestamp.
     $disks = [];
     $raid = [];
+    $fs = [];
     $latestTs = '';
     foreach (pmssStorageHealthReadLastEntries($jsonPath) as $entry) {
         $ts = (string) ($entry['timestamp'] ?? '');
         $kind = (string) ($entry['kind'] ?? '');
-        if (strcmp($ts, $latestTs) > 0) {
+        // Frequent space-only entries must not make the device snapshot look newer than it is.
+        if ($kind !== 'fs' && strcmp($ts, $latestTs) > 0) {
             $latestTs = $ts;
         }
-        if ($kind === 'raid') {
+        if ($kind === 'fs') {
+            $fs[] = $entry;
+        } elseif ($kind === 'raid') {
             $raid[] = $entry;
         } elseif ($kind === 'smart' || $kind === 'nvme') {
             $disks[] = $entry;
@@ -105,6 +109,7 @@ function pmssStorageHealthReportMain(array $argv): int
     $onlyProblems = pmssCliOptionPresent($parsed, 'only-problems');
     $disks = pmssStorageHealthReportFilter($disks, pmssCliOptionString($parsed, 'device', null, null), $onlyProblems);
     $raid = pmssStorageHealthReportFilter($raid, null, $onlyProblems);
+    $fs = pmssStorageHealthReportFilter($fs, null, $onlyProblems);
     $perfStatus = pmssStorageHealthPerformanceStatus($raid);
 
     if (pmssCliOptionPresent($parsed, 'user-notice')) {
@@ -112,12 +117,12 @@ function pmssStorageHealthReportMain(array $argv): int
         pmssStorageHealthReportSyncUserNotice($noticePath, $perfStatus, $latestTs);
     }
     if (pmssCliOptionPresent($parsed, 'raw')) {
-        foreach (array_merge($disks, $raid) as $entry) {
+        foreach (array_merge($disks, $raid, $fs) as $entry) {
             if (pmssJsonEmitPayload($entry, 'Failed to encode storage health JSON line.', JSON_UNESCAPED_SLASHES) !== 0) return 1;
         }
         return 0;
     }
-    if (empty($disks) && empty($raid)) {
+    if (empty($disks) && empty($raid) && empty($fs)) {
         echo "No storage health entries found in {$jsonPath}\n";
         return 1;
     }
@@ -125,6 +130,6 @@ function pmssStorageHealthReportMain(array $argv): int
     echo $perfStatus !== null
         ? pmssStorageHealthColor('warn', 'Performance Limited').": {$perfStatus['reason']}\n\n"
         : "Performance status: OK\n\n";
-    pmssStorageHealthPrintTable($disks, $raid, $latestTs !== '' ? $latestTs : 'unknown', $jsonPath);
+    pmssStorageHealthPrintTable($disks, $raid, $latestTs !== '' ? $latestTs : 'unknown', $jsonPath, $fs);
     return 0;
 }
