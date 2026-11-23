@@ -241,6 +241,8 @@ Run from SSH:
 
 The uninstall mode stops the media-stack `tmux` sessions, removes only the PMSS-managed app directories under `~/.bin`, removes the matching config directories under `~/.config`, removes `~/.lighttpd/custom.d/media-stack.conf`, clears the installer log and watchdog status snapshot, and backs up `~/.bashrc.custom` before stripping the installer-managed alias/PATH blocks. Credentials and unrelated files under `~/.bin` or `~/.config` remain untouched.
 
+An app started without the installer's `--data` path keeps its data in its own default folder, `~/.config/Radarr`, `~/.config/Sonarr` or `~/.config/Prowlarr` (capitalized). The installer never created those folders, so uninstall does not remove them; when one exists as a real directory it prints a notice naming it and the command that removes it. Dry runs print the notice too.
+
 It also strips the uninstalled web apps' URL blocks from regular `custom.d/*.conf`
 fragments, including `custom-migrated.conf`, recognizing the panel's bare, public,
 and user app paths. Fragment files, permissions, and unrelated rules remain;

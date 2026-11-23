@@ -1502,6 +1502,22 @@ media_stack_app_processes_kill() {
 	return 0
 }
 
+# Servarr apps started without --data keep their data in ~/.config/<App>, capitalized.
+# This installer always passes a lowercase --data path, so it never created these
+# folders and does not remove them (an exact-name match is no proof of ownership).
+# Name them so "uninstall complete" is not read as "all app data is gone" (GH #1010).
+media_stack_uninstall_default_data_notice() {
+	local app dir quoted
+
+	for app in Radarr Sonarr Prowlarr; do
+		dir="$HOME/.config/$app"
+		[[ -d "$dir" && ! -L "$dir" ]] || continue
+		printf -v quoted '%q' "$dir"
+		log_warn "Not removed: $dir (the app's own default data folder, not created by this installer)."
+		log_warn "Review it, and remove it yourself if you no longer need it: rm -rf -- $quoted"
+	done
+}
+
 media_stack_uninstall() {
 	local app username managed_path custom_fragment
 
@@ -1530,6 +1546,7 @@ media_stack_uninstall() {
 		lighttpd_custom_strip_managed_media_stack_routes "$custom_fragment" 1 || return 1
 	done
 	bashrc_custom_media_stack_blocks_strip
+	media_stack_uninstall_default_data_notice
 	log_ok "PMSS media stack uninstall complete."
 }
 

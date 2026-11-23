@@ -1506,6 +1506,152 @@ LIGHTTPD;
         }
     }
 
+    public function testUninstallNamesDefaultCaseServarrDataWithoutRemovingIt(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-media-stack-uninstall-default-case-home-');
+        $bin = $this->pmssMakeTempDir('pmss-media-stack-uninstall-default-case-bin-');
+        $elsewhere = $this->pmssMakeTempDir('pmss-media-stack-uninstall-default-case-link-');
+        // A capitalized folder is the app's own default data folder; the lowercase one is installer-managed.
+        $this->pmssWriteFiles($home, ['.config/Prowlarr/prowlarr.db' => "keep\n", '.config/prowlarr/config.xml' => "managed\n"]);
+        $this->pmssEnsureDir($home.'/.config');
+        $this->assertTrue(symlink($elsewhere, $home.'/.config/Sonarr'), 'fixture symlink');
+        $this->pmssWriteExecutableFile($bin.'/tmux', "#!/usr/bin/env bash\nexit 0\n");
+        $this->pmssWriteExecutableFile($bin.'/pgrep', "#!/usr/bin/env bash\nexit 1\n");
+        $this->pmssWriteExecutableFile($bin.'/ps', "#!/usr/bin/env bash\nexit 1\n");
+
+        $run = function (string $flags) use ($home, $bin): string {
+            return $this->pmssRunShellHarness(implode("\n", array(
+                '#!/usr/bin/env bash',
+                'set -euo pipefail',
+                'export HOME='.escapeshellarg($home),
+                'export PATH='.escapeshellarg($bin).':/usr/bin:/bin',
+                '/bin/bash '.escapeshellarg($this->pmssRepoPath('etc/skel/install-media-stack.sh')).' --uninstall'.$flags,
+                '',
+            )));
+        };
+
+        // Dry run reports the folder too, and removes nothing.
+        $dryOutput = $run(' --dry-run');
+        $this->assertStringContainsString('Not removed: '.$home.'/.config/Prowlarr', $dryOutput);
+        $this->assertTrue(is_dir($home.'/.config/prowlarr'));
+
+        $output = $run('');
+
+        $this->assertStringContainsString('PMSS media stack uninstall complete.', $output);
+        $this->assertStringContainsString('Not removed: '.$home.'/.config/Prowlarr', $output);
+        $this->assertStringContainsString('rm -rf -- '.$home.'/.config/Prowlarr', $output);
+        $this->assertSame("keep\n", (string) file_get_contents($home.'/.config/Prowlarr/prowlarr.db'));
+        $this->assertFalse(file_exists($home.'/.config/prowlarr'), 'the managed lowercase folder is still removed');
+        // A symlink and an absent folder are neither named nor touched.
+        $this->assertStringNotContainsString('.config/Sonarr', $output);
+        $this->assertStringNotContainsString('.config/Radarr', $output);
+        $this->assertTrue(is_link($home.'/.config/Sonarr'));
+    }
+
+    /** Run `install-media-stack.sh --uninstall` against a fixture home; returns the combined output. */
+    private function uninstallRun(string $home, string $flags = ''): string
+    {
+        $bin = $this->pmssMakeTempDir('pmss-media-stack-uninstall-run-bin-');
+        $this->pmssWriteExecutableFile($bin.'/tmux', "#!/usr/bin/env bash\nexit 0\n");
+        $this->pmssWriteExecutableFile($bin.'/pgrep', "#!/usr/bin/env bash\nexit 1\n");
+        $this->pmssWriteExecutableFile($bin.'/ps', "#!/usr/bin/env bash\nexit 1\n");
+
+        return $this->pmssRunShellHarness(implode("\n", array(
+            '#!/usr/bin/env bash',
+            'set -euo pipefail',
+            'export HOME='.escapeshellarg($home),
+            'export PATH='.escapeshellarg($bin).':/usr/bin:/bin',
+            '/bin/bash '.escapeshellarg($this->pmssRepoPath('etc/skel/install-media-stack.sh')).' --uninstall'.$flags,
+            '',
+        )));
+    }
+
+    public function testUninstallNamesEachCapitalizedServarrDefaultFolder(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-media-stack-uninstall-each-');
+        $this->pmssWriteFiles($home, ['.config/Radarr/radarr.db' => 'r', '.config/Sonarr/sonarr.db' => 's', '.config/Prowlarr/prowlarr.db' => 'p']);
+
+        $output = $this->uninstallRun($home);
+
+        foreach (['Radarr', 'Sonarr', 'Prowlarr'] as $app) {
+            $this->assertStringContainsString('Not removed: '.$home.'/.config/'.$app, $output);
+            $this->assertTrue(is_dir($home.'/.config/'.$app), $app.' data is kept');
+        }
+        $this->assertStringContainsString('PMSS media stack uninstall complete.', $output);
+    }
+
+    public function testUninstallNoticeQuotesThePathForTheRemovalCommand(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-media-stack-uninstall-quote-').'/home dir';
+        $this->pmssWriteFile($home.'/.config/Prowlarr/prowlarr.db', 'p');
+
+        $output = $this->uninstallRun($home);
+
+        $this->assertStringContainsString('rm -rf -- '.str_replace(' ', '\\ ', $home).'/.config/Prowlarr', $output);
+    }
+
+    public function testUninstallIsSilentAboutAbsentAndNonDirectoryDefaultFolders(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-media-stack-uninstall-absent-');
+        // A regular file with the app's name is not an app data folder.
+        $this->pmssWriteFiles($home, ['.config/Radarr' => 'a file, not a folder', '.config/rclone/rclone.conf' => 'keep']);
+
+        $output = $this->uninstallRun($home);
+
+        $this->assertStringNotContainsString('Not removed', $output);
+        $this->assertSame('keep', file_get_contents($home.'/.config/rclone/rclone.conf'), 'unrelated config is untouched and unnamed');
+        $this->assertSame('a file, not a folder', file_get_contents($home.'/.config/Radarr'));
+    }
+
+    public function testUninstallRerunKeepsTheDataAndNamesItAgain(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-media-stack-uninstall-rerun-');
+        $this->pmssWriteFiles($home, ['.config/Prowlarr/prowlarr.db' => 'p', '.config/prowlarr/config.xml' => 'managed']);
+
+        $first = $this->uninstallRun($home);
+        $second = $this->uninstallRun($home);
+
+        $this->assertStringContainsString('Not removed: '.$home.'/.config/Prowlarr', $first);
+        $this->assertStringContainsString('Not removed: '.$home.'/.config/Prowlarr', $second);
+        $this->assertSame('p', file_get_contents($home.'/.config/Prowlarr/prowlarr.db'));
+        $this->assertFalse(file_exists($home.'/.config/prowlarr'));
+    }
+
+    public function testUninstallNeverNamesAnotherAccountsFolders(): void
+    {
+        $base = $this->pmssMakeTempDir('pmss-media-stack-uninstall-two-');
+        $this->pmssWriteFile($base.'/mine/.install-media-stack.log', 'log');
+        $this->pmssWriteFile($base.'/other/.config/Prowlarr/prowlarr.db', 'theirs');
+
+        $output = $this->uninstallRun($base.'/mine');
+
+        $this->assertStringNotContainsString('Not removed', $output);
+        $this->assertSame('theirs', file_get_contents($base.'/other/.config/Prowlarr/prowlarr.db'));
+    }
+
+    public function testUninstallStillRemovesCapitalizedBinDirectoriesTheInstallerCreates(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-media-stack-uninstall-bin-');
+        $this->pmssWriteFiles($home, ['.bin/Radarr/Radarr.dll' => 'x', '.bin/Prowlarr/Prowlarr.dll' => 'x', '.bin/keep/file' => 'keep']);
+
+        $output = $this->uninstallRun($home);
+
+        $this->assertFalse(file_exists($home.'/.bin/Radarr'));
+        $this->assertFalse(file_exists($home.'/.bin/Prowlarr'));
+        $this->assertSame('keep', file_get_contents($home.'/.bin/keep/file'));
+        $this->assertStringNotContainsString('Not removed', $output);
+    }
+
+    public function testUninstallNoticeIsPrintedBeforeTheCompletionLine(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-media-stack-uninstall-order-');
+        $this->pmssWriteFile($home.'/.config/Sonarr/sonarr.db', 's');
+
+        $output = $this->uninstallRun($home);
+
+        $this->assertOrderedStrings(['Not removed: '.$home.'/.config/Sonarr', 'PMSS media stack uninstall complete.'], $output);
+    }
+
     public function testJellyfinConfigResetUsesExactPathGuard(): void
     {
         $removedHelper = 'jellyfin_config_dir_reset_target'.'_is_safe';
