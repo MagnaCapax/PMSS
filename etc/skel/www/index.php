@@ -654,7 +654,8 @@ if ($useLocalFrames) {
     // This keeps the familiar tabbed GUI layout even when pulsedmedia.com
     // is unreachable or remote frames are explicitly disabled.
     $htmlHead = <<<EOF
-        <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+        <script src="jquery.min.js"></script>
+        <script>window.jQuery || document.write('<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"><\/script>')</script>
         <script src="pmssTabs.js"></script>
         <link rel="stylesheet" href="jquery.tabs.css" type="text/css" media="print, projection, screen">
 EOF;

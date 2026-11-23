@@ -103,6 +103,7 @@ PHP;
         'www/filemanager.php',
         'www/info.php',
         'www/index.php',
+        'www/jquery.min.js',
         'www/jquery.tabs.css',
         'www/mediaStack.php',
         'www/mediaStackRecoveryCommand.php',

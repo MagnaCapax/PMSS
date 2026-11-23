@@ -135,7 +135,8 @@ $homeNewsHtml = pmssWelcomeHomeNewsHtmlRead(dirname(__DIR__), false);
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title><?= pmssWelcomeHtmlAttr($vendor['name']); ?> Seedbox</title>
     <link href="screen.css" rel="stylesheet" type="text/css" media="screen" />
-    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+    <script type="text/javascript" src="jquery.min.js"></script>
+    <script>window.jQuery || document.write('<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"><\/script>')</script>
     <script type="text/javascript"><?= pmssActionScriptJs() ?></script>
     <?= pmssCustomerAppsCss() ?>
     <script type="text/javascript">function pmssWelcomeTabOpen(hash, link) { try { var tab = window.parent !== window ? window.parent.document.querySelector('a[href="' + hash + '"]') : null; if (tab) { tab.click(); return false; } } catch (e) {} return true; }</script>
