@@ -211,7 +211,7 @@ fclose($consoleLock);
 
 // Load the terminal via the reverse-proxy path (relative -> /user-<user>/console/).
 $label = $persist ? 'persistent tmux session (reattaches on reconnect)'
-                   : 'ephemeral session (ends when you close this tab)';
+                   : 'ephemeral session (closing or reloading the tab stops running programs; run long jobs in the Persistent (tmux) session)';
 header('Content-Type: text/html; charset=utf-8');
 echo '<!doctype html><html lang="en"><head><script>var u = new URL(location.href); if (u.username || u.password) { u.username = \'\'; u.password = \'\'; location.replace(u.href); }</script><meta charset="utf-8">'
     .'<meta name="viewport" content="width=device-width, initial-scale=1">'
