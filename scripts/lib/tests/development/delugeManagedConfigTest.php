@@ -176,4 +176,18 @@ JSON
         $this->assertFalse(\pmssDelugeHostlistSyncLocalclientPassword('fixtur01', $linkPath, $authPath));
         $this->assertStringContainsString('"old-secret"', (string) file_get_contents($targetPath));
     }
+
+    public function testWatchdogHealsHostlistWhileDaemonRunsWithoutTouchingCoreConfig(): void
+    {
+        // Deluge's own hostlist migration resets the localclient password while deluged stays up (#721).
+        $source = $this->pmssReadRepoFile('scripts/cron/checkDelugeInstances.php');
+        $this->assertOrderedStrings([
+            '$delugedRunning && pmssDelugeHostlistSyncLocalclientPassword($thisUser)',
+            "pmssTorrentClientNativeStop(\$thisUser, 'deluge', 9, ['processName' => 'deluge-web'])",
+            "pmssUserWatchdogApplyManagedConfigWhenStopped(\$thisUser, \$delugedRunning, 'pmssDelugeApplyManagedConfig')",
+        ], $source);
+        // The running-daemon branch is hostlist-only: the full apply mutates daemon-owned core.conf.
+        $branch = substr($source, (int) strpos($source, '$delugedRunning && pmssDelugeHostlistSync'), 400);
+        $this->assertStringNotContainsString('pmssDelugeApplyManagedConfig(', $branch);
+    }
 }

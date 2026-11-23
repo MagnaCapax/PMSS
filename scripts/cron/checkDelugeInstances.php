@@ -40,6 +40,13 @@ pmssUserWatchdogRunService('Deluge', 'delugeEnable', ['deluged', 'deluge-web'], 
     if ($running && !$delugedRunning && pmssUserWatchdogProcessRunning($thisUser, 'deluged')) {
         return ['deluged' => true, 'deluge-web' => true];
     }
+    // The web-owned hostlist can drift while deluged keeps running (Deluge's own hostlist migration resets the
+    // localclient password), and the stopped-daemon apply below never runs then. Sync only the hostlist here:
+    // core.conf is daemon-owned and stays behind that guard. SIGKILL: deluge-web gets no exit-time write-back.
+    if ($delugedRunning && pmssDelugeHostlistSyncLocalclientPassword($thisUser)) {
+        pmssUserLog($thisUser, 'deluge-web restarted to apply hostlist localclient password');
+        pmssTorrentClientNativeStop($thisUser, 'deluge', 9, ['processName' => 'deluge-web']);
+    }
     pmssUserWatchdogApplyManagedConfigWhenStopped($thisUser, $delugedRunning, 'pmssDelugeApplyManagedConfig');
     pmssUserWatchdogApplyManagedConfigWhenStopped($thisUser, $delugedRunning, 'pmssDelugeApplyUploadThrottle');
     return ['deluged' => $delugedRunning];
