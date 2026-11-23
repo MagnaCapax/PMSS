@@ -14,6 +14,7 @@ require_once __DIR__.'/../lib/lighttpd/watchdogPhpCgiDrift.php';
 require_once __DIR__.'/../lib/lighttpd/watchdogCustomConfig.php';
 require_once __DIR__.'/../lib/lighttpd/hermesUiConverge.php';
 require_once __DIR__.'/../lib/lighttpd/transmissionProxy.php';
+require_once __DIR__.'/../lib/lighttpd/htpasswd.php';
 require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/update/runtime/commands.php';
 pmssRequireRelativeFiles(__DIR__.'/../lib', ['user/userConfigStore.php', 'user/watchdog.php']);
@@ -76,6 +77,12 @@ foreach($users AS $thisUser) {
         );
         if ($result['timed_out']) continue;
         pmssUserLog($thisUser, 'lighttpd config generated (missing config detected)');
+    }
+
+    // A missing credential file leaves every health signal green while panel login is refused; rebuild it from the
+    // account's shadow hash, the source unsuspend uses. An unusable hash writes nothing, so it costs one lookup.
+    if (pmssUserHtpasswdRestoreIfMissing($thisUser, $homeDir)) {
+        pmssUserLog($thisUser, 'lighttpd credential file restored (.htpasswd was missing)');
     }
 
     // A successful customer Docker install requests one managed proxy rebuild.

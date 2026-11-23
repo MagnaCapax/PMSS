@@ -98,3 +98,28 @@ function pmssUserHtpasswdSyncFromShadow(string $username, string $shadowPath = '
 
     return pmssUserHtpasswdHashWrite($htpasswdPath, $username, $passwordHash, $username);
 }
+
+/**
+ * Restore a missing per-user .htpasswd from the account's shadow hash.
+ *
+ * Panel login reads this file, and nothing else rebuilds it once lighttpd
+ * support files are regenerated around it, so the account looks healthy while
+ * every login is refused. Only an absent entry counts as missing: an existing
+ * file, link or directory is left to the writer's own refusals, and a missing
+ * .lighttpd directory is left to config regeneration. An unusable (locked or
+ * empty) hash writes nothing. Returns true only when the file was written.
+ */
+function pmssUserHtpasswdRestoreIfMissing(string $username, string $homeDir, string $shadowPath = '/etc/shadow'): bool
+{
+    $htpasswdPath = rtrim($homeDir, '/').'/.lighttpd/.htpasswd';
+    clearstatcache(true, $htpasswdPath);
+    if (@lstat($htpasswdPath) !== false) {
+        return false;
+    }
+    $lighttpdDir = dirname($htpasswdPath);
+    if (!is_dir($lighttpdDir) || is_link($lighttpdDir)) {
+        return false;
+    }
+
+    return pmssUserHtpasswdSyncFromShadow($username, $shadowPath, $htpasswdPath);
+}
