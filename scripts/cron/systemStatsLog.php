@@ -13,7 +13,7 @@ require_once __DIR__.'/../lib/systemStats/hostPressure.php';
 $logDir = '/var/log/pmss';
 $logFile = $logDir.'/system-stats.log';
 $hostPressureFile = '/var/lib/pmss/public/host-pressure.json';
-pmssDirEnsureExists($logDir, 0755);
+pmssDirEnsureExists($logDir, 0700);
 
 // Gather metrics from procfs + optional ioping/ps.
 $stats = pmssSystemStatsCollect();

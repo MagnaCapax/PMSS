@@ -27,7 +27,7 @@ require_once '/scripts/lib/runtime.php';
 // Non-blocking: skip if another run holds the lock. Hold the handle until exit.
 $trafficLimitsLock = pmssCronLockAcquire('trafficLimits');
 
-if (!pmssDirEnsureExists('/var/run/pmss/trafficLimits', 0755)) {
+if (!pmssDirEnsureExists('/var/run/pmss/trafficLimits', 0700)) {
     exit(pmssCliReturnWithStderr("Unable to prepare traffic limit runtime directory\n"));
 }
 

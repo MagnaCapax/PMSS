@@ -43,7 +43,7 @@ class checkRtorrentContractTest extends TestCase
             '/pmssCheckRtorrentCleanupStaleSocket\(\$user, \$socketPath, \$state\[\'unresponsive\'\], \$debug\);.*?if \(!\$executorPresent\).*?rtorrentProcessStart\(\$user, \$logCallback, \$state\[\'startMarker\'\]\);/s');
         $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/checkRtorrent.php', [
             'PMSS_RTORRENT_ACCEPT_QUEUE_WEDGE_CYCLES',
-            "if (!pmssDirEnsureExists(\$stateDir, 0755))",
+            "if (!pmssDirEnsureExists(\$stateDir, 0700))",
             "ERROR: failed to create runtime state directory: ",
             'pmssCheckRtorrentHandleMissingProcess(',
             'pmssCheckRtorrentHandleAliveProcess(',

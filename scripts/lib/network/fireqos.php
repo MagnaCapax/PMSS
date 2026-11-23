@@ -114,7 +114,7 @@ function networkApplyFireqos(string $config): bool
     $logPath = pmssResolvePathFromEnv('PMSS_FIREQOS_LOG_PATH', '/var/log/pmss/fireqos.log');
 
     // Ensure the rendered policy is on disk before attempting a restart.
-    if (!pmssDirEnsureExists(dirname($configPath), 0755) || !pmssDirEnsureExists(dirname($logPath), 0755)) {
+    if (!pmssDirEnsureExists(dirname($configPath), 0755) || !pmssDirEnsureExists(dirname($logPath), 0700)) {
         return false;
     }
     if (!pmssAtomicWriteFile($configPath, $config, 0644)) {

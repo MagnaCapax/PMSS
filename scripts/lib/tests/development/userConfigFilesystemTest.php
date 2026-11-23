@@ -112,6 +112,73 @@ class UserConfigFilesystemTest extends TestCase
         $this->pmssAssertMessagesContain($logs, 'Refusing temporary directory cleanup for unsafe path');
     }
 
+    /** Octal permission bits of a path, e.g. '700'. */
+    private function pmssModeOctal(string $path): string
+    {
+        clearstatcache(true, $path);
+        return substr(sprintf('%o', fileperms($path)), -3);
+    }
+
+    public function testDirEnsureExistsCreatesMissingDirectoryAndParentsAtRequestedMode(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-dir-ensure-', 0700);
+        $oldUmask = umask(0022);
+        try {
+            $this->assertTrue(\pmssDirEnsureExists($root.'/parent/child', 0700));
+        } finally {
+            umask($oldUmask);
+        }
+
+        $this->assertSame('700', $this->pmssModeOctal($root.'/parent/child'));
+        $this->assertSame('700', $this->pmssModeOctal($root.'/parent'));
+    }
+
+    public function testDirEnsureExistsNeverWidensAnExistingDirectory(): void
+    {
+        // The hourly sweep owns the runtime trees at 0700; a 0755 request must not reopen one.
+        $root = $this->pmssMakeTempDir('pmss-dir-ensure-', 0700);
+        $existing = $root.'/runtime';
+        $this->assertTrue(mkdir($existing, 0700));
+        chmod($existing, 0700);
+
+        $this->assertTrue(\pmssDirEnsureExists($existing, 0755));
+        $this->assertSame('700', $this->pmssModeOctal($existing));
+    }
+
+    public function testDirEnsureExistsNeverTightensAnExistingDirectory(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-dir-ensure-', 0700);
+        $existing = $root.'/shared';
+        $this->assertTrue(mkdir($existing, 0755));
+        chmod($existing, 0755);
+
+        $this->assertTrue(\pmssDirEnsureExists($existing, 0700));
+        $this->assertSame('755', $this->pmssModeOctal($existing));
+    }
+
+    public function testDirEnsureExistsRequestedModeIsFilteredByUmask(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-dir-ensure-', 0700);
+        $oldUmask = umask(0077);
+        try {
+            $this->assertTrue(\pmssDirEnsureExists($root.'/narrowed', 0750));
+        } finally {
+            umask($oldUmask);
+        }
+
+        $this->assertSame('700', $this->pmssModeOctal($root.'/narrowed'));
+    }
+
+    public function testRuntimeCreationLiteralsAgreeWithTheSweepOwnerOfTheirPath(): void
+    {
+        // Paths on pmssCheckDirectoriesRequiredDirectories() are swept to 0700, so their creators ask for 0700.
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/trafficLimits.php', ["pmssDirEnsureExists('/var/run/pmss/trafficLimits', 0700)"]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/systemStatsLog.php', ['pmssDirEnsureExists($logDir, 0700);']);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/checkRtorrent.php', ['pmssDirEnsureExists($stateDir, 0700)']);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/network/fireqos.php', ['pmssDirEnsureExists(dirname($logPath), 0700)']);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/wireguard.php', ['pmssDirEnsureExists($configDir, 0700);']);
+    }
+
     public function testRequiredFileRejectsNulBytePathBeforeFilesystemCall(): void
     {
         $path = $this->pmssWriteFile($this->pmssMakeTempDir('pmss-user-config-fs-', 0700).'/defaults.conf', "enabled = yes\n");

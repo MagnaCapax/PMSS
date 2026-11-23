@@ -44,7 +44,7 @@ $users = $listUsersResult['users'];
 
 $changedConfig = [];
 $stateDir = '/run/pmss';
-if (!pmssDirEnsureExists($stateDir, 0755)) {
+if (!pmssDirEnsureExists($stateDir, 0700)) {
     pmssCheckRtorrentLog('ERROR: failed to create runtime state directory: '.$stateDir, true, $debug);
     exit(1);
 }

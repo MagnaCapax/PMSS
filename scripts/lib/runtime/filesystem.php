@@ -6,6 +6,15 @@
  * @author PMSS Team
  */
 
+/**
+ * Ensure a directory exists, creating it (and any missing parents) when absent.
+ *
+ * `$mode` is a CREATION mode only: it applies to a directory this call creates, filtered by the
+ * process umask. The mode of an already-existing directory is never read or changed here; the
+ * runtime trees listed by pmssCheckDirectoriesRequiredDirectories() are owned by the hourly
+ * directory sweep, so a caller must request 0700 for those paths. A caller that needs a mode on
+ * an existing directory calls chmod() itself and checks the result.
+ */
 function pmssDirEnsureExists(string $path, int $mode = 0755): bool { return $path !== '' && !pmssFilesystemPathHasNulByte($path) && (is_dir($path) || @mkdir($path, $mode, true) || is_dir($path)); }
 
 /**
