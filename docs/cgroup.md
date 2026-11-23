@@ -423,8 +423,8 @@ open until the next run.
   - `CPUWeight=1..10000` (relative CPU priority)
   - `CPUQuota=` (hard cap; the PMSS default sets 85% of total logical cores — see the defaults above and ADR 0003)
 - Memory
-  - `MemoryHigh=` (soft throttle)
-  - `MemoryMax=` (hard cap)
+  - `MemoryHigh=` (soft throttle on the unified hierarchy only; production runs cgroup v1, where systemd does not apply it, so `memory.soft_limit_in_bytes` stays at the unlimited sentinel and readers see only the `MemoryMax` ceiling, ADR 0298 and ADR 0019)
+  - `MemoryMax=` (hard cap; the only per-account memory limit enforced on cgroup v1)
 - Processes/Threads
   - `TasksMax=` (max processes/threads)
 - File descriptors

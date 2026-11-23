@@ -30,6 +30,16 @@ class CgroupPolicyTrackingTest extends TestCase
         ]);
     }
 
+    public function testCgroupDocsSayMemoryHighIsNotAppliedOnV1(): void
+    {
+        // MemoryHigh is a unified-hierarchy feature; the v1 production hosts enforce MemoryMax only.
+        $this->pmssAssertRepoFileContainsAllStrings('docs/cgroup.md', [
+            '`MemoryHigh=` (soft throttle on the unified hierarchy only;',
+            'systemd does not apply it',
+            '`MemoryMax=` (hard cap; the only per-account memory limit enforced on cgroup v1)',
+        ]);
+    }
+
     public function testGlobalTodoIndexReferencesCgroupBacklog(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('docs/TODO.md', [
