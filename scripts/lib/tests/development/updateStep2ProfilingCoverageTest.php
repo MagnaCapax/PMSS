@@ -14,8 +14,8 @@ class UpdateStep2ProfilingCoverageTest extends TestCase
         foreach ($matches as $match) {
             $steps[] = $match[1].'|'.$match[2];
         }
-        $this->assertSame(25, count($steps), 'Profiled batch step count changed');
-        $this->assertSame('b6cb367121af2552c0c81f4a05d906936a4412c38396f39a4fa889d8e55e793b', hash('sha256', implode("\n", $steps)), 'Profiled batch order or callable changed');
+        $this->assertSame(26, count($steps), 'Profiled batch step count changed');
+        $this->assertSame('682dd83cc7fa6183054075e3d0944f74a7a3c96b3c3eb8ce87b70a545b503da1', hash('sha256', implode("\n", $steps)), 'Profiled batch order or callable changed');
     }
 
     public function testUpdateStep2UsesProfiledWrappersForModuleCalls(): void
