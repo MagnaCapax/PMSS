@@ -10,6 +10,8 @@ require_once __DIR__.'/state.php';
  */
 function pmssQuotaFileHeaderInvalid(string $path, string $type): bool
 {
+    // Unusable paths cannot prove header corruption or authorize fresh-file recovery.
+    if ($path === '' || strpos($path, "\0") !== false) return false;
     // quota-tools INITQMAGICS for the v2 tree format (vfsv0/vfsv1) as little-endian bytes, so 32-bit PHP compares the same.
     $magic = ['user' => '111fc0d9', 'group' => '2719c0d9'][$type] ?? null;
     if ($magic === null || !is_file($path) || ($handle = @fopen($path, 'rb')) === false) {

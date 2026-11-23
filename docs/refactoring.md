@@ -1,5 +1,14 @@
 # Refactoring Guidelines
 
+Quota filesystem reports reject empty, NUL-containing and option-shaped selectors
+before caching or command capture. Header inspection rejects empty or NUL-containing
+paths before file I/O, so unusable paths cannot authorize fresh-file recovery.
+Both retain their existing failure shapes; valid selectors, command bytes, cached
+success/failure reports and header handling stay unchanged (ADRs 0254 and 0285).
+`QuotaBoundaryInputSafetyTest` covers both boundaries with intercepted operations
+and memory streams. Execution stays on testing machines; devbox checks changed-file
+PHP syntax only.
+
 Account reconfiguration keeps its CLI and `userConfigRuntime.php` include while
 separating validated intent/persistence, optional limit publication and service
 policy (ADR 0321). The CLI retains torrent configuration and guarded restart

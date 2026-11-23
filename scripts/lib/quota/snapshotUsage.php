@@ -6,6 +6,10 @@ require_once dirname(__DIR__).'/quotaSnapshotCron.php';
 /** Cache one bounded numeric user report per filesystem during a snapshot sweep. */
 function pmssQuotaSnapshotFilesystemReport(string $filesystem): array
 {
+    // Shell quoting cannot stop repquota interpreting a filesystem as an option.
+    if ($filesystem === '' || $filesystem[0] === '-' || strpos($filesystem, "\0") !== false) {
+        return ['rc' => 2, 'lines' => [], 'timed_out' => false];
+    }
     static $reports = [];
     if (!isset($reports[$filesystem])) {
         $reports[$filesystem] = pmssQuotaReportCapture('LC_ALL=C repquota -u -n '.escapeshellarg($filesystem).' 2>&1');
