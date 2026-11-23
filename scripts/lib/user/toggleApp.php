@@ -94,7 +94,9 @@ function pmssToggleAppStartCommand(string $user, string $app): string
     $config = '/home/'.$user.'/'.$row['config'];
     $secured = '/home/'.$user.'/'.$row['securedMarker'];
     $enabled = '/home/'.$user.'/'.$row['enable'];
-    $launch = pmssToggleAppLaunchCommand($row, $config, '/home/'.$user);
+    // Console output goes to an account-private log beside the app's other managed state files.
+    $log = '/home/'.$user.'/'.dirname($row['securedMarker']).'/'.$app.'.log';
+    $launch = pmssToggleAppLoggedLaunch(pmssToggleAppLaunchCommand($row, $config, '/home/'.$user), $log);
     $conditions = 'test -s '.escapeshellarg($config).' && test -f '.escapeshellarg($secured)
         .' && test -f '.escapeshellarg($enabled);
     return pmssBuildUserServiceShellCommand($user, pmssToggleAppDetachedGroup($conditions, $launch));
@@ -108,4 +110,20 @@ function pmssToggleAppStartCommand(string $user, string $app): string
 function pmssToggleAppDetachedGroup(string $conditions, string $launch): string
 {
     return '( umask 077; '.$conditions.' && '.$launch.' ) </dev/null >/dev/null 2>&1 &';
+}
+
+/**
+ * Send stdout and stderr of a launch to a size-bounded log, run as the account under umask 077.
+ * The writer drains the pipe until the app exits, so the app never meets a broken pipe, even when the log
+ * cannot be written (a full quota). At the cap the log keeps its newest half, so the newest output is always
+ * there and disk use stays near the cap.
+ */
+function pmssToggleAppLoggedLaunch(string $launch, string $log, int $cap = 1048576): string
+{
+    $file = escapeshellarg($log);
+    $size = '$(stat -c %s '.$file.' 2>/dev/null || echo 0)';
+    $trim = 'tail -c '.intdiv($cap, 2).' '.$file.' > '.escapeshellarg($log.'.tmp').' && mv -f '.escapeshellarg($log.'.tmp').' '.$file;
+    $writer = 'while :; do s='.$size.'; [ "$s" -lt '.$cap.' ] || { '.$trim.'; s='.$size.'; }; '
+        .'head -c '.max(1, intdiv($cap, 16)).' >> '.$file.'; [ "'.$size.'" -gt "$s" ] || break; done; cat >/dev/null';
+    return '{ '.$launch.'; } 2>&1 | { '.$writer.'; }';
 }
