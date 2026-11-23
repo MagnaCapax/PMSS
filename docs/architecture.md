@@ -97,6 +97,10 @@ Keep the canonical installer/update details under `docs/install.md` and
   selectors use the invalid-request result before pgrep runs; valid command bytes
   stay unchanged. Proc start-time reads reject NUL paths and invalid PIDs, and
   unrepresentable kernel fields or timestamp sums retain the inode-time fallback.
+  Process-stat records must begin with the requested numeric PID and an opening
+  command parenthesis before field offsets are trusted. Malformed or mismatched
+  headers retain the inode-time fallback; command names containing spaces or
+  parentheses remain supported by `WatchdogProcessBoundaryTest`.
   Lock acquisition closes its stream if child-descriptor export throws, then
   propagates the original throwable. Successful exports still transfer the open
   lock to the caller; `WatchdogLockSafetyTest` covers both ownership paths.

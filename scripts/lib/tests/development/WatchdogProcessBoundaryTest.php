@@ -110,6 +110,27 @@ class WatchdogProcessBoundaryTest extends TestCase
         }
     }
 
+    public function testProcessStatHeaderMustIdentifyTheRequestedPidAndFrameTheCommand(): void
+    {
+        $proc = $this->procFixture('1000', '100');
+        $raw = file_get_contents($proc.'/77/stat');
+        $tail = substr($raw, strrpos($raw, ')') + 1);
+        foreach ([
+            ['77 (worker)', 1001], ['77 (worker (nested))', 1001],
+            ['77 (demo worker) x)', 1001], ['00077 (worker)', 1001],
+            ['78 (worker)', 1234567890], ['0 (worker)', 1234567890],
+            [PHP_INT_MAX.'0 (worker)', 1234567890], ['bad (worker)', 1234567890],
+            ['(worker)', 1234567890], ['77 worker)', 1234567890],
+            ['77 (worker', 1234567890], ["77\t(worker)", 1234567890],
+            ["junk\n77 (worker)", 1234567890], ['-77 (worker)', 1234567890],
+        ] as [$header, $expected]) {
+            // Keep a complete, valid numeric tail so only the header decides the fallback.
+            $this->pmssWriteFile($proc.'/77/stat', $header.$tail);
+            clearstatcache();
+            $this->assertSame($expected, pmssUserWatchdogProcStartTime($proc, '77'), $header);
+        }
+    }
+
     /** Field 22 follows nineteen fields after the parenthesised command name. */
     private function procFixture(string $boot, string $ticks): string
     {

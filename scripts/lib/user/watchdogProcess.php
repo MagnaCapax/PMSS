@@ -114,7 +114,10 @@ function pmssUserWatchdogProcStartTime(string $procRoot, string $pid): ?int
     $boot = strpos($bootRaw, "\0") === false && preg_match('/^btime\s+(\d+)$/m', $bootRaw, $m) === 1
         ? pmssUnsignedDecimalIntParse($m[1]) : null;
     $stat = (string) @file_get_contents($procRoot.'/'.$pid.'/stat');
-    $close = strpos($stat, "\0") === false ? strrpos($stat, ')') : false;
+    // Require the requested PID and a parenthesised command before trusting the field offsets.
+    $close = strpos($stat, "\0") === false && preg_match('/\A([0-9]+) \(/', $stat, $m) === 1
+        && pmssUnsignedDecimalIntParse($m[1]) === pmssUnsignedDecimalIntParse($pid)
+        ? strrpos($stat, ')') : false;
     // Fields after the parenthesised command name start at field 3, so field 22 is index 19.
     $fields = $close === false ? array() : pmssConfigLineColumns(substr($stat, $close + 1), 0, []);
     $ticks = isset($fields[19]) ? pmssUnsignedDecimalIntParse($fields[19]) : null;
