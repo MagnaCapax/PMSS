@@ -25,6 +25,34 @@ function pmssClampLighttpdBandwidthLimits(string $config): string
     return is_string($clamped) ? $clamped : $config;
 }
 
+/**
+ * Whether the account opted in to buffered proxy responses (ADR 0338).
+ *
+ * The marker is account-writable and this runs as root: the signal is a regular
+ * file owned by the account inside its own .lighttpd directory, never followed
+ * through a link (a link would let the account probe which paths exist for
+ * root), and the content is never read. Anything else, an invalid name
+ * included, keeps the host default.
+ */
+function pmssLighttpdStreamResponseBuffered(string $user): bool
+{
+    if (!pmssUsernameIsValid($user)) {
+        return false;
+    }
+    $home = pmssDirPathResolve(null, 'PMSS_HOME_DIR', '/home')."/{$user}";
+    $paths = [$home, $home.'/.lighttpd', $home.'/.lighttpd/stream-response-body.buffered'];
+    foreach ($paths as $path) {
+        clearstatcache(true, $path);
+    }
+    $homeStat = @lstat($paths[0]);
+    $dirStat = @lstat($paths[1]);
+    $markerStat = @lstat($paths[2]);
+
+    return is_array($homeStat) && is_array($dirStat) && is_array($markerStat)
+        && ($dirStat['mode'] & 0170000) === 0040000 && ($markerStat['mode'] & 0170000) === 0100000
+        && $dirStat['uid'] === $homeStat['uid'] && $markerStat['uid'] === $homeStat['uid'];
+}
+
 function pmssWebdavWwwPolicyBlock(string $user): string
 {
     if (!pmssUsernameIsValid($user)) {
@@ -101,6 +129,10 @@ function pmssLighttpdRenderUserConfig(
     );
 
     $config = pmssClampLighttpdBandwidthLimits(is_string($config) ? $config : (string) $template);
+    if (pmssLighttpdStreamResponseBuffered($user)) {
+        // Response side only: request streaming (uploads, WebDAV PUT) keeps its template mode.
+        $config = preg_replace('/^(\s*server\.stream-response-body\s*=\s*)2\b/m', '${1}1', $config, 1);
+    }
     $config = pmssLighttpdPanelSessionConfigApply($config, $user, $panelSessionLogin);
     $config .= pmssLighttpdPikkumiesUiBlock($user);
     $config .= pmssLighttpdPikkumiesHermesBlock($user);
