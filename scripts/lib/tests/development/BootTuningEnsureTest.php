@@ -96,12 +96,15 @@ class BootTuningEnsureTest extends TestCase
         $gateStart = strpos($rcLocal, 'if [ ! -e /usr/local/sbin/pmss-boot-tuning.sh ]; then');
         $gateEnd = strpos($rcLocal, "\nfi\n", $gateStart);
         $mdLoop = strpos($rcLocal, 'for MD in');
-        $bcacheMode = strpos($rcLocal, 'for BCACHE in');
-        $this->assertTrue($gateStart !== false && $gateEnd !== false && $mdLoop !== false && $bcacheMode !== false,
-            'rc.local must retain the presence gate, md loop, and bcache cache_mode loop');
+        $this->assertTrue($gateStart !== false && $gateEnd !== false && $mdLoop !== false,
+            'rc.local must retain the presence gate and md loop');
         $this->assertTrue($gateStart < $mdLoop && $mdLoop < $gateEnd, 'md loop must be inside the boot-tuning presence gate');
-        $this->assertTrue($gateEnd < $bcacheMode && strpos($rcLocal, 'bcache/cache_mode', $bcacheMode) !== false,
-            'bcache cache_mode loop must remain outside the gate');
+        // The kernel keeps bcache cache_mode in the backing device's superblock, so a template that
+        // rewrites it at every boot and update undoes a mode chosen on the host: rc.local writes none.
+        foreach (['for BCACHE in', 'bcache/cache_mode', 'bcache/writeback_percent', 'bcache/writeback_delay'] as $modeWrite) {
+            $this->assertStringNotContainsString($modeWrite, $rcLocal,
+                'rc.local must not rewrite bcache cache-mode knobs at boot or update: '.$modeWrite);
+        }
 
         $bootTuning = $this->pmssReadRepoFile('etc/seedbox/config/template.pmss-boot-tuning.sh');
         foreach (['sync_speed_min' => '25000', 'sync_speed_max' => '750000'] as $knob => $value) {
@@ -154,10 +157,9 @@ class BootTuningEnsureTest extends TestCase
             .'before rc.local\'s per-disk loop can be gated off (ADR 0064 step 1); a missing '
             .'declaration also makes the audit surface lie about the host');
 
-        // Scope fence, asserted rather than merely commented: the cache MODE knobs come from a
-        // SEPARATE rc.local loop, not the blanket per-disk one, so they are outside step 1 and
-        // survive step 2 untouched. Hosts are actively being moved off writeback, so adopting
-        // that mode here would freeze a live policy decision into this unit as a side effect.
+        // Scope fence, asserted rather than merely commented: the cache MODE knobs are written by no
+        // PMSS template (the kernel keeps the mode in the backing device's superblock), so adopting
+        // them here would freeze a host's mode choice into this unit as a side effect.
         // Assert the sysfs PATH form, not the bare word: the mode knobs live under
         // /sys/block/bcacheN/bcache/ while the queue knobs this unit owns live under
         // /sys/block/bcacheN/queue/. Matching the bare word would fire on the comment above
@@ -166,8 +168,8 @@ class BootTuningEnsureTest extends TestCase
             $this->pmssAssertStringNotContainsString(
                 $modeKnob,
                 $body,
-                'this unit tunes bcache QUEUE knobs only; '.$modeKnob.' belongs to template.rc.local\'s '
-                .'separate bcache loop and must not be adopted here (ADR 0064 step 1 scope fence)'
+                'this unit tunes bcache QUEUE knobs only; '.$modeKnob.' is not written by any PMSS '
+                .'template and must not be adopted here (ADR 0064 step 1 scope fence)'
             );
         }
     }

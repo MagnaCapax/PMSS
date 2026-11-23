@@ -179,10 +179,9 @@ done
 # other class here does: both writers touch these knobs, so a mismatch makes the effective value
 # depend on which unit ran last.
 # SCOPE FENCE - queue knobs ONLY. cache_mode / writeback_percent / writeback_delay are written by
-# a SEPARATE rc.local loop, not the blanket per-disk one, and are deliberately NOT adopted here:
-# ADR 0064 step 2 gates only the per-disk loop, so that block survives and loses no coverage, and
-# the cache MODE is a live policy question (hosts are being moved off writeback) that must not be
-# frozen into this unit as a side effect of a read_ahead consolidation.
+# no PMSS template: the kernel keeps cache_mode in the backing device's superblock, so the mode a
+# host was given survives boots and updates and must not be frozen into this unit as a side effect
+# of a read_ahead consolidation.
 for disk in /sys/block/bcache*; do
 	[ -d "$disk/queue" ] || continue
 	write_sys "$disk/queue/scheduler" bfq

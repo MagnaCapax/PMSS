@@ -103,6 +103,13 @@ as deferred — not adopted as a side effect of consolidating the writers.
   boot-tuning writes the md per-array knobs. rc.local's fallback now matches its
   `sync_speed_min` 25000 and `sync_speed_max` 750000; the bcache `cache_mode` loop
   remains ungated and rc.local-only.
+- **Implementation status correction (2026-11-23).** The bcache `cache_mode` loop is removed from
+  `template.rc.local`. The kernel stores `cache_mode` in the backing device's superblock
+  (`drivers/md/bcache/sysfs.c`, `cache_mode` store: `SET_BDEV_CACHE_MODE` then
+  `bch_write_bdev_super`), so the loop forced writeback at every boot and update and undid any mode
+  chosen on a host; a host already in writeback keeps it. `writeback_percent` and `writeback_delay`
+  are no longer set at boot, so a host that still caches falls back to the kernel defaults there.
+  No PMSS template writes bcache mode knobs now; `BootTuningEnsureTest` pins the absence.
 - **Step 3: blocked on fleet minimum PMSS version**, as designed.
 
 ## Consequences

@@ -4,7 +4,8 @@ modprobe bfq;
 
 # ADR 0064: boot-tuning owns sd*/vd*/bcache* queue knobs and md per-array knobs.
 # Run rc.local's per-disk and md loops only when boot-tuning is absent, so older hosts
-# keep their tuning. The bcache cache_mode loop remains rc.local-only and ungated.
+# keep their tuning. bcache cache_mode is not written here: the kernel keeps it in the
+# backing device's superblock, so a mode chosen on a host survives boots and updates.
 if [ ! -e /usr/local/sbin/pmss-boot-tuning.sh ]; then
 for DISK in `ls /sys/block|grep -v nvme|grep -v md|grep -v loop`
 do
@@ -24,14 +25,6 @@ do
     echo "bfq" > /sys/block/${MD}/queue/scheduler  &
 done
 fi
-
-# If there is bcache, set writeback caching
-for BCACHE in `ls /sys/block|grep -v md|grep -v nvme|grep -v loop|grep bcache`
-do
-    echo writeback > /sys/block/${BCACHE}/bcache/cache_mode
-    echo 75 > /sys/block/${BCACHE}/bcache/writeback_percent
-    echo 300 > /sys/block/${BCACHE}/bcache/writeback_delay
-done
 
 # Some security enhancements, making double certain
 mount -o remount,hidepid=2 /proc;
