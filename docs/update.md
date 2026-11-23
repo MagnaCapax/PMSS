@@ -277,6 +277,12 @@ MBR `core.img` the package's own `grub-install` left, and it can hang at the GRU
 banner if that install failed. The step never runs `grub-install` or writes the MBR;
 it only logs a `[WARN]` line, and a failure of the step is soft. See
 [ADR 0340](adr/0340-grub-boot-safety-detects-and-warns-it-does-not-write-the-mbr.md).
+The log read is capped at 16 MiB plus one overflow-detection byte even if the file
+grows after its size check. Invalid log paths and NUL-containing log observations
+use the existing unusable-log count and partial-result warning; invalid boot-stat
+paths or NUL-containing boot observations use the existing unreadable-boot skip.
+`BootGrubInputSafetyTest` intercepts these reads and checks the limit, refusals and
+valid-input results on the testing machine; devbox verification is PHP syntax only.
 
 Immediately before boot defaults, Debian 12 hosts receive the SHA-256-pinned
 7.3.4 kernel package through the verified remote-deb installer (soft-fail,

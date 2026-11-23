@@ -30,12 +30,19 @@ function pmssBootGrubUpgradeTimes(array $logPaths, &$unusable = 0): array
     $times = [];
     $unusable = 0;
     foreach ($logPaths as $path) {
+        // Invalid selectors are unusable evidence, not filesystem arguments.
+        if (!is_string($path) || $path === '' || strpos($path, "\0") !== false) {
+            $unusable++;
+            continue;
+        }
         if (!is_file($path)) {
             continue;
         }
         $size = @filesize($path);
-        $text = ($size === false || $size > PMSS_BOOT_GRUB_LOG_MAX_BYTES) ? false : @file_get_contents($path);
-        if ($text === false) {
+        // Recheck the actual bytes: the log may grow after the size observation.
+        $text = ($size === false || $size > PMSS_BOOT_GRUB_LOG_MAX_BYTES)
+            ? false : @file_get_contents($path, false, null, 0, PMSS_BOOT_GRUB_LOG_MAX_BYTES + 1);
+        if ($text === false || strlen($text) > PMSS_BOOT_GRUB_LOG_MAX_BYTES || strpos($text, "\0") !== false) {
             $unusable++;
             continue;
         }
@@ -63,8 +70,11 @@ function pmssBootGrubUpgradeTimes(array $logPaths, &$unusable = 0): array
  */
 function pmssBootGrubBootEpoch(string $procStat): ?int
 {
+    if ($procStat === '' || strpos($procStat, "\0") !== false) {
+        return null;
+    }
     $text = is_file($procStat) ? @file_get_contents($procStat) : false;
-    if ($text === false || preg_match('/^btime\s+(\d+)\s*$/m', $text, $match) !== 1) {
+    if ($text === false || strpos($text, "\0") !== false || preg_match('/^btime\s+(\d+)\s*$/m', $text, $match) !== 1) {
         return null;
     }
     return (int) $match[1];
