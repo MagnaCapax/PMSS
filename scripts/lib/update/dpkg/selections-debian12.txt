@@ -205,6 +205,7 @@ initramfs-tools	install
 initramfs-tools-core	install
 installation-report	install
 intel-media-va-driver:amd64	install
+intel-opencl-icd:amd64	install
 intltool	install
 inxi	install
 iotop	install
@@ -493,6 +494,8 @@ libidn11:amd64	install
 libidn12:amd64	install
 libidn2-0:amd64	install
 libiec61883-0:amd64	install
+libigc1:amd64	install
+libigdfcl1:amd64	install
 libigdgmm12:amd64	install
 libijs-0.35:amd64	install
 libimagequant0:amd64	install

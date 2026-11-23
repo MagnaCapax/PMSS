@@ -260,3 +260,21 @@ Consequences:
 - Acceptance needs real AMD hardware: firmware present, amdgpu bound without
   `nomodeset`, `/dev/dri/renderD128` mode 0666, `vainfo` H.264/HEVC encode
   entrypoints, and a `gpuEnabled=false` account denied (`getfacl`).
+
+## Amendment 2026-11-23: OpenCL runtime on Intel iGPU hosts
+
+Jellyfin's OpenCL tone mapping (HDR to SDR) needs an OpenCL platform. The Debian 12
+baseline carried the ICD loader (`ocl-icd-libopencl1`) but no Intel ICD, so
+`/etc/OpenCL/vendors/` stayed empty and the transcode failed with
+`Failed to get number of OpenCL platforms: -1001`. The baseline now selects
+`intel-opencl-icd`, `libigc1` and `libigdfcl1`; `apt dselect-upgrade` pulls the
+LLVM 14 and opencl-clang libraries they depend on, all from bookworm main
+(measured with `apt -s` on an N100 host: 7 new packages, nothing upgraded or removed).
+
+The sanitiser drops the three selections without a deinstall state when no Intel
+display device is present, the same runtime-conditional category as
+`firmware-misc-nonfree`, so non-Intel hosts never pull LLVM 14 for them. A
+selection written as `hold`, or any other package name, is untouched. OpenCL uses
+the render node this ADR already opens, so no device or permission surface is
+added. Debian 13 package names are not covered and stay deferred with the other
+trixie Intel items above.

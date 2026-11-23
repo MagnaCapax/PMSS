@@ -125,4 +125,36 @@ class IntelGpuFirmwareSelectionTest extends TestCase
         $this->pmssWriteFile($root.'/0000:00:02.0/class', "0x030000\n");
         $this->assertFalse(\pmssHostHasIntelDisplayPciDevice($root));
     }
+    public function testOpenClRuntimeFollowsIntelDisplayOnly(): void
+    {
+        // Jellyfin OpenCL tone mapping needs the Intel ICD plus the IGC compiler; other hosts must never pull LLVM 14 for it.
+        $lines = ["intel-opencl-icd:amd64\tinstall", "libigc1:amd64\tinstall", "libigdfcl1:amd64\tinstall", "alpha\tinstall"];
+        $absent = \pmssDpkgSelectionsSanitise($lines, 12, ...self::pmssMakeCallbacks([true, false]));
+        $this->pmssAssertArraySubsetSame(['sanitised' => ["alpha\tinstall"], 'dropped_hardware' => ['intel-opencl-icd:amd64', 'libigc1:amd64', 'libigdfcl1:amd64']], $absent);
+        $present = \pmssDpkgSelectionsSanitise($lines, 12, ...self::pmssMakeCallbacks([true, true]));
+        $this->pmssAssertArraySubsetSame(['sanitised' => ["intel-opencl-icd:amd64\tinstall", "libigc1:amd64\tinstall", "libigdfcl1:amd64\tinstall", "alpha\tinstall"], 'dropped_hardware' => []], $present);
+    }
+
+    public function testOpenClRuntimeHoldAndUnqualifiedNamesFollowTheSameGate(): void
+    {
+        // Only an install selection is gated: a hold stays as written, and the bare name is gated like the arch-qualified one.
+        $held = \pmssDpkgSelectionsSanitise(['intel-opencl-icd hold'], 12, ...self::pmssMakeCallbacks([true, false]));
+        $this->pmssAssertArraySubsetSame(['sanitised' => ["intel-opencl-icd\thold"], 'dropped_hardware' => []], $held);
+        $bare = \pmssDpkgSelectionsSanitise(['libigc1 install', 'libigc12:amd64 install'], 12, ...self::pmssMakeCallbacks([true, false]));
+        $this->pmssAssertArraySubsetSame(['sanitised' => ["libigc12:amd64\tinstall"], 'dropped_hardware' => ['libigc1']], $bare);
+    }
+
+    public function testShippedDebian12BaselineCarriesOpenClRuntimeOnlyForIntelHosts(): void
+    {
+        $lines = file(dirname(__DIR__, 2).'/update/dpkg/selections-debian12.txt', FILE_IGNORE_NEW_LINES);
+        $this->assertTrue(is_array($lines));
+        $packages = ['intel-opencl-icd:amd64', 'libigc1:amd64', 'libigdfcl1:amd64'];
+        $intel = \pmssDpkgSelectionsSanitise($lines, 12, ...self::pmssMakeCallbacks([true, true]));
+        $other = \pmssDpkgSelectionsSanitise($lines, 12, ...self::pmssMakeCallbacks([true, false]));
+        foreach ($packages as $package) {
+            $this->assertTrue(in_array($package."\tinstall", $intel['sanitised'], true));
+            $this->assertFalse(in_array($package."\tinstall", $other['sanitised'], true));
+            $this->assertTrue(in_array($package, $other['dropped_hardware'], true));
+        }
+    }
 }

@@ -43,7 +43,10 @@ function pmssDpkgSelectionsSanitise(array $lines, int $runtimeVersion, ?callable
             $result['warnings'] = true;
             continue;
         }
-        if ($lower === 'firmware-misc-nonfree' && strtolower($state) === 'install' && !$intelDisplayPresent()) {
+        // Baselines may write entries arch-qualified (libigc1:amd64); compare the bare package name.
+        $archSuffix = (string) strstr($package, ':');
+        // ADR 0096 amendment 2026-11-23: the OpenCL runtime for Jellyfin tone mapping (ICD, IGC compiler) is Intel-iGPU-only too.
+        if (in_array(substr($lower, 0, strlen($lower) - strlen($archSuffix)), ['firmware-misc-nonfree', 'intel-opencl-icd', 'libigc1', 'libigdfcl1'], true) && strtolower($state) === 'install' && !$intelDisplayPresent()) {
             pmssDpkgSelectionsDrop($result, 'dropped_hardware', $package);
             continue;
         }
@@ -56,7 +59,6 @@ function pmssDpkgSelectionsSanitise(array $lines, int $runtimeVersion, ?callable
         // (HD/UHD 630), so Intel iGPU hosts get the non-free build when the non-free component offers it.
         // The baselines write this entry as intel-media-va-driver:amd64, so compare the name without the arch suffix
         // and keep the suffix on both emitted lines (the first version compared the suffixed name and never fired).
-        $archSuffix = (string) strstr($package, ':');
         if (substr($lower, 0, strlen($lower) - strlen($archSuffix)) === 'intel-media-va-driver' && strtolower($state) === 'install'
             && $intelDisplayPresent() && $packageAvailable('intel-media-va-driver-non-free')) {
             $result['sanitised'][] = "intel-media-va-driver-non-free{$archSuffix}\tinstall";
