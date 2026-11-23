@@ -6,6 +6,7 @@
  * @author PMSS Team
  */
 require_once __DIR__.'/../runtime.php';
+require_once __DIR__.'/../cgroup/policy.php';
 
 // UINT64_MAX casts to PHP_INT_MAX (9223372036854775807) in PHP. systemd reports it
 // for unavailable slice properties on cgroup v1 (#467). Treat any value at/above this
@@ -19,20 +20,65 @@ function pmssResourceLogReadSysfsCounter(string $path): ?int
     return ($value < 0 || $value >= PMSS_RESOURCE_COUNTER_SENTINEL) ? null : $value;
 }
 
+/** Normalise a textual major:minor ("008:000") to its numeric form ("8:0"), or null when malformed. */
+function pmssResourceLogDeviceKey(string $device): ?string
+{
+    if (preg_match('/\A([0-9]+):([0-9]+)\z/', trim($device), $m) !== 1) return null;
+    $major = pmssUnsignedDecimalIntParse($m[1]); $minor = pmssUnsignedDecimalIntParse($m[2]);
+    return $major === null || $minor === null ? null : $major.':'.$minor;
+}
+
+/**
+ * major:minor keys of the /home device and the whole disks under it (#1297), or null when unresolved.
+ *
+ * Throttle rows sit on the device the I/O was submitted to (the /home md or dm device, where the
+ * read-IOPS cap is written); BFQ rows sit on the whole disks that run the scheduler. Intermediate
+ * stacked devices are left out so a row is never counted twice. The mount source comes from the
+ * same resolver as the cap. Null keeps the all-device sum: unknown topology is never "no /home I/O".
+ * BFQ rows are per whole disk, so other partitions on the /home disks still count.
+ *
+ * @return array<string,true>|null
+ */
+function pmssResourceLogHomeDeviceKeys(?callable $mountRunner = null, string $sysClassBlock = '/sys/class/block'): ?array
+{
+    static $cached = [];
+    $useCache = $mountRunner === null && $sysClassBlock === '/sys/class/block';
+    if ($useCache && array_key_exists('keys', $cached)) return $cached['keys'];
+    $root = rtrim($sysClassBlock, '/'); $keys = null;
+    $source = pmssCgroupPolicyMountSourceResolve('/home', $mountRunner);
+    if ($source !== '' && !pmssFilesystemPathHasNulByte($source.$root) && strpos($source, '/dev/') === 0) {
+        if (strpos($source, '/dev/mapper/') === 0) $source = (string) realpath($source);
+        $top = basename($source);
+        $topology = pmssBlockDeviceLeaves($top, $root, static function (string $pattern) { return @glob($pattern); });
+        if ($topology['complete'] && $topology['leaves'] !== []) {
+            $keys = [];
+            foreach (array_unique(array_merge([$top], $topology['leaves'])) as $name) {
+                $key = pmssResourceLogDeviceKey((string) pmssReadRegularFileContents($root.'/'.$name.'/dev'));
+                if ($key === null) { $keys = null; break; }
+                $keys[$key] = true;
+            }
+        }
+    }
+    if ($useCache) $cached['keys'] = $keys;
+    return $keys;
+}
+
 /**
  * Sum the Read/Write rows of a v1 blkio per-device file.
  * Totals must stay below the counter sentinel; an unrepresentable sum is absent.
+ * With $devices (major:minor => true), only rows of those devices count (#1297).
  */
-function pmssResourceLogReadBlkioReadWrite(string $path): ?array
+function pmssResourceLogReadBlkioReadWrite(string $path, ?array $devices = null): ?array
 {
     $totals = null;
     foreach (pmssTextLines(pmssReadRegularFileContents($path) ?? '') as $line) {
         // Require major:minor devices; reject NULs before trim() can hide corruption.
         if (pmssFilesystemPathHasNulByte($line)
-            || preg_match('/^[0-9]+:[0-9]+\s+(Read|Write)\s+([0-9]+)$/', trim($line), $m) !== 1) continue;
-        $value = pmssUnsignedDecimalIntParse($m[2]);
+            || preg_match('/^([0-9]+:[0-9]+)\s+(Read|Write)\s+([0-9]+)$/', trim($line), $m) !== 1) continue;
+        if ($devices !== null && !isset($devices[pmssResourceLogDeviceKey($m[1]) ?? ''])) continue;
+        $value = pmssUnsignedDecimalIntParse($m[3]);
         if ($value === null || $value >= PMSS_RESOURCE_COUNTER_SENTINEL) continue;
-        $direction = $m[1] === 'Read' ? 'read' : 'write';
+        $direction = $m[2] === 'Read' ? 'read' : 'write';
         $totals = $totals ?? ['read' => 0, 'write' => 0];
         // Check before addition: integer overflow becomes a float and can later cast negative.
         if ($value >= PMSS_RESOURCE_COUNTER_SENTINEL - $totals[$direction]) return null;
@@ -55,11 +101,11 @@ function pmssResourceLogReadBlkioReadWrite(string $path): ?array
  *
  * @return array{read:int,write:int,source:string}|null
  */
-function pmssResourceLogReadBlkioBytesWithSource(string $blkioSliceDir, string $bfqFile = 'blkio.bfq.io_service_bytes_recursive', string $throttleFile = 'blkio.throttle.io_service_bytes_recursive'): ?array
+function pmssResourceLogReadBlkioBytesWithSource(string $blkioSliceDir, string $bfqFile = 'blkio.bfq.io_service_bytes_recursive', string $throttleFile = 'blkio.throttle.io_service_bytes_recursive', ?array $devices = null): ?array
 {
-    $bfq = pmssResourceLogReadBlkioReadWrite($blkioSliceDir.$bfqFile);
+    $bfq = pmssResourceLogReadBlkioReadWrite($blkioSliceDir.$bfqFile, $devices);
     if ($bfq !== null && ($bfq['read'] > 0 || $bfq['write'] > 0)) return $bfq + ['source' => 'bfq'];
-    $throttle = pmssResourceLogReadBlkioReadWrite($blkioSliceDir.$throttleFile);
+    $throttle = pmssResourceLogReadBlkioReadWrite($blkioSliceDir.$throttleFile, $devices);
     if ($throttle !== null && ($bfq === null || $throttle['read'] > 0 || $throttle['write'] > 0)) return $throttle + ['source' => 'throttle'];
     // Both absent or genuinely zero: keep a stable source label from whichever file exists so
     // an idle user does not thrash io_source (which would force a spurious reseed each sample).
@@ -88,8 +134,9 @@ function pmssResourceLogReadMemoryStatField(string $path, string $field): ?int {
 /**
  * Acquire v1 sources once in telemetry order; billing may request just its non-IO fields.
  * Missing counters are omitted. Each direction's IO ops use its bytes accounting family.
+ * $ioDevices (major:minor => true) limits IO to those devices and marks io_scope (#1297).
  */
-function pmssResourceV1ReadMetrics(int $uid, ?string $cgroupRoot = null, ?array $wanted = null): array
+function pmssResourceV1ReadMetrics(int $uid, ?string $cgroupRoot = null, ?array $wanted = null, ?array $ioDevices = null): array
 {
     $root = rtrim($cgroupRoot ?? '/sys/fs/cgroup', '/');
     $slice = '/user.slice/user-'.$uid.'.slice/';
@@ -129,21 +176,22 @@ function pmssResourceV1ReadMetrics(int $uid, ?string $cgroupRoot = null, ?array 
         }
     }
     // Keep partial IO for telemetry; billing enforces its atomic group at projection time.
-    $bytes = pmssResourceLogReadBlkioBytesWithSource($root.'/blkio'.$slice);
+    $bytes = pmssResourceLogReadBlkioBytesWithSource($root.'/blkio'.$slice, 'blkio.bfq.io_service_bytes_recursive', 'blkio.throttle.io_service_bytes_recursive', $ioDevices);
     if ($bytes !== null) {
-        $ops = pmssResourceLogReadBlkioReadWrite($root.'/blkio'.$slice.'blkio.'.$bytes['source'].'.io_serviced_recursive');
+        $ops = pmssResourceLogReadBlkioReadWrite($root.'/blkio'.$slice.'blkio.'.$bytes['source'].'.io_serviced_recursive', $ioDevices);
         // BFQ can account reads but miss writes on md hosts (#1296). Keep reads and use
         // a complete throttle write pair; a distinct source makes either transition reseed.
         if ($bytes['source'] === 'bfq' && $bytes['write'] === 0 && $ops !== null && $ops['write'] === 0) {
-            $writeBytes = pmssResourceLogReadBlkioReadWrite($root.'/blkio'.$slice.'blkio.throttle.io_service_bytes_recursive');
-            $writeOps = pmssResourceLogReadBlkioReadWrite($root.'/blkio'.$slice.'blkio.throttle.io_serviced_recursive');
+            $writeBytes = pmssResourceLogReadBlkioReadWrite($root.'/blkio'.$slice.'blkio.throttle.io_service_bytes_recursive', $ioDevices);
+            $writeOps = pmssResourceLogReadBlkioReadWrite($root.'/blkio'.$slice.'blkio.throttle.io_serviced_recursive', $ioDevices);
             if ($writeBytes !== null && $writeBytes['write'] > 0 && $writeOps !== null) {
                 $bytes['write'] = $writeBytes['write'];
                 $ops['write'] = $writeOps['write'];
                 $bytes['source'] = 'bfq-read-throttle-write';
             }
         }
-        $metrics += ['io_bytes_read' => $bytes['read'], 'io_bytes_write' => $bytes['write'], 'io_source' => $bytes['source']];
+        $metrics += ['io_bytes_read' => $bytes['read'], 'io_bytes_write' => $bytes['write'], 'io_source' => $bytes['source'],
+            'io_scope' => $ioDevices === null ? 'recursive' : 'home-recursive'];
         if ($ops !== null) $metrics += ['io_ops_read' => $ops['read'], 'io_ops_write' => $ops['write']];
     }
     return $metrics;

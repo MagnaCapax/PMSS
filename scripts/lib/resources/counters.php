@@ -57,8 +57,11 @@ function pmssResourceLogReadCounters(int $uid, ?string $cgroupRoot = null): ?arr
  */
 function pmssResourceLogReadCountersV1(int $uid, ?string $cgroupRoot = null): ?array
 {
+    // The monthly IOPS budget bounds /home impact, so billing counts only the /home devices (#1297).
+    // An injected root is a fixture tree with no block-device tree beside it: keep the all-device sum.
     $sample = pmssResourceV1ReadMetrics($uid, $cgroupRoot,
-        ['cpu_usage_nsec', 'mem_current', 'pids_current', 'mem_total_rss', 'mem_rss', 'mem_total_cache', 'mem_cache']);
+        ['cpu_usage_nsec', 'mem_current', 'pids_current', 'mem_total_rss', 'mem_rss', 'mem_total_cache', 'mem_cache'],
+        $cgroupRoot === null ? pmssResourceLogHomeDeviceKeys() : null);
     $values = [];
     foreach (['cpu_nsec' => 'cpu_usage_nsec', 'memory' => 'mem_current', 'tasks' => 'pids_current'] as $key => $field) {
         if (isset($sample[$field])) $values[$key] = $sample[$field];
@@ -68,7 +71,7 @@ function pmssResourceLogReadCountersV1(int $uid, ?string $cgroupRoot = null): ?a
     if (isset($sample['io_ops_read'], $sample['io_ops_write'])) {
         $values += ['io_read' => $sample['io_bytes_read'], 'io_write' => $sample['io_bytes_write'],
             'io_read_ops' => $sample['io_ops_read'], 'io_write_ops' => $sample['io_ops_write'],
-            'io_source' => $sample['io_source'], 'io_scope' => 'recursive'];
+            'io_source' => $sample['io_source'], 'io_scope' => $sample['io_scope']];
     }
     // User processes live in child cgroups: prefer hierarchical totals, even when they are zero.
     foreach (['memory_anon' => ['mem_total_rss', 'mem_rss'], 'memory_file' => ['mem_total_cache', 'mem_cache']] as $key => $fields) {

@@ -83,6 +83,29 @@ subtree activity as new usage. Missing recursive sources remain unavailable.
 Regression coverage lives in `resourceLogHelpersTest`, `userMetricsCollectTest`
 and `counterStateCharacterizationTest`; execution belongs on the testing machine.
 
+## Amendment: /home device scope for billing IO (2026-11-23, #1297)
+
+The recursive files carry one row per device, and billing summed them all, so
+system-disk and swap IO counted toward the monthly IOPS budget whose exceed action
+clamps `/home`. Billing now counts only the rows of the `/home` device and of the
+whole disks under it. Throttle rows sit on the device the IO was submitted to (the
+`/home` md or dm device, where the read cap is written); BFQ rows sit on the whole
+disks that run the scheduler. Intermediate stacked devices and partitions are left
+out, so no IO is counted twice: on a 6.1 and a 7.3 md host the throttle files held
+no member-disk rows with IO and the BFQ files held no md row. The mount source comes
+from the same resolver as the cap writer.
+
+Options considered: keep the sum and document it (the budget then charges IO the
+clamp does not cover); record the per-device split in the sample (more state, same
+decision later). Chosen: filter at acquisition.
+
+Complete billing samples carry `io_scope=home-recursive`; the existing reseed guard
+emits zero IO deltas once when the scope changes, as in the #1022 migration. When
+`/home` cannot be resolved, billing keeps the all-device sum and `io_scope=recursive`,
+so unknown topology never reads as no IO. BFQ rows are per whole disk: IO on other
+partitions of the `/home` disks still counts. Telemetry keeps the all-device sum and
+carries no scope marker. Coverage: `ResourceHomeDeviceScopeTest`.
+
 ## References
 - GH PMSS #707 (per-user I/O dashboard blank; converged IMPLEMENT + §0 guard across 11 comments),
   GH #467 (prior throttle-only fix), ADR 0019 (production cgroup-v1 pin), ADR 0003 (dual-path detection).

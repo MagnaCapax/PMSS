@@ -34,7 +34,7 @@ function pmssUserMetricsCollect(int $uid, ?string $cgroupRoot = null): array
 {
     $metrics = pmssResourceV1ReadMetrics($uid, $cgroupRoot);
     // Telemetry records local memory fields and available IO, without billing's source marker.
-    unset($metrics['mem_total_rss'], $metrics['mem_total_cache'], $metrics['io_source']);
+    unset($metrics['mem_total_rss'], $metrics['mem_total_cache'], $metrics['io_source'], $metrics['io_scope']);
     $root = rtrim($cgroupRoot ?? '/sys/fs/cgroup', '/');
     $raw = pmssReadRegularFileContents($root.'/unified/user.slice/user-'.$uid.'.slice/io.pressure');
     if ($raw !== null) {
