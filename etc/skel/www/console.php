@@ -99,6 +99,63 @@ function pmssConsoleSpawnAllowed($uid, $ttyd, $sock, $ops = array())
     return false;
 }
 
+/**
+ * Shell words ttyd runs: the shell, then a private marker once the shell itself returns.
+ *
+ * When the browser connection drops, ttyd signals this wrapper with SIGHUP, so it
+ * dies before the marker line; only exit, logout or a tmux detach reach it (GH #1232).
+ * The trap keeps a stray terminal interrupt from ending the wrapper early.
+ */
+function pmssConsoleShellCommand($shellCmd, $marker)
+{
+    return 'sh -c '.escapeshellarg('trap : INT QUIT; '.$shellCmd.'; : > '.escapeshellarg($marker));
+}
+
+/** True once per ended session: reads the marker left by pmssConsoleShellCommand() and removes it. */
+function pmssConsoleSessionEnded($marker)
+{
+    if (!is_file($marker)) {
+        return false;
+    }
+    @unlink($marker);
+    return true;
+}
+
+/** The console page HTML: the terminal frame, or the session-ended notice (GH #1232). */
+function pmssConsolePage($persist, $ended)
+{
+    $label = $persist ? 'persistent tmux session (reattaches on reconnect)'
+                       : 'ephemeral session (closing or reloading the tab stops running programs; run long jobs in the Persistent (tmux) session)';
+    $head = '<!doctype html><html lang="en"><head><script>var u = new URL(location.href); if (u.username || u.password) { u.username = \'\'; u.password = \'\'; location.replace(u.href); }</script><meta charset="utf-8">'
+        .'<meta name="viewport" content="width=device-width, initial-scale=1">'
+        .'<title>Shell console</title>'
+        .'<style>html,body{margin:0;height:100%;background:#101216}'
+        .'iframe{border:0;width:100%;height:100%;display:block}</style></head>';
+    if ($ended) {
+        return $head.'<body style="font-family:sans-serif;padding:2em;max-width:40em;color:#e6e6e6">'
+            .'<h2>Session ended</h2>'
+            .'<p>The shell was closed. A dropped connection reconnects on its own; '
+            .'this page only appears after the shell itself ended.</p>'
+            .'<p><a style="color:#8ab4f8" href="console.php'.($persist ? '?mode=persist' : '').'">Start a new session</a></p>'
+            .'</body></html>';
+    }
+    return $head.'<body><iframe id="terminal" src="console/" title="'.htmlspecialchars($label, ENT_QUOTES).'">'
+        .'</iframe><script>'
+        .'/* ttyd --once exits on disconnect; its in-frame retry cannot restart it. */'
+        .'setInterval(function () {'
+        .'var frame = document.getElementById("terminal");'
+        .'var page = frame.contentDocument;'
+        .'if (!page) return;'
+        .'var overlays = page.querySelectorAll(".xterm > div");'
+        .'for (var i = 0; i < overlays.length; i++) {'
+        .'if (overlays[i].textContent === "Press ⏎ to Reconnect") {'
+        .'window.location.reload(); return;'
+        .'}'
+        .'}'
+        .'}, 500);'
+        .'</script></body></html>';
+}
+
 // Resolve the running customer from the process identity — never from request data.
 $uid  = function_exists('posix_getuid') ? posix_getuid() : null;
 $pw   = ($uid !== null && function_exists('posix_getpwuid')) ? posix_getpwuid($uid) : false;
@@ -129,6 +186,15 @@ if (!is_file($ttyd) || !is_executable($ttyd)) {
 // Mode is a FIXED enum — request text never reaches the spawned command.
 $persist  = (isset($_GET['mode']) && $_GET['mode'] === 'persist');
 $shellCmd = $persist ? 'tmux new -A -s console' : 'bash';
+
+// A shell that ended on purpose (exit, logout, detach) leaves a marker in the private
+// tree: show "session ended" instead of relaunching. Dropped connections leave none.
+$endMarker = $home.'/.lighttpd/console.ended';
+if (pmssConsoleSessionEnded($endMarker)) {
+    header('Content-Type: text/html; charset=utf-8');
+    echo pmssConsolePage($persist, true);
+    return;
+}
 
 // ttyd receives the full external path (mod_proxy does not strip), so the
 // base-path must match the reverse-proxy prefix for asset/WebSocket resolution.
@@ -166,7 +232,7 @@ if (!$running) {
         .' -i '.escapeshellarg($sock)
         .' -b '.escapeshellarg($basePath)
         .' -t fontSize=15 -t disableReconnect=true'
-        .' '.$shellCmd;
+        .' '.pmssConsoleShellCommand($shellCmd, $endMarker);
 
     // Start the shell in the customer's HOME. The per-user lighttpd (and its
     // php-cgi children) inherit cwd=/root from the root cron that starts them,
@@ -210,26 +276,5 @@ if (!$running) {
 fclose($consoleLock);
 
 // Load the terminal via the reverse-proxy path (relative -> /user-<user>/console/).
-$label = $persist ? 'persistent tmux session (reattaches on reconnect)'
-                   : 'ephemeral session (closing or reloading the tab stops running programs; run long jobs in the Persistent (tmux) session)';
 header('Content-Type: text/html; charset=utf-8');
-echo '<!doctype html><html lang="en"><head><script>var u = new URL(location.href); if (u.username || u.password) { u.username = \'\'; u.password = \'\'; location.replace(u.href); }</script><meta charset="utf-8">'
-    .'<meta name="viewport" content="width=device-width, initial-scale=1">'
-    .'<title>Shell console</title>'
-    .'<style>html,body{margin:0;height:100%;background:#101216}'
-    .'iframe{border:0;width:100%;height:100%;display:block}</style></head>'
-    .'<body><iframe id="terminal" src="console/" title="'.htmlspecialchars($label, ENT_QUOTES).'">'
-    .'</iframe><script>'
-    .'/* ttyd --once exits on disconnect; its in-frame retry cannot restart it. */'
-    .'setInterval(function () {'
-    .'var frame = document.getElementById("terminal");'
-    .'var page = frame.contentDocument;'
-    .'if (!page) return;'
-    .'var overlays = page.querySelectorAll(".xterm > div");'
-    .'for (var i = 0; i < overlays.length; i++) {'
-    .'if (overlays[i].textContent === "Press ⏎ to Reconnect") {'
-    .'window.location.reload(); return;'
-    .'}'
-    .'}'
-    .'}, 500);'
-    .'</script></body></html>';
+echo pmssConsolePage($persist, false);

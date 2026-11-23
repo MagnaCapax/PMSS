@@ -165,7 +165,8 @@ class BrowserConsoleArtifactsTest extends TestCase
     private function loadLifecycleHelpers(): void
     {
         $src = $this->pmssReadRepoFile('etc/skel/www/console.php');
-        foreach (array('pmssConsoleTtydProcesses', 'pmssConsoleSpawnAllowed') as $function) {
+        foreach (array('pmssConsoleTtydProcesses', 'pmssConsoleSpawnAllowed', 'pmssConsoleShellCommand',
+            'pmssConsoleSessionEnded', 'pmssConsolePage') as $function) {
             $this->assertTrue(preg_match('/^function '.$function.'\(.*?^\}$/ms', $src, $match) === 1);
             if (!function_exists($function)) eval($match[0]);
         }
@@ -281,5 +282,67 @@ class BrowserConsoleArtifactsTest extends TestCase
             '@unlink($sock)', "@exec('setsid", 'fclose($consoleLock)',
         ], $src);
         $this->assertStringContainsAllStrings(["console.lock', 'ce'", "'exec '.\$cmd"], $src);
+    }
+
+    /** Run the launcher's wrapped command with a stand-in shell; optionally SIGHUP the wrapper like ttyd does.
+     * The leading exec makes the wrapper itself the signalled process, not an outer shell. */
+    private function runConsoleWrapper(string $shellCmd, string $marker, bool $hangup): void
+    {
+        $process = proc_open('exec '.\pmssConsoleShellCommand($shellCmd, $marker), array(array('file', '/dev/null', 'r'),
+            array('file', '/dev/null', 'w'), array('file', '/dev/null', 'w')), $pipes);
+        $this->assertTrue(is_resource($process), 'wrapper must start');
+        if ($hangup) {
+            usleep(300000);
+            proc_terminate($process, 1);
+        }
+        proc_close($process);
+    }
+
+    public function testConsoleMarkerIsWrittenOnlyWhenTheShellItselfEnds(): void
+    {
+        $this->loadLifecycleHelpers();
+        $dir = $this->pmssMakeTempDir('pmss-console-end-');
+        // The marker path has a space and a quote: it must survive both shell quoting layers.
+        $marker = $dir."/it's here/console.ended";
+        mkdir(dirname($marker), 0700, true);
+        // A shell that returns with status 0, and one that returns with a failing status.
+        foreach (array("sh -c 'exit 0'", "sh -c 'exit 3'") as $shell) {
+            $this->runConsoleWrapper($shell, $marker, false);
+            $this->assertTrue(is_file($marker), 'exit ('.$shell.') must leave the session-ended marker');
+            unlink($marker);
+        }
+        // A dropped connection: ttyd signals the wrapper with SIGHUP while the shell still runs.
+        $this->runConsoleWrapper('sleep 2', $marker, true);
+        $this->assertFalse(is_file($marker), 'a dropped connection must not leave the session-ended marker');
+    }
+
+    public function testConsoleEndedSessionIsReportedOnce(): void
+    {
+        $this->loadLifecycleHelpers();
+        $marker = $this->pmssMakeTempDir('pmss-console-once-').'/console.ended';
+        $this->assertFalse(\pmssConsoleSessionEnded($marker), 'no marker means the session did not end on purpose');
+        touch($marker);
+        $this->assertTrue(\pmssConsoleSessionEnded($marker));
+        $this->assertFalse(is_file($marker), 'the marker is consumed so the next load starts a session');
+        $this->assertFalse(\pmssConsoleSessionEnded($marker));
+    }
+
+    public function testConsolePageShowsEndedNoticeInsteadOfRelaunching(): void
+    {
+        $this->loadLifecycleHelpers();
+        $ended = \pmssConsolePage(false, true);
+        $this->assertStringContainsAllStrings(['Session ended', 'Start a new session', 'href="console.php"'], $ended);
+        $this->assertStringNotContainsString('window.location.reload()', $ended);
+        $this->assertStringNotContainsString('<iframe', $ended);
+        $this->assertStringContainsString('href="console.php?mode=persist"', \pmssConsolePage(true, true));
+        $live = \pmssConsolePage(false, false);
+        $this->assertStringContainsAllStrings(['<iframe id="terminal"', 'Press ⏎ to Reconnect', 'window.location.reload()'], $live);
+    }
+
+    public function testConsoleLauncherChecksEndMarkerBeforeSpawning(): void
+    {
+        $src = $this->pmssReadRepoFile('etc/skel/www/console.php');
+        $this->assertOrderedStrings(['pmssConsoleSessionEnded($endMarker)', 'LOCK_EX | LOCK_NB',
+            'pmssConsoleShellCommand($shellCmd, $endMarker)'], $src);
     }
 }
