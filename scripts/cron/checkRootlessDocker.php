@@ -54,6 +54,8 @@ foreach ($users as $user) {
     // Reuse checked shutdown for idle daemons that survived a package upgrade.
     $action = userDockerWatchdogAction($user, $logDockerMessage);
     if ($action === null) continue;
+    // The launch below reports OK even when dockerd dies during start-up; surface that on the next tick.
+    userDockerWatchdogLaunchObserve($user, $logDockerMessage);
     $cmd = sprintf('php /scripts/util/userDocker.php %s %s', escapeshellarg($user), escapeshellarg($action));
     runCommand($cmd, false, $logDockerMessage);
 }

@@ -24,7 +24,12 @@ healthy between full update runs:
   successful `docker ps --quiet` reports no running containers. Each account-side
   probe has a five-second deadline; busy daemons and failed probes defer drift
   recovery and log the decision. A timed-out probe uses the shared 15-minute
-  account/service backoff (ADR 0286). Logs to `/var/log/pmss/rootlessDocker.log`.
+  account/service backoff (ADR 0286). A launch only reports that `dockerd-rootless.sh`
+  was started, so each enabled account keeps a launch marker in the private runtime
+  directory: when the previous tick launched and no daemon process exists now, the
+  watchdog logs `event=daemon_died_after_launch` (a `[WARN]` line, also in the
+  account's own log) and relaunches as before. A running daemon clears the marker;
+  the first launch after boot stays silent. Logs to `/var/log/pmss/rootlessDocker.log`.
   `*/5 * * * * root flock -xn -o /run/lock/pmss-checkRootlessDocker.lock /scripts/cron/checkRootlessDocker.php >> /var/log/pmss/rootlessDocker.log 2>&1`
 - **WireGuard health check** – Ensures the WireGuard kernel module is loaded
   and `wg-quick@wg0` stays active. Logs to `/var/log/pmss/checkWireguard.log`

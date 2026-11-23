@@ -4,6 +4,12 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/process.php';
+require_once dirname(__DIR__).'/watchdogLaunch.php';
+
+/** Seconds a launch marker stays meaningful: six 5-minute ticks. */
+const PMSS_DOCKER_LAUNCH_MARKER_MAX_AGE = 1800;
+
 /** Select a restart only after successful version and idle-container observations. */
 function userDockerWatchdogAction(string $user, callable $log): ?string
 {
@@ -51,4 +57,30 @@ function userDockerWatchdogAction(string $user, callable $log): ?string
     $reason = $idle ? 'idle' : ($containers['rc'] === 0 ? 'running_containers' : 'container_probe_failed');
     $log("Docker watchdog for {$user}: event=version_drift server={$running} installed={$match[1]} decision={$action} reason={$reason} rc={$containers['rc']}");
     return $action;
+}
+
+/**
+ * Surface a daemon that died after a successful launch (the launch itself always reports OK).
+ *
+ * Call before the start decision: a running daemon clears the launch marker; an absent one with a
+ * marker left by the previous tick is logged as a post-launch death. Relaunch is never suppressed,
+ * and the first launch after boot or enablement stays silent. An unreadable process list is no evidence.
+ */
+function userDockerWatchdogLaunchObserve(string $user, callable $log): void
+{
+    $checkOk = true;
+    $pids = userDockerCollectPids($user, false, $checkOk);
+    if (!$checkOk) return;
+    if ($pids !== []) {
+        pmssUserWatchdogLaunchMarkerClear($user, 'docker');
+        return;
+    }
+    $launched = pmssUserWatchdogLaunchMarkerRead($user, 'docker');
+    // A marker older than a few ticks is stale (account disabled or parked since), not a death.
+    if ($launched !== null && time() - $launched <= PMSS_DOCKER_LAUNCH_MARKER_MAX_AGE) {
+        $log("[WARN] Docker watchdog for {$user}: event=daemon_died_after_launch launched_at={$launched}; "
+            .'dockerd-rootless.sh was started on the previous tick and is not running now; relaunching');
+        pmssUserLog($user, '[WARN] userDocker: daemon died after launch; the watchdog relaunches it every tick, run dockerd-rootless.sh in the foreground to see why');
+    }
+    pmssUserWatchdogLaunchMarkerWrite($user, 'docker');
 }
