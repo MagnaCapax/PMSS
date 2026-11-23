@@ -272,6 +272,58 @@ PHP;
         }
     }
 
+    public function testScgiDecisionRestartsWhenSocketFileIsGoneButListenerRemains(): void
+    {
+        $path = $this->tempDir.'/accept-queue.count';
+        $states = [44 => ['pid' => 44, 'stat' => 'Sl', 'wchan' => 'poll_schedule_timeout']];
+
+        // File removed while the process holds the bind: only a restart recreates the path (#723).
+        $decision = \rtorrentProcessScgiUnresponsiveDecision([44], $states, ['recvQ' => 0, 'sendQ' => 100], $path, 3, false);
+        $this->assertSame('restart', $decision['action']);
+        $this->assertStringContainsString('socket file is missing', $decision['message']);
+        $this->assertFalse(file_exists($path), 'a missing file must not touch the queue wedge counter');
+    }
+
+    public function testScgiDecisionKeepsGraceWhenSocketFileIsGoneAndNothingIsBound(): void
+    {
+        $path = $this->tempDir.'/accept-queue.count';
+        $aliveStates = [44 => ['pid' => 44, 'stat' => 'Sl', 'wchan' => 'poll_schedule_timeout']];
+
+        // Never bound (full disk or inodes) or no usable ss output: restarting cannot help and would repeat.
+        $decision = \rtorrentProcessScgiUnresponsiveDecision([44], $aliveStates, null, $path, 3, false);
+        $this->assertSame('extend_grace', $decision['action']);
+        // Uninterruptible I/O and unknown process state still win over a missing file.
+        $decision = \rtorrentProcessScgiUnresponsiveDecision([44], [44 => ['pid' => 44, 'stat' => 'Dl', 'wchan' => 'io_schedule']], ['recvQ' => 0, 'sendQ' => 100], $path, 3, false);
+        $this->assertSame('extend_grace', $decision['action']);
+        $decision = \rtorrentProcessScgiUnresponsiveDecision([44], [], ['recvQ' => 0, 'sendQ' => 100], $path, 3, false);
+        $this->assertSame('extend_grace', $decision['action']);
+        // A present file with an open queue keeps the old grace behaviour.
+        $decision = \rtorrentProcessScgiUnresponsiveDecision([44], $aliveStates, ['recvQ' => 0, 'sendQ' => 100], $path, 3, true);
+        $this->assertSame('extend_grace', $decision['action']);
+        $this->assertFalse(file_exists($path));
+    }
+
+    public function testAliveProcessCallerPassesTheSocketFileObservation(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/lib/rtorrent/watchdogScgi.php');
+        $this->assertOrderedStrings([
+            'function pmssCheckRtorrentHandleAliveProcess(',
+            '$acceptQueueWedgeCycles,',
+            'rtorrentScgiSocketFileExists($socketPath)',
+        ], $source);
+    }
+
+    public function testSocketFileProbeSeesTheCurrentFilesystemAndRejectsUnusablePaths(): void
+    {
+        $path = $this->tempDir.'/rtorrent.socket';
+        $this->assertFalse(\rtorrentScgiSocketFileExists($path));
+        $this->pmssWriteFile($path, '');
+        $this->assertTrue(\rtorrentScgiSocketFileExists($path));
+        unlink($path);
+        $this->assertFalse(\rtorrentScgiSocketFileExists($path), 'a removal must be seen despite the stat cache');
+        $this->assertFalse(\rtorrentScgiSocketFileExists(''));
+        $this->assertFalse(\rtorrentScgiSocketFileExists("/x\0y"));
+    }
     public function testChangedConfigReportPublishesAndClearsStateFile(): void
     {
         $path = $this->tempDir.'/changedConfigs';

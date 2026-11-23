@@ -19,6 +19,7 @@ function rtorrentProcessUnresponsiveGraceState(string $restartMarker, int $baseG
 }
 
 /** Decide what to do with an alive but SCGI-unresponsive process.
+ * $socketFileExists is the caller's observation of the socket path on the filesystem (true keeps the old behaviour).
  * @return array{action:string,message:string} action is extend_grace|observe_wedge|restart.
  */
 function rtorrentProcessScgiUnresponsiveDecision(
@@ -26,7 +27,8 @@ function rtorrentProcessScgiUnresponsiveDecision(
     array $processStates,
     ?array $queueSnapshot,
     string $wedgeStateFile,
-    int $wedgeCycles
+    int $wedgeCycles,
+    bool $socketFileExists = true
 ): array {
     $pidsText = implode(',', rtorrentProcessNormalizePids($rtorrentPids));
     if ($processStates === []) {
@@ -35,6 +37,12 @@ function rtorrentProcessScgiUnresponsiveDecision(
 
     if (rtorrentProcessStatesHaveUninterruptibleIo($processStates)) {
         return ['action' => 'extend_grace', 'message' => 'SCGI unresponsive but rtorrent is in uninterruptible I/O state (pids='.$pidsText.'); extending grace'];
+    }
+
+    // A listener the kernel still holds without a filesystem entry cannot be reached by path; only a restart recreates
+    // it. No listener at all means it was never bound (full disk or inodes), which a restart cannot fix: stay in grace.
+    if (!$socketFileExists && $queueSnapshot !== null) {
+        return ['action' => 'restart', 'message' => 'SCGI socket file is missing while the kernel still holds its listener (pids='.$pidsText.'); restarting rtorrent to recreate it'];
     }
 
     $queueText = $queueSnapshot === null
@@ -109,7 +117,8 @@ function pmssCheckRtorrentHandleAliveProcess(
             rtorrentProcessStatesForPids($rtorrentPids),
             rtorrentScgiSocketQueueSnapshot($socketPath),
             $state['acceptQueueWedge'],
-            $acceptQueueWedgeCycles
+            $acceptQueueWedgeCycles,
+            rtorrentScgiSocketFileExists($socketPath)
         );
         // Both pending decisions refresh grace; only liveness grace resets wedge evidence.
         if ($decision['action'] === 'extend_grace' || $decision['action'] === 'observe_wedge') {

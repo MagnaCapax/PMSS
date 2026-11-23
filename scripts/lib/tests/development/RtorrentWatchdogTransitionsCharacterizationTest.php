@@ -24,6 +24,7 @@ function rtorrentProcessCheckStaleState($path, $grace) {
 }
 function rtorrentProcessStatesForPids($pids) { record('states', $pids); return $GLOBALS['case']['states'] ?? [44 => []]; }
 function rtorrentScgiSocketQueueSnapshot($socket) { record('queue', $socket); return ['recvQ' => 100, 'sendQ' => 100]; }
+function rtorrentScgiSocketFileExists($socket) { return $GLOBALS['case']['fileExists'] ?? true; }
 function rtorrentProcessNormalizePids($pids) { return $pids; }
 function rtorrentProcessStatesHaveUninterruptibleIo($states) { return $GLOBALS['case']['dstate'] ?? false; }
 function rtorrentScgiSocketQueueSaturated($queue) { return $GLOBALS['case']['saturated'] ?? true; }
@@ -106,6 +107,15 @@ PHP;
             $this->aliveTrace(['pids' => [[44], []]]));
     }
 
+    public function testMissingSocketFileWithLiveListenerRestartsWithoutTouchingTheWedgeCounter(): void
+    {
+        $prefix = [['probe', '/socket', 'system.api_version', [], 5], ['pids', [44]], ['stale', 'unresponsive', 120]];
+        // File gone, kernel still lists the listener: restart without touching the wedge counter (#723).
+        $this->assertSame([null, array_merge($prefix, [['pids', [44]], ['states', [44]], ['queue', '/socket'],
+            ['both', 'fixtur01', 'SCGI socket file is missing while the kernel still holds its listener (pids=44); restarting rtorrent to recreate it', false],
+            ['restart', 'fixtur01', [44], [77], false], ['clear', 'unresponsive'], ['clear', 'wedge']])],
+            $this->aliveTrace(['pids' => [[44], [44]], 'fileExists' => false]));
+    }
     public function testResolvedMarkerPolicyKeepsRemovalOrderAndMissingKeyBehavior(): void
     {
         $script = <<<'PHP'

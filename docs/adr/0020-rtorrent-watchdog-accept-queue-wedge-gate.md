@@ -72,3 +72,14 @@ acting on it.
 - PMSS issue #431
 - ADR-0004: Shell Command Guardrails for Destructive Operations
 - ADR-0005: Trust Boundaries for Internal Tools and Script Output
+
+## Amendment: missing socket file with a live listener
+
+An alive, non-`D` rTorrent whose SCGI socket file is missing while `ss -xln` still
+shows the listener is restarted once grace expires: ruTorrent connects by path,
+so the instance stays unreachable and only a restart recreates the file. A
+socket file that is missing and shows no listener was never bound (full
+filesystem or inode exhaustion at start); a restart cannot fix that and would
+repeat on every instance in the same state, so it stays in grace. The queue
+saturation threshold and the `D`-state exclusion are unchanged, and a host
+without usable `ss` output keeps the conservative no-restart behavior.

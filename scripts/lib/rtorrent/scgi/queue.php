@@ -79,3 +79,19 @@ function rtorrentScgiSocketPath(string $username): string
 {
     return '/home/' . $username . '/.rtorrent.socket';
 }
+
+/**
+ * True while the SCGI socket path still exists on the filesystem.
+ *
+ * The listener can outlive its path (the entry was removed while the process kept
+ * the bind), so the stat cache is cleared before looking.
+ */
+function rtorrentScgiSocketFileExists(string $socketPath): bool
+{
+    if ($socketPath === '' || pmssFilesystemPathHasNulByte($socketPath)) {
+        return false;
+    }
+    clearstatcache(true, $socketPath);
+
+    return file_exists($socketPath);
+}
