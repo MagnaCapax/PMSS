@@ -19,7 +19,8 @@
  *   3. Remove stale check files (/home/aquota*new)
  *   4. Recalculate quota usage from disk (quotacheck -avugmn; after a failed
  *      quotaoff only a per-type /home recount, when every declared type is off)
- *   5. Re-enable quotas (quotaon -av)
+ *   5. Re-enable quotas (quotaon -av); a run cut short after quotaoff (deadline kill,
+ *      fatal error) re-enables them on its way out (pmssQuotaFixEnforcementRestore)
  *   6. Report final state for comparison
  *
  * The completion stamp (pmssQuotaRecalculationStampPath) is removed before quotaoff
@@ -54,7 +55,9 @@ if (file_exists($quotaFixStamp) && !@unlink($quotaFixStamp)) {
 // 1. Report current status before any changes
 pmssQuotaFixRunCommand('[quotaFix] Current quota state:', 'repquota -as', false, $exitCode);
 
-// 2. Disable quotas to allow safe recalculation
+// 2. Disable quotas to allow safe recalculation. From here a deadline kill or fatal error would leave
+// enforcement off until the next update, so arm the restore first (disarmed after step 6's quotaon).
+$quotaRestoreDisarm = pmssQuotaFixRestoreArm();
 $quotaOffResult = pmssQuotaFixRunCommand('[quotaFix] Disabling quotas for recalculation', 'quotaoff -av', true, $exitCode);
 // quotaoff cannot act on an unreadable quota file; recover only when every declared /home type is verifiably off.
 // The failed quotaoff keeps exitCode 1, so a recovered run leaves no stamp and the next update recounts normally.
@@ -91,6 +94,7 @@ usleep(500000);
 
 // 6. Re-enable quotas
 pmssQuotaFixRunCommand('[quotaFix] Re-enabling quotas', 'quotaon -av', true, $exitCode);
+$quotaRestoreDisarm();
 
 // 6.5. Verify enforcement actually took effect after the quotaon call. Without
 // this line the runtime.log records the ATTEMPT but not the OUTCOME — a silent

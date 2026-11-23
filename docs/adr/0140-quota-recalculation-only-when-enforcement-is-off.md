@@ -41,3 +41,7 @@ The decision is taken before the quota-mount step because its remount turns jour
 
 - `scripts/util/quotaFix.php`, `scripts/lib/update/services/quota.php` (`pmssQuotaHomeRecalculationNeeded`).
 - ADR 0013: ext4 native quota migration deferred.
+
+## Amendment: an interrupted cycle re-enables quota on its way out
+
+A cycle killed by the 1200 s step deadline left quota off for every account until the next update, which could be weeks away on a host that updates rarely: limits unenforced and usage frozen, not only stale. quotaFix now arms `pmssQuotaFixRestoreArm()` before `quotaoff`. A SIGTERM, SIGINT or SIGHUP becomes a normal exit (with pcntl), and a shutdown function runs `pmssQuotaFixEnforcementRestore()`: it removes the temporary files an interrupted `quotacheck` leaves and runs `quotaon -av`, which switches journaled quota back on with the previous counts. The completion stamp stays absent, so the next update still recounts. The restore is disarmed once quotaFix's own `quotaon` has run. A SIGKILL that lands before the restore finishes (the update step escalates 5 s after SIGTERM) leaves the earlier behaviour. The recount itself still needs to finish within the step deadline on a slow host; that is not changed here.
