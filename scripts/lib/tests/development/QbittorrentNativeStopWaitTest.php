@@ -33,8 +33,8 @@ final class QbittorrentNativeStopWaitTest extends TestCase
                 $calls[] = $args;
                 return $result;
             };
-            $pause = self::pmssMakeCallbacks(['pause' => null], $pauses)['pause'];
-            $this->assertSame($expected, \pmssCustomerNativeWaitForExit($pids, ['/fixture/t', 'deluge'], $budget, $pause));
+            $this->assertSame($expected, \pmssCustomerNativeWaitForExit($pids, ['/fixture/t', 'deluge'], $budget,
+                self::pmssMakeCallbacks(['pause' => null], $pauses)['pause']));
             $this->assertSame(array_fill(0, $probes, ['/fixture/t', 'deluge']), $calls);
             $this->assertSame(array_fill(0, $sleeps, 'pause'), $pauses);
         }

@@ -41,9 +41,8 @@ class RealtekNicAspmTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-realtek-aspm-missing-udev-', 0700);
         $messages = [];
         $commands = [];
-        $runner = self::pmssMakeCallbacks(['run' => 0], $commands)['run'];
-        $path = self::pmssMakeCallbacks(['path' => ''])['path'];
-        \pmssEnsureRealtekNicAspmOff($this->pmssMakeArrayLogger($messages), $root.'/rule', $runner, $path);
+        \pmssEnsureRealtekNicAspmOff($this->pmssMakeArrayLogger($messages), $root.'/rule',
+            self::pmssMakeCallbacks(['run' => 0], $commands)['run'], self::pmssMakeCallbacks(['path' => ''])['path']);
         $this->assertSame([], $commands);
         $this->assertTrue(in_array('[WARN] udevadm unavailable; Realtek NIC ASPM rule will apply on the next device event', $messages, true));
     }

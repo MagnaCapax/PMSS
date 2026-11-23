@@ -35,8 +35,8 @@ class RuntimeTempPrefixSafetyTest extends TestCase
         $prefix = "pmss-prefix-newline-\n";
         $directory = $this->pmssMakeTempDir($prefix);
         $calls = [];
-        $runner = self::pmssMakeCallbacks(['run' => 0], $calls)['run'];
-        $this->assertSame(1, \pmssRemovePrivateTempDir($directory, $prefix, 'Cleanup fixture', self::pmssMakeCallbacks(['log' => null])['log'], $runner));
+        $this->assertSame(1, \pmssRemovePrivateTempDir($directory, $prefix, 'Cleanup fixture',
+            self::pmssMakeCallbacks(['log' => null])['log'], self::pmssMakeCallbacks(['run' => 0], $calls)['run']));
         $this->assertSame([], $calls);
         $this->assertTrue(is_dir($directory));
     }
@@ -49,10 +49,10 @@ class RuntimeTempPrefixSafetyTest extends TestCase
         $calls = [];
         $messages = [];
         $logger = $this->pmssMakeArrayLogger($messages);
-        $runner = self::pmssMakeCallbacks(['run' => 0], $calls)['run'];
 
         $this->assertSame(null, \pmssPrivateTempDirRealpath($nested, 'pmss-prefix-', $logger));
-        $this->assertSame(1, \pmssRemovePrivateTempDir($nested, 'pmss-prefix-', 'Cleanup fixture', $logger, $runner));
+        $this->assertSame(1, \pmssRemovePrivateTempDir($nested, 'pmss-prefix-', 'Cleanup fixture', $logger,
+            self::pmssMakeCallbacks(['run' => 0], $calls)['run']));
         $this->assertSame([], $calls);
         $this->assertSame(array_fill(0, 2, '[WARN] Refusing temporary directory cleanup outside PMSS temp scope: '.realpath($nested)), $messages);
         $this->assertTrue(is_dir($nested));
@@ -71,8 +71,8 @@ class RuntimeTempPrefixSafetyTest extends TestCase
                 $this->assertSame(0700, fileperms($directory) & 0777);
                 $this->assertSame(realpath($directory), \pmssPrivateTempDirRealpath($directory, $prefix));
                 $calls = [];
-                $runner = $this->pmssMakeStepRunner($calls, 23);
-                $this->assertSame(23, \pmssRemovePrivateTempDir($directory, $prefix, 'Cleanup fixture', null, $runner));
+                $this->assertSame(23, \pmssRemovePrivateTempDir($directory, $prefix, 'Cleanup fixture', null,
+                    $this->pmssMakeStepRunner($calls, 23)));
                 $this->assertSame([['Cleanup fixture', 'rm -rf '.escapeshellarg(realpath($directory))]], $calls);
                 $this->assertTrue(is_dir($directory));
             } finally {
