@@ -115,10 +115,6 @@ PHP;
         ['php/settings.php', '((integer)($tm["minutes"]/$interval))*$interval+$interval,', '((integer)($tm["minutes"]/((int)$interval)))*((int)$interval)+((int)$interval),'],
         ['php/Snoopy.class.inc', $snoopyAcceptLegacy, $snoopyAcceptPatched],
         ['plugins/rss/action.php', 'ob_flush();', '@ob_flush();'],
-        // Hash new torrents with mktorrent (C, already in every dpkg baseline and already ionice'd by root.cron)
-        // instead of the slow internal PHP hasher. Only the stock literal is rewritten, so an account that chose
-        // another creator keeps it; a host without the binary keeps the internal hasher.
-        ['plugins/create/conf.php', "\$useExternal = false;\t\t// Valid choices:", "\$useExternal = is_executable('/usr/bin/mktorrent') ? 'mktorrent' : false;\t\t// Valid choices:"],
         ['plugins/hddquota/action.php', 'return $field;', 'return (int) $field;'],
         // Named channels need a nonzero global rate; 327625 KiB/s stays below libtorrent's unchoke limit.
         // Bypass stale MAX_SPEED constants and heal copies zeroed by the earlier compatibility patch.
@@ -126,7 +122,7 @@ PHP;
         ['plugins/throttle/throttle.php', 'new rXMLRPCCommand( "set_download_rate", MAX_SPEED )', 'new rXMLRPCCommand( "set_download_rate", 327625*1024 )'],
         ['plugins/throttle/throttle.php', 'new rXMLRPCCommand( "set_upload_rate", 0 )', 'new rXMLRPCCommand( "set_upload_rate", 327625*1024 )'],
         ['plugins/throttle/throttle.php', 'new rXMLRPCCommand( "set_download_rate", 0 )', 'new rXMLRPCCommand( "set_download_rate", 327625*1024 )'],
-    ], pmssUserRutorrentRpcCompatibilityPatches()) as [$path, $legacy, $patched]) {
+    ], pmssUserRutorrentRpcCompatibilityPatches(), pmssUserRutorrentCreatePluginPatches()) as [$path, $legacy, $patched]) {
         pmssUserPatchWritableStrings($ctx['home'].'/www/rutorrent/'.$path, [['legacy' => $legacy, 'patched' => $patched]]);
     }
 }
@@ -223,4 +219,22 @@ function pmssUserUpgradeRutorrent(array $ctx): void
 
     updateRutorrentConfig($user, 1);
     pmssRutorrentAccountStep($user, $home, 'Setting ruTorrent permissions', pmssUserEntryChmodCommand($rutorrentPath, 0751, true));
+}
+
+/**
+ * Compatibility patch moving the ruTorrent create plugin to mktorrent.
+ *
+ * The plugin's own config comment calls its internal PHP hasher too slow for large files; mktorrent is in every dpkg baseline (Debian 13 hosts use the
+ * Debian 12 one) and root.cron already demotes it to idle I/O. Only the stock literal is rewritten, so an account
+ * that chose another creator keeps it, and a host without the binary keeps the internal hasher.
+ *
+ * @return array<int, array{0:string,1:string,2:string}> Relative path, legacy text, patched text.
+ */
+function pmssUserRutorrentCreatePluginPatches(): array
+{
+    return [[
+        'plugins/create/conf.php',
+        "\$useExternal = false;\t\t// Valid choices:",
+        "\$useExternal = is_executable('/usr/bin/mktorrent') ? 'mktorrent' : false;\t\t// Valid choices:",
+    ]];
 }
