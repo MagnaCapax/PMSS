@@ -56,6 +56,22 @@ function pmssPinnedRemoteBinaryPrepareInstall(string $path, array $commands, str
         && pmssPinnedRemoteStaleBinaryRemove($path, $label);
 }
 
+/**
+ * Judge a deb-installed pinned app from the package database, never by running it.
+ *
+ * 'current' means dpkg holds the pinned version; 'reinstall' means dpkg holds another
+ * version, which installing the pinned deb upgrades in place; 'legacy' means dpkg does
+ * not hold the package, so the guarded binary probe stays in charge.
+ */
+function pmssPinnedRemoteDebState(string $status, string $installedVersion, string $pinnedVersion): string
+{
+    if ($status !== 'install ok installed') {
+        return 'legacy';
+    }
+
+    return $installedVersion === $pinnedVersion ? 'current' : 'reinstall';
+}
+
 /** Install a verified remote binary, refreshing only when needed. */
 function pmssInstallPinnedRemoteBinary(
     string $label,
