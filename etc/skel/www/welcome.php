@@ -1386,20 +1386,22 @@ function pmssWelcomeHomeNewsEmit($home)
     echo pmssWelcomeHomeNewsHtmlRead($home, true);
 }
 
-/** @return array{state:string,used:float,total:float,hard:float,percent:float} */
+/** @return array{state:string,used:float,total:float,hard:float,percent:float,graceUntil:?int} */
 function pmssWelcomeHomeQuotaStateBuild($quotaInfo)
 {
-    if (!is_array($quotaInfo) || $quotaInfo === array()) return array('state' => 'none', 'used' => 0.0, 'total' => 0.0, 'hard' => 0.0, 'percent' => 0.0);
+    if (!is_array($quotaInfo) || $quotaInfo === array()) return array('state' => 'none', 'used' => 0.0, 'total' => 0.0, 'hard' => 0.0, 'percent' => 0.0, 'graceUntil' => null);
     $fields = array();
     foreach (array('hardLimit', 'totalSpace', 'usedBytes') as $field) {
         $fields[$field] = isset($quotaInfo[$field]) ? pmssCustomerNonnegativeFloat($quotaInfo[$field]) : null;
     }
     if (in_array(null, $fields, true) || $fields['hardLimit'] == 0 || $fields['totalSpace'] == 0) {
-        return array('state' => 'missing', 'used' => 0.0, 'total' => 0.0, 'hard' => 0.0, 'percent' => 0.0);
+        return array('state' => 'missing', 'used' => 0.0, 'total' => 0.0, 'hard' => 0.0, 'percent' => 0.0, 'graceUntil' => null);
     }
     $percent = pmssWelcomePercent($fields['usedBytes'], $fields['totalSpace'], 1);
+    // The moment the kernel's burst grace ends; only meaningful while over the soft limit.
+    $graceUntil = isset($quotaInfo['graceUntil']) ? pmssCustomerNonnegativeFloat($quotaInfo['graceUntil']) : null;
     return array('state' => $percent > 100 ? 'over' : 'ok', 'used' => $fields['usedBytes'], 'total' => $fields['totalSpace'],
-        'hard' => $fields['hardLimit'], 'percent' => $percent);
+        'hard' => $fields['hardLimit'], 'percent' => $percent, 'graceUntil' => $graceUntil === null ? null : (int) $graceUntil);
 }
 
 /** Traffic over the rolling 30 days, using the same limit and bonus readers as before. */
@@ -1603,6 +1605,24 @@ function pmssWelcomeHomeFleetMetricHtmlBuild($home, $ownPath = '/var/lib/pmss/pu
         array(array('s-base', $bar)), $meta, $title, 50);
 }
 
+/**
+ * Over-quota warning, consequence first. With the account's own grace deadline it names when writes begin to fail;
+ * without one (no grace column in the snapshot) it states the 7-day policy as before.
+ */
+function pmssWelcomeHomeOverQuotaTextBuild($graceUntil, $now = null)
+{
+    $effect = 'some applications will not operate and will shut down automatically, and will not restart until you are within quota limit.';
+    if (!is_int($graceUntil)) {
+        return 'If you go over your burst limit, '.$effect.' You are allowed to burst quota up to 7 days.';
+    }
+    $remaining = $graceUntil - ($now === null ? time() : (int) $now);
+    if ($remaining <= 0) {
+        return 'Your burst period has ended. Writes are now limited to your quota, so '.$effect;
+    }
+    return 'Your burst period ends in about '.pmssWelcomeDurationCompact($remaining).' (around '.gmdate('j M Y H:i', $graceUntil).' UTC). After that, '.$effect
+        .' Going over your burst limit has the same effect immediately.';
+}
+
 /** Alerts appear only when something needs the customer's attention, each with what it means and what to do. */
 function pmssWelcomeHomeAlertsHtmlBuild(array $quota, array $traffic, array $memory, $bandwidthState, $billingServiceId)
 {
@@ -1610,7 +1630,7 @@ function pmssWelcomeHomeAlertsHtmlBuild(array $quota, array $traffic, array $mem
     if ($quota['state'] === 'missing') {
         $alerts .= '<div class="h-alert"><strong>Quota info is missing</strong><p>If this persists for more than an hour, contact support.</p></div>';
     } elseif ($quota['state'] === 'over') {
-        $alerts .= '<div class="h-alert h-alert-bad"><strong>Over your storage quota</strong><p>If you go over your burst limit, some applications will not operate and will shut down automatically, and will not restart until you are within quota limit. You are allowed to burst quota up to 7 days.</p></div>';
+        $alerts .= '<div class="h-alert h-alert-bad"><strong>Over your storage quota</strong><p>'.pmssWelcomeHomeOverQuotaTextBuild($quota['graceUntil']).'</p></div>';
     }
     if ($traffic['available'] && $traffic['limitGiB'] > 0 && ($traffic['overCap'] || $traffic['reduced'])) {
         $alerts .= '<div class="h-alert'.($traffic['reduced'] ? ' h-alert-bad' : '').'"><strong>'.($traffic['overCap'] ? 'Over your monthly traffic limit' : 'Traffic speed is reduced').'</strong>'

@@ -292,6 +292,83 @@ class IndexSkeletonFrameDataTest extends TestCase
         $this->assertTrue($quotaInfo['freeSpace'] < 0, 'Quota payload should preserve over-soft-limit free-space debt.');
     }
 
+    /** Write a quota snapshot row with a fixed mtime so the grace deadline is predictable. */
+    private function writeQuotaSnapshotWithRow(string $row, int $mtime): string
+    {
+        $path = $this->pmssWriteFile($this->pmssMakeTempPath('pmss-index-quota-', '.txt'),
+            "Disk quotas for user panel (uid 1000):\n"
+            ."     Filesystem   space   quota   limit   grace   files   quota   limit   grace\n"
+            .$row."\n"
+        );
+        $this->assertTrue(touch($path, $mtime));
+        return $path;
+    }
+
+    public function testLocalFallbackQuotaParserReportsGraceDeadlineWhileOverSoftLimit(): void
+    {
+        $this->loadIndexFrameHelpers();
+        $mtime = 1700000000;
+        $cases = array(
+            '6days' => 6 * 86400,
+            '00:59' => 59 * 60,
+            '1days' => 86400,
+            'none' => 0,
+        );
+        foreach ($cases as $grace => $seconds) {
+            $path = $this->writeQuotaSnapshotWithRow('       /dev/md4   1500G*   1380G   1725G   '.$grace.'    5642    690k    863k', $mtime);
+            $quotaInfo = \pmssLocalFrameQuotaInfoRead($path);
+
+            $this->assertSame($mtime + $seconds, $quotaInfo['graceUntil'], 'grace column '.$grace);
+        }
+    }
+
+    public function testLocalFallbackQuotaParserHandlesGraceOnWrappedDeviceLine(): void
+    {
+        $this->loadIndexFrameHelpers();
+        $mtime = 1700000000;
+        $path = $this->writeQuotaSnapshotWithRow("       /dev/mapper/vg-home\n                1.5T*      1T      2T   3days    5642    690k    863k", $mtime);
+
+        $this->assertSame($mtime + 3 * 86400, \pmssLocalFrameQuotaInfoRead($path)['graceUntil']);
+    }
+
+    public function testLocalFallbackQuotaParserOmitsGraceWhenNotOverSoftLimit(): void
+    {
+        $this->loadIndexFrameHelpers();
+        // Under the soft limit the fourth token is the file count, never a grace value.
+        $under = \pmssLocalFrameQuotaInfoRead($this->writeQuotaSnapshotWithRow('       /dev/md4    594G   1380G   1725G            5642    690k    863k', 1700000000));
+        $this->assertFalse(array_key_exists('graceUntil', $under));
+
+        // Over soft with a grace column this parser cannot read: no deadline is invented.
+        $unreadable = \pmssLocalFrameQuotaInfoRead($this->writeQuotaSnapshotWithRow('       /dev/md4   1500G*   1380G   1725G   soon    5642    690k    863k', 1700000000));
+        $this->assertFalse(array_key_exists('graceUntil', $unreadable));
+        $this->assertSame(1500 * 1024 * 1024 * 1024, $unreadable['usedBytes']);
+    }
+
+    public function testLocalFallbackQuotaParserIgnoresMalformedGraceColumns(): void
+    {
+        $this->loadIndexFrameHelpers();
+        // Over soft, but the grace token is not one the kernel prints: no deadline is invented and the rest still parses.
+        foreach (array('6weeks', 'days', '1:2', '--', '-3days', '99999days', 'NaN') as $grace) {
+            $path = $this->writeQuotaSnapshotWithRow('       /dev/md4   1500G*   1380G   1725G   '.$grace.'    5642    690k    863k', 1700000000);
+            $quotaInfo = \pmssLocalFrameQuotaInfoRead($path);
+
+            $this->assertFalse(array_key_exists('graceUntil', $quotaInfo), 'grace token '.$grace);
+            $this->assertSame(1725 * 1024 * 1024 * 1024, $quotaInfo['hardLimit'], 'grace token '.$grace);
+        }
+    }
+
+    public function testLocalFallbackWelcomeUrlCarriesGraceDeadlineToTheWelcomePage(): void
+    {
+        $this->loadIndexFrameHelpers();
+        $mtime = 1700000000;
+        $path = $this->writeQuotaSnapshotWithRow('       /dev/md4   1500G*   1380G   1725G   2days    5642    690k    863k', $mtime);
+
+        $quotaInfo = $this->quotaInfoFromWelcomeUrl(\pmssLocalFrameWelcomeUrlBuild($path));
+
+        $this->assertSame($mtime + 2 * 86400, $quotaInfo['graceUntil']);
+        $this->assertSame(1380 * 1024 * 1024 * 1024, $quotaInfo['totalSpace']);
+    }
+
     public function testLocalFallbackWelcomeUrlStaysPlainWhenQuotaMissingOrInvalid(): void
     {
         $this->loadIndexFrameHelpers();

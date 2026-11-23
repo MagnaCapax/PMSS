@@ -281,6 +281,39 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         $this->assertStringContainsAllStrings(array('Over your storage quota', 'You are allowed to burst quota up to 7 days.'), $home['alerts']);
     }
 
+    public function testWelcomeOverQuotaAlertNamesTheAccountsOwnGraceDeadline(): void
+    {
+        $until = time() + 3 * 86400 - 600;
+        $home = $this->renderWelcomeHome(array('hardLimit' => 200, 'totalSpace' => 100, 'usedBytes' => 150, 'graceUntil' => $until), null, 0);
+
+        $this->assertStringContainsAllStrings(
+            array('Over your storage quota', 'Your burst period ends in about 3 days', 'around '.gmdate('j M Y H:i', $until).' UTC', 'will shut down automatically'),
+            $home['alerts']
+        );
+        // The constant policy sentence must not stand in for the account's own remaining grace.
+        $this->assertStringContainsAndOmitsStrings([], ['You are allowed to burst quota up to 7 days.'], $home['alerts']);
+    }
+
+    public function testWelcomeOverQuotaAlertCountsDownInHoursOnTheLastDay(): void
+    {
+        $hours = $this->renderWelcomeHome(array('hardLimit' => 200, 'totalSpace' => 100, 'usedBytes' => 150, 'graceUntil' => time() + 5 * 3600 - 60), null, 0);
+        $this->assertStringContainsString('Your burst period ends in about 5 hours', $hours['alerts']);
+    }
+
+    public function testWelcomeOverQuotaAlertStatesWhenGraceHasEnded(): void
+    {
+        $ended =$this->renderWelcomeHome(array('hardLimit' => 200, 'totalSpace' => 100, 'usedBytes' => 150, 'graceUntil' => time() - 10), null, 0);
+        $this->assertStringContainsAllStrings(array('Your burst period has ended', 'Writes are now limited to your quota'), $ended['alerts']);
+        $this->assertStringContainsAndOmitsStrings([], ['You are allowed to burst quota up to 7 days.', 'ends in about'], $ended['alerts']);
+    }
+
+    public function testWelcomeOverQuotaAlertShowsNoGraceWhileUnderTheSoftLimit(): void
+    {
+        $home = $this->renderWelcomeHome(array('hardLimit' => 200, 'totalSpace' => 100, 'usedBytes' => 50, 'graceUntil' => time() + 86400), null, 0);
+
+        $this->assertSame('', $home['alerts']);
+    }
+
     public function testWelcomeHomeTrafficMetricHandlesMalformedPayloadWithoutNotice(): void
     {
         $home = $this->renderWelcomeHome(array(), null, 100);

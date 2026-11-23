@@ -90,12 +90,30 @@ function pmssLocalFrameQuotaSizeToBytes($value)
     return (int) round((float) $matches[1] * pow(1024, $powerMap[$unit]));
 }
 
+/** Block grace column of a `quota -s` row in seconds (`6days`, `00:59`, `none`); null when it is not a grace value. */
+function pmssLocalFrameQuotaGraceSeconds($token)
+{
+    $token = strtolower(trim((string) $token));
+    if ($token === 'none') {
+        return 0;
+    }
+    if (preg_match('/^(\d{1,4})days?$/', $token, $matches) === 1) {
+        return (int) $matches[1] * 86400;
+    }
+    if (preg_match('/^(\d+):(\d{2})$/', $token, $matches) === 1) {
+        return (int) $matches[1] * 3600 + (int) $matches[2] * 60;
+    }
+
+    return null;
+}
+
 /**
  * Build the quota payload expected by welcome.php from the local snapshot.
+ * `$graceColumn` counts only when the used figure carries `*` (over soft); it becomes `graceUntil`, a Unix time.
  *
  * @return array<string,int|bool>
  */
-function pmssLocalFrameQuotaInfoBuild($used, $softLimit, $hardLimit)
+function pmssLocalFrameQuotaInfoBuild($used, $softLimit, $hardLimit, $graceColumn = '', $snapshotTime = 0)
 {
     $usedBytes = pmssLocalFrameQuotaSizeToBytes($used);
     $totalSpace = pmssLocalFrameQuotaSizeToBytes($softLimit);
@@ -104,13 +122,19 @@ function pmssLocalFrameQuotaInfoBuild($used, $softLimit, $hardLimit)
         return array();
     }
 
-    return array(
+    $info = array(
         'overQuota'  => $hardLimitBytes > 0 && $usedBytes > $hardLimitBytes,
         'totalSpace' => $totalSpace,
         'freeSpace'  => $totalSpace - $usedBytes,
         'hardLimit'  => $hardLimitBytes,
         'usedBytes'  => $usedBytes,
     );
+    $graceSeconds = substr(trim($used), -1) === '*' ? pmssLocalFrameQuotaGraceSeconds($graceColumn) : null;
+    if ($graceSeconds !== null) {
+        $info['graceUntil'] = ($snapshotTime > 0 ? (int) $snapshotTime : time()) + $graceSeconds;
+    }
+
+    return $info;
 }
 
 /**
@@ -132,12 +156,12 @@ function pmssLocalFrameQuotaInfoRead($quotaPath = '../.quota')
             continue;
         }
 
-        if (preg_match('/^\/dev\/\S+\s+(\S+)\s+(\S+)\s+(\S+)/', $line, $matches) === 1) {
-            return pmssLocalFrameQuotaInfoBuild($matches[1], $matches[2], $matches[3]);
+        if (preg_match('/^\/dev\/\S+\s+(\S+)\s+(\S+)\s+(\S+)(?:\s+(\S+))?/', $line, $matches) === 1) {
+            return pmssLocalFrameQuotaInfoBuild($matches[1], $matches[2], $matches[3], isset($matches[4]) ? $matches[4] : '', @filemtime($quotaPath));
         }
 
-        if ($expectWrappedValues && preg_match('/^(\S+)\s+(\S+)\s+(\S+)/', $line, $matches) === 1) {
-            return pmssLocalFrameQuotaInfoBuild($matches[1], $matches[2], $matches[3]);
+        if ($expectWrappedValues && preg_match('/^(\S+)\s+(\S+)\s+(\S+)(?:\s+(\S+))?/', $line, $matches) === 1) {
+            return pmssLocalFrameQuotaInfoBuild($matches[1], $matches[2], $matches[3], isset($matches[4]) ? $matches[4] : '', @filemtime($quotaPath));
         }
 
         $expectWrappedValues = preg_match('/^\/dev\/\S+$/', $line) === 1;
