@@ -89,4 +89,141 @@ class UsageAlertsTest extends TestCase
             'Usage alert cron must not log transport diagnostics that may contain the recipient.'
         );
     }
+    public function testConditionKeysAreSortedNamesOnly(): void
+    {
+        $active = [
+            'traffic' => 'Traffic usage is 85.0% of the monthly allowance.',
+            'disk' => 'Disk usage is 95.0% of quota.',
+            'service' => 'Monitored services reported down: Sonarr.',
+        ];
+
+        $this->assertSame(['disk', 'service', 'traffic'], \pmssUsageAlertsConditionKeys($active));
+        $this->assertSame('disk,traffic', implode(',', \pmssUsageAlertsConditionKeys(array_diff_key($active, ['service' => 1]))));
+        $this->assertSame([], \pmssUsageAlertsConditionKeys([]));
+        $this->assertStringNotContainsString('85.0', implode(',', \pmssUsageAlertsConditionKeys($active)));
+    }
+
+    public function testOptedInAccountWithoutRecipientStillReportsItsStatus(): void
+    {
+        $stateDir = $this->pmssMakeTempDir('pmss-usage-alert-norecipient-');
+        $noRecipient = new class extends \UserConfigStore {
+            public function __construct() {}
+            public function readNotificationEmail(string $username): ?string { return null; }
+        };
+        $active = ['traffic' => 'traffic warning', 'disk' => 'disk warning'];
+
+        $this->assertSame('recipient_missing', \pmssUsageAlertsNotifyConditions('fixtur01', $active, $stateDir, $noRecipient));
+        $this->assertSame('recipient_missing', \pmssUsageAlertsNotifyConditions('fixtur01', [], $stateDir, $noRecipient));
+    }
+
+    public function testOptedInAccountWithRecipientAndNothingActiveIsClear(): void
+    {
+        $stateDir = $this->pmssMakeTempDir('pmss-usage-alert-clear-');
+        $withRecipient = new class extends \UserConfigStore {
+            public function __construct() {}
+            public function readNotificationEmail(string $username): ?string { return 'fixtur01@example.com'; }
+        };
+
+        $this->assertSame('clear', \pmssUsageAlertsNotifyConditions('fixtur01', [], $stateDir, $withRecipient));
+    }
+
+    public function testDisabledAccountKeepsItsLineAndReportsNoConditionKeys(): void
+    {
+        // No passwd entry for the fixture name, so the account is not opted in whatever its marker says.
+        $keys = ['stale'];
+        $stateDir = $this->pmssMakeTempDir('pmss-usage-alert-disabled-');
+        putenv('PMSS_USAGE_ALERTS_STATE_DIR='.$stateDir);
+        try {
+            $this->assertSame('disabled', \pmssUsageAlertsNotifyUser('fixtur01', null, null, null, $keys));
+        } finally {
+            putenv('PMSS_USAGE_ALERTS_STATE_DIR');
+        }
+        // A disabled account's by-reference keys are never filled in, so the cron adds no conditions= field.
+        $this->assertSame(['stale'], $keys);
+    }
+
+    public function testCronLogsConditionKeysOnlyForOptedInAccountsAndReadsThemBeforeTheRecipientCheck(): void
+    {
+        $this->pmssAssertRepoFileContainsOrderedStrings(
+            'scripts/cron/usageAlertsNotify.php',
+            ['$conditionKeys = null;', 'pmssUsageAlertsNotifyUser($user, null, null, null, $conditionKeys)',
+                "' result='.\$status", "\$conditionKeys === null ? '' : ' conditions='.implode(',', \$conditionKeys)"],
+            'Usage alert cron must log the condition keys after result=: '
+        );
+        $this->pmssAssertRepoFileContainsOrderedStrings(
+            'scripts/lib/user/usageAlertDelivery.php',
+            ['pmssUsageAlertsOptInEnabled(', "return 'disabled';", 'pmssUsageAlertsConditionsRead(', '$conditionKeys = pmssUsageAlertsConditionKeys($active);',
+                'pmssUsageAlertsNotifyConditions(', 'readNotificationEmail(', "return 'recipient_missing';"],
+            'Conditions must be read after the opt-in check and before the recipient check: '
+        );
+    }
+    private function conditionsFor(?float $traffic, ?float $disk, array $apps): array
+    {
+        return \pmssUsageAlertsConditionsBuild($traffic, $disk, ['apps' => $apps]);
+    }
+
+    public function testTrafficConditionAloneLogsOnlyItsKey(): void
+    {
+        $this->assertSame(['traffic'], \pmssUsageAlertsConditionKeys($this->conditionsFor(85.0, 10.0, [])));
+    }
+
+    public function testDiskConditionAloneLogsOnlyItsKey(): void
+    {
+        $this->assertSame(['disk'], \pmssUsageAlertsConditionKeys($this->conditionsFor(10.0, 95.0, [])));
+    }
+
+    public function testServiceConditionAloneLogsOnlyItsKey(): void
+    {
+        $apps = ['sonarr' => ['state' => 'failed', 'label' => 'Sonarr'], 'radarr' => ['state' => 'running']];
+        $this->assertSame(['service'], \pmssUsageAlertsConditionKeys($this->conditionsFor(10.0, 10.0, $apps)));
+    }
+
+    public function testAllThreeConditionsLogTogetherInSortedOrder(): void
+    {
+        $apps = ['sonarr' => ['state' => 'failed']];
+        $this->assertSame('disk,service,traffic', implode(',', \pmssUsageAlertsConditionKeys($this->conditionsFor(99.0, 99.0, $apps))));
+    }
+
+    public function testRecipientAndNewConditionSendsThenARerunIsUnchangedWithTheSameKeys(): void
+    {
+        $stateDir = $this->pmssMakeTempDir('pmss-usage-alert-rerun-');
+        $store = new class extends \UserConfigStore {
+            public function __construct() {}
+            public function readNotificationEmail(string $username): ?string { return 'fixtur01@example.com'; }
+        };
+        $sent = 0;
+        $transport = static function () use (&$sent): void { $sent++; };
+        $active = ['disk' => 'Disk usage is 95.0% of quota.'];
+
+        $this->assertSame('sent', \pmssUsageAlertsNotifyConditions('fixtur01', $active, $stateDir, $store, $transport, ['x' => 1]));
+        // Second cron run, same condition: no second mail; the keys a caller logs are the same.
+        $this->assertSame('unchanged', \pmssUsageAlertsNotifyConditions('fixtur01', $active, $stateDir, $store, $transport, ['x' => 1]));
+        $this->assertSame(1, $sent);
+        $this->assertSame(['disk'], \pmssUsageAlertsConditionKeys($active));
+    }
+
+    public function testExistingFourArgumentCallersAreUnaffected(): void
+    {
+        $stateDir = $this->pmssMakeTempDir('pmss-usage-alert-oldcaller-');
+        putenv('PMSS_USAGE_ALERTS_STATE_DIR='.$stateDir);
+        try {
+            // The pre-change call shape (no fifth argument) still returns the same status string.
+            $this->assertSame('disabled', \pmssUsageAlertsNotifyUser('fixtur01', null, null, null));
+        } finally {
+            putenv('PMSS_USAGE_ALERTS_STATE_DIR');
+        }
+        $parameter = (new \ReflectionFunction('pmssUsageAlertsNotifyUser'))->getParameters()[4];
+        $this->assertSame('conditionKeys', $parameter->getName());
+        $this->assertTrue($parameter->isOptional());
+        $this->assertTrue($parameter->isPassedByReference());
+    }
+
+    public function testLoggedKeysNeverCarryValuesOrAddresses(): void
+    {
+        $active = ['traffic' => 'Traffic usage is 85.0% of the monthly allowance.', 'disk' => 'Disk usage is 95.0% of quota.'];
+        $line = implode(',', \pmssUsageAlertsConditionKeys($active));
+        $this->assertSame('disk,traffic', $line);
+        $this->assertStringNotContainsString('%', $line);
+        $this->assertStringNotContainsString('@', $line);
+    }
 }

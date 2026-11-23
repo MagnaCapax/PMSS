@@ -1363,6 +1363,11 @@ read-only probes used by baseline sanitization and source-build guards.
   a condition remains active. A marker is written only after delivery succeeds
   and is removed when the condition clears or the customer opts out.
 - Delivery reuses `pmssSupportMailSend()` and never logs the recipient address.
+- Each cron line is `event=usage_alerts user=<user> result=<status>`. For an opted-in account it
+  ends with `conditions=<keys>`: the active condition keys (`disk`, `service`, `traffic`),
+  alphabetical, comma-separated, or empty when none is active. The conditions are read before the
+  recipient check, so `result=recipient_missing` carries them too. Keys only, never thresholds,
+  values or addresses. A `result=disabled` line has no `conditions=` field.
 
 ---
 

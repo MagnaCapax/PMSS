@@ -21,8 +21,11 @@ if ((int) $result['exitCode'] !== 0) {
 $failures = 0;
 foreach ($result['users'] as $user) {
     try {
-        $status = pmssUsageAlertsNotifyUser($user);
-        echo gmdate('c').' event=usage_alerts user='.$user.' result='.$status.PHP_EOL;
+        $conditionKeys = null;
+        $status = pmssUsageAlertsNotifyUser($user, null, null, null, $conditionKeys);
+        // Opted-in accounts also log which conditions are active (keys only); a disabled account's line is unchanged.
+        echo gmdate('c').' event=usage_alerts user='.$user.' result='.$status
+            .($conditionKeys === null ? '' : ' conditions='.implode(',', $conditionKeys)).PHP_EOL;
     } catch (Throwable $exception) {
         $failures++;
         fwrite(STDERR, gmdate('c').' event=usage_alerts user='.$user.' result=failed error='.get_class($exception).PHP_EOL);
