@@ -9,7 +9,9 @@ class BootDefaultsEnsureTest extends TestCase
 {
     protected function setUp(): void
     {
-        $this->pmssTrackEnvOverrides(['PMSS_DRY_RUN' => '1'], true);
+        $dir = $this->pmssMakeTempDir('pmss-boot-active-lsm-', 0700);
+        $this->pmssWriteFiles($dir, ['lsm' => "capability,bpf\n"]);
+        $this->pmssTrackEnvOverrides(['PMSS_DRY_RUN' => '1', 'PMSS_SECURITY_LSM_PATH' => $dir.'/lsm'], true);
     }
 
     public function testBootDefaultsMatrix(): void

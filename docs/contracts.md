@@ -1056,6 +1056,15 @@ Sub-handlers:
 - pmssNetconsoleConfigure(callable $logger, ?callable $runner=null): void → when `/etc/seedbox/config/netconsole` contains a valid kernel `netconsole=` spec and the target MAC is reachable, writes `/etc/modprobe.d/netconsole.conf`, enables module autoload, and reloads `netconsole`.
 - pmssEnsureBootTuning(?callable $logger=null): void → installs `/usr/local/sbin/pmss-boot-tuning.sh` and `/etc/systemd/system/pmss-boot-tuning.service` from templates, replaces `%%PMSS_BOOT_TUNING_SCRIPT%%`, enables/starts the unit, records `/etc/seedbox/config/hardware.json` when the boot script runs, and skips systemd actions in test/dry-run or when systemd is unavailable.
 - pmssEnsureBootDefaults(?callable $logger=null, ?string $fstabPath=null, ?string $grubPath=null, ?string $grubOption=null, ?array $extraGrubOptions=null, ?array $extraGrubSettings=null): void → enforces `/proc` `hidepid=2`, ensures required grub cmdline options, and optionally pins explicit grub settings such as serial-console directives.
+  - When `bpf` is inactive and the running kernel's `/boot/config-*` declares
+    `CONFIG_BPF_LSM=y` with a valid `CONFIG_LSM`, converges one `lsm=` option in
+    `GRUB_CMDLINE_LINUX_DEFAULT`. Keeps explicit LSM selection priority, adds
+    missing build defaults and `bpf`, and preserves other kernel options.
+    Active `bpf`, unreadable/malformed observations or non-literal GRUB
+    assignments leave LSM options unchanged. `PMSS_SECURITY_LSM_PATH` overrides
+    the active-list observation for fixtures, as in the BPF loader.
+    Managed persistence must succeed before `update-grub`; a reboot activates
+    the change (ADR 0323). No loader validation or credential policy changes.
 - pmssVerifyDistUpgradeBootReadiness(?string $mdstatPath=null, ?string $grubConfigPath=null, ?string $mdadmConfigPath=null, ?string $initramfsMdadmPath=null): void → non-fatal post-upgrade boot checks (RAID degradation markers, grub config presence/size, mdadm ARRAY entries, BOOT_DEGRADED flag) with warning logs for operator follow-up before reboot.
 - pmssDistUpgradeRunLockedCommand(string $command, string $lockMessage, bool $inheritTty=false): ?int → waits for the dpkg locks (null when they never clear), then runs one dist-upgrade apt/dpkg step with its own deadline: `PMSS_DIST_UPGRADE_APT_TIMEOUT` (default 7200s, 0 = none) set as `PMSS_COMMAND_TIMEOUT` for that command only and restored afterwards, so a slow step is not killed mid-unpack at the 1200s default (ADR 0035 keeps one shared default; this is a caller-level deadline like `userTransfer.php`).
 

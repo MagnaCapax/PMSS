@@ -8,6 +8,8 @@
  * @license GPL-3.0-only
  */
 
+require_once __DIR__.'/bootDefaultsGrub.php';
+
 function pmssBootDefaultsRequiredGrubOptions(string $grubOption, ?array $extraGrubOptions): array
 {
     $options = [];
@@ -49,13 +51,6 @@ function pmssBootDefaultsEnsureProcHidepid(string $fstabPath, callable $log): vo
     if ($rc !== 0) $log('[WARN] /proc hidepid remount failed (rc='.$rc.')');
 }
 
-function pmssBootDefaultsGrubValueUnquote(string $rawValue): string
-{
-    if (strlen($rawValue) < 2) return $rawValue;
-    $quote = $rawValue[0];
-    return (($quote === '"' || $quote === "'") && $rawValue[strlen($rawValue) - 1] === $quote) ? substr($rawValue, 1, -1) : $rawValue;
-}
-
 function pmssBootDefaultsEnsureGrubOptions(array &$lines, array $requiredGrubOptions, string $grubPath, callable $log): bool
 {
     $changed = $found = false;
@@ -87,27 +82,6 @@ function pmssBootDefaultsEnsureGrubOptions(array &$lines, array $requiredGrubOpt
     $lines[] = 'GRUB_CMDLINE_LINUX_DEFAULT="'.implode(' ', $requiredGrubOptions).'"';
     $log('Added GRUB_CMDLINE_LINUX_DEFAULT to '.$grubPath);
     return true;
-}
-
-function pmssBootDefaultsEnsureGrubSettings(array &$lines, array $requiredGrubSettings, string $grubPath, callable $log): bool
-{
-    $changed = false;
-    foreach ($requiredGrubSettings as $settingKey => $settingValue) {
-        $settingPrefix = $settingKey.'=';
-        foreach ($lines as $lineIdx => $line) {
-            if (strpos($line, $settingPrefix) !== 0) continue;
-            if (pmssBootDefaultsGrubValueUnquote(trim(substr($line, strlen($settingPrefix)))) !== $settingValue) {
-                $lines[$lineIdx] = $settingKey.'="'.$settingValue.'"';
-                $changed = true;
-                $log('Updated '.$settingKey.' in '.$grubPath);
-            }
-            continue 2;
-        }
-        $lines[] = $settingKey.'="'.$settingValue.'"';
-        $changed = true;
-        $log('Added '.$settingKey.' to '.$grubPath);
-    }
-    return $changed;
 }
 
 function pmssBootDefaultsApplyGrubChanges(bool $grubChanged, string $grubPath, string $grubOption, callable $log): void
@@ -144,6 +118,7 @@ function pmssEnsureBootDefaults(
     if (is_readable($grubPath) && ($lines = file($grubPath, FILE_IGNORE_NEW_LINES)) !== false) {
         $grubChanged = pmssBootDefaultsEnsureGrubOptions($lines, pmssBootDefaultsRequiredGrubOptions($grubOption, $extraGrubOptions), $grubPath, $log);
         $grubChanged = pmssBootDefaultsEnsureGrubSettings($lines, pmssBootDefaultsRequiredGrubSettings($extraGrubSettings), $grubPath, $log) || $grubChanged;
+        $grubChanged = pmssBootDefaultsEnsureBpfLsm($lines, $grubPath, $log) || $grubChanged;
         // Only regenerate boot configuration after the managed write succeeds.
         if ($grubChanged) $grubChanged = pmssWriteManagedPathFileWithBackup($grubPath, $lines, 'grub', $log);
     } else {

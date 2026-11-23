@@ -262,6 +262,14 @@ preflight, reads and publication; the systemd gate follows both writes. Locale
 observations retain their original matching rules without separate match flags.
 Public helpers, command/log bytes and the phase-2 call order stay unchanged.
 
+Boot defaults also prepare BPF-LSM activation when the running kernel has
+`CONFIG_BPF_LSM=y` but its readable active LSM list lacks `bpf`. The GRUB
+`lsm=` option uses that release's `/boot/config-*` `CONFIG_LSM` names plus
+`bpf`, preserving explicit LSM selections and their priority. Existing managed
+write and `update-grub` safeguards apply; activation requires the next boot.
+Missing or malformed observations leave the LSM boot options unchanged. See
+[ADR 0323](adr/0323-bpf-lsm-boot-defaults.md) for validation and rollback.
+
 Environment hints captured by `install.sh` are passed via `PMSS_HOSTNAME`,
 `PMSS_SKIP_HOSTNAME`, `PMSS_QUOTA_MOUNT`, and `PMSS_SKIP_QUOTA`; phase 2 honors
 those flags when reapplying legacy hostname/quota defaults. Optional hardening
