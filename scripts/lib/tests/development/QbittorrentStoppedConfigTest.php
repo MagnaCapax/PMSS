@@ -30,6 +30,27 @@ final class QbittorrentStoppedConfigTest extends TemporaryHomeRootTestCase
         }
     }
 
+    public function testContainerInAnotherNamespaceBlocksOnlyWhenItMountsTheConfigDir(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-qbt-ns-home-');
+        $config = $this->pmssEnsureDir($home.'/.config/qBittorrent');
+        $dev = stat($config)['dev']; $id = (($dev >> 8) & 0xfff | (($dev >> 32) & ~0xfff)).':'.(($dev & 0xff) | (($dev >> 12) & ~0xff));
+        // pid => mountinfo of a same-UID process in another namespace (null: no table); own-namespace 100 always counts.
+        $cases = [201 => ["30 20 0:99 / / rw - overlay overlay rw"], 202 => ["31 20 $id /.config/qBittorrent /config rw - ext4 /dev/x rw"],
+            203 => ["32 20 $id / /host rw - ext4 /dev/x rw"], 204 => ["33 20 $id /other /data rw - ext4 /dev/x rw"], 205 => null,
+            206 => ["34 20 $id /.config/qBittorrent/qBittorrent.conf /c.conf rw - ext4 /dev/x rw"]];
+        foreach (['pmssQbittorrentAccountPids', 'pmssQbittorrentFrontendAccountPids'] as $pids) {
+            $proc = $this->pmssMakeTempDir('pmss-qbt-ns-proc-');
+            $this->pmssWriteSymlinks($proc.'/self', ['ns/mnt' => 'mnt:[1]']);
+            foreach ([100 => 1] + array_fill_keys(array_keys($cases), 2) as $pid => $ns) {
+                $this->pmssWriteFiles($proc.'/'.$pid, ['comm' => "qbittorrent-nox\n", 'status' => "Uid:\t1234\t1234\n"]
+                    + (isset($cases[$pid]) && $cases[$pid] !== null ? ['mountinfo' => implode("\n", $cases[$pid])."\n"] : []));
+                $this->pmssWriteSymlinks($proc.'/'.$pid, ['ns/mnt' => 'mnt:['.$ns.']']);
+            }
+            $this->assertSame([100, 202, 203, 205, 206], $pids($proc, 1234, $config));
+        }
+    }
+
     public function testAccountPathGuardAllowsLinkedParentsAndHardlinkedRegularLeaves(): void
     {
         $home = $this->pmssMakeTempDir('pmss-qbt-paths-');
