@@ -99,7 +99,7 @@ class KernelHardeningAlgifAeadTest extends KernelHardeningTestCase
         });
 
         $this->assertTrue($builtIn['copyfail'], 'expected copyfail builtin probe to match configured kconfig');
-        $this->assertFalse($builtIn['dirtyfrag'], 'expected dirtyfrag to skip builtin probe without builtin_kconfig');
+        $this->assertFalse($builtIn['dirtyfrag'], 'expected dirtyfrag builtin probe to read its own kernel config (loadable here), not the copyfail one');
 
         $logs = [];
         [, $stdout] = $this->pmssCaptureStdout(function () use ($env, &$logs): void {
@@ -166,6 +166,7 @@ class KernelHardeningAlgifAeadTest extends KernelHardeningTestCase
             'PMSS_ALGIF_KERNEL_CONFIG_PATH' => $this->pmssWriteTempFile('algif-kernel-config', $kernelConfig),
             'PMSS_DIRTYFRAG_MODPROBE_PATH' => $dir.'/modprobe.d/dirtyfrag.conf',
             'PMSS_DIRTYFRAG_FLAG_PATH' => $dir.'/runtime/dirtyfrag-modules-loaded',
+            'PMSS_DIRTYFRAG_KERNEL_CONFIG_PATH' => $this->pmssWriteTempFile('dirtyfrag-kernel-config', "CONFIG_INET_ESP=m\n"),
             'PMSS_LSMOD_OUTPUT_PATH' => $this->pmssWriteTempFile('lsmod', $lsmodOutput),
         ];
     }

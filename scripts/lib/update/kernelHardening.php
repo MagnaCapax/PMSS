@@ -17,6 +17,10 @@ const PMSS_KERNEL_HARDENING = [
         'evict' => ['esp4_offload', 'esp6_offload', 'xfrm_interface', 'esp4', 'esp6', 'rxrpc', 'ipcomp', 'ipcomp6', 'espintcp'], // Offloads first: they hold esp4/esp6. xfrm_user is blacklisted but pinned on live hosts.
         'label' => 'Dirty Frag blacklist', 'short' => 'Dirty Frag', 'unload' => 'Unloading Dirty Frag modules (esp4_offload esp6_offload xfrm_interface esp4 esp6 rxrpc ipcomp ipcomp6 espintcp)',
         'runtime_flag' => ['PMSS_DIRTYFRAG_FLAG_PATH', 'dirtyfrag-modules-loaded'],
+        // One kconfig symbol per blacklisted module; any of them =y means that module is in the kernel image.
+        'builtin_kconfig' => ['CONFIG_INET_ESP', 'CONFIG_INET6_ESP', 'CONFIG_AF_RXRPC', 'CONFIG_INET_IPCOMP', 'CONFIG_INET6_IPCOMP', 'CONFIG_XFRM_USER', 'CONFIG_INET_ESPINTCP', 'CONFIG_INET_ESP_OFFLOAD', 'CONFIG_INET6_ESP_OFFLOAD', 'CONFIG_XFRM_INTERFACE'],
+        'builtin_config_env' => 'PMSS_DIRTYFRAG_KERNEL_CONFIG_PATH',
+        'builtin_warning' => 'Dirty Frag modules (esp4, esp6, rxrpc, ipcomp, ipcomp6, xfrm_user, espintcp, esp4_offload, esp6_offload or xfrm_interface) are built into this kernel; the PMSS modprobe blacklist cannot block them. '.'Install a patched kernel and reboot.',
     ],
 ];
 
@@ -57,6 +61,12 @@ function pmssApplyModprobeBlacklist(array $spec, callable $log, ?callable $runne
     else return;
 
     $runner($spec['unload'], 'bash -lc '.escapeshellarg('modprobe -r '.implode(' ', $spec['evict']).' >/dev/null 2>&1 || true'));
+    // Built-in modules never appear in lsmod, so the runtime_flag block below returns early for them: warn first.
+    if (isset($spec['builtin_kconfig']) && pmssKernelHardeningBuiltIn($spec)) {
+        $warning = (string) $spec['builtin_warning'];
+        if (!is_string($log) || !in_array($log, ['logMessage', 'logmsg'], true)) $log('[WARN] '.$warning);
+        pmssLogStatus('WARN', $warning, 0);
+    }
     if (isset($spec['runtime_flag'])) {
         $flagPath = pmssResolvePathFromEnv($spec['runtime_flag'][0], pmssRuntimeDir().'/'.$spec['runtime_flag'][1]);
         $loaded = pmssKernelHardeningLoadedModules($spec['modules']);
@@ -78,11 +88,6 @@ function pmssApplyModprobeBlacklist(array $spec, callable $log, ?callable $runne
             $log('[WARN] '.$spec['short'].' runtime flag written to '.$flagPath);
         }
     }
-    if (isset($spec['builtin_kconfig']) && pmssKernelHardeningBuiltIn($spec)) {
-        $warning = (string) $spec['builtin_warning'];
-        if (!is_string($log) || !in_array($log, ['logMessage', 'logmsg'], true)) $log('[WARN] '.$warning);
-        pmssLogStatus('WARN', $warning, 0);
-    }
 }
 
 function pmssKernelHardeningBuiltIn(array $spec): bool
@@ -94,8 +99,12 @@ function pmssKernelHardeningBuiltIn(array $spec): bool
         if ($release === '') return false;
         $kernelConfigPath = '/boot/config-'.$release;
     }
-    return is_string($kernelConfig = @file_get_contents($kernelConfigPath))
-        && preg_match('/^'.preg_quote((string) $spec['builtin_kconfig'], '/').'=y$/m', $kernelConfig) === 1;
+    if (!is_string($kernelConfig = @file_get_contents($kernelConfigPath))) return false;
+    // builtin_kconfig is one symbol (string) or several (list); any symbol set to =y counts.
+    foreach ((array) $spec['builtin_kconfig'] as $symbol) {
+        if (preg_match('/^'.preg_quote((string) $symbol, '/').'=y$/m', $kernelConfig) === 1) return true;
+    }
+    return false;
 }
 
 function pmssKernelHardeningLoadedModules(array $modules): ?array

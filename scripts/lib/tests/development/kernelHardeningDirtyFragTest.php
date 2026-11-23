@@ -89,15 +89,84 @@ class KernelHardeningDirtyFragTest extends KernelHardeningTestCase
         $this->assertEquals([], $calls);
     }
 
+    public function testWarnsWhenKernelBuildsDirtyFragModulesIn(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-dirtyfrag-built-in-');
+        $logs = [];
+        // Built-in modules never show in lsmod: the snapshot is empty, as on a real built-in kernel.
+        $env = $this->dirtyFragEnv($dir, "Module                  Size  Used by\n", "CONFIG_INET_ESP=y\n");
+
+        [, $stdout] = $this->pmssCaptureStdout(function () use ($env, &$logs): void {
+            $this->pmssRunKernelHardeningNoop('\pmssEnsureDirtyFragBlacklist', $env, $logs);
+        });
+
+        $this->pmssAssertMessagesContain($logs, 'Dirty Frag modules (esp4, esp6, rxrpc', 'expected built-in warning via custom logger');
+        $this->pmssAssertMessagesContain($logs, 'built into this kernel', 'expected built-in wording');
+        $this->assertStringContainsString((string) \PMSS_KERNEL_HARDENING['dirtyfrag']['builtin_warning'], $stdout, 'expected pmssLogStatus warning');
+    }
+
+    public function testWarnsForEachBlacklistedModuleSymbolBuiltIn(): void
+    {
+        $symbols = ['CONFIG_INET_ESP', 'CONFIG_INET6_ESP', 'CONFIG_AF_RXRPC', 'CONFIG_INET_IPCOMP', 'CONFIG_INET6_IPCOMP', 'CONFIG_XFRM_USER', 'CONFIG_INET_ESPINTCP', 'CONFIG_INET_ESP_OFFLOAD', 'CONFIG_INET6_ESP_OFFLOAD', 'CONFIG_XFRM_INTERFACE'];
+        foreach ($symbols as $symbol) {
+            $dir = $this->pmssMakeTempDir('pmss-dirtyfrag-symbol-');
+            $logs = [];
+            // Every other symbol stays loadable; only this one is compiled in.
+            $config = implode("\n", array_map(static function (string $other) use ($symbol): string {
+                return $other.($other === $symbol ? '=y' : '=m');
+            }, $symbols))."\n";
+            $env = $this->dirtyFragEnv($dir, "Module                  Size  Used by\n", $config);
+
+            $this->pmssCaptureStdout(function () use ($env, &$logs): void {
+                $this->pmssRunKernelHardeningNoop('\pmssEnsureDirtyFragBlacklist', $env, $logs);
+            });
+
+            $this->pmssAssertMessagesContain($logs, 'built into this kernel', 'expected built-in warning for '.$symbol);
+        }
+    }
+
+    public function testStaysQuietWhenDirtyFragModulesAreLoadableOrConfigIsMissing(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-dirtyfrag-loadable-');
+        $logs = [];
+        $env = $this->dirtyFragEnv($dir, "Module                  Size  Used by\n", "CONFIG_INET_ESP=m\nCONFIG_AF_RXRPC=m\n# CONFIG_INET_ESPINTCP is not set\n");
+        $this->pmssRunKernelHardeningNoop('\pmssEnsureDirtyFragBlacklist', $env, $logs);
+        $this->assertFalse($this->pmssMessagesContain($logs, 'built into this kernel'), 'loadable modules must not warn');
+
+        $logs = [];
+        $env = $this->dirtyFragEnv($dir, "Module                  Size  Used by\n", null);
+        $env['PMSS_DIRTYFRAG_KERNEL_CONFIG_PATH'] = $dir.'/no-such-kernel-config';
+        $this->pmssRunKernelHardeningNoop('\pmssEnsureDirtyFragBlacklist', $env, $logs);
+        $this->assertFalse($this->pmssMessagesContain($logs, 'built into this kernel'), 'an unreadable kernel config must not warn');
+    }
+
+    public function testBuiltInWarningCoexistsWithPinnedRuntimeFlag(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-dirtyfrag-built-in-flag-');
+        $logs = [];
+        $snapshot = "Module                  Size  Used by\nxfrm_user              20480  3\n";
+        $env = $this->dirtyFragEnv($dir, $snapshot, "CONFIG_AF_RXRPC=y\n");
+
+        $this->pmssCaptureStdout(function () use ($env, &$logs): void {
+            $this->pmssRunKernelHardeningNoop('\pmssEnsureDirtyFragBlacklist', $env, $logs);
+        });
+
+        $this->pmssAssertMessagesContain($logs, 'built into this kernel', 'expected built-in warning when a loadable module is also pinned');
+        $this->assertTrue(is_file($dir.'/runtime/dirtyfrag-modules-loaded'), 'expected the pinned-module runtime flag to be kept');
+    }
+
     /**
      * @return array<string, string>
      */
-    private function dirtyFragEnv(string $dir, ?string $lsmodOutput): array
+    private function dirtyFragEnv(string $dir, ?string $lsmodOutput, ?string $kernelConfig = "CONFIG_INET_ESP=m\n"): array
     {
         $env = [
             'PMSS_DIRTYFRAG_MODPROBE_PATH' => $dir.'/modprobe.d/dirtyfrag.conf',
             'PMSS_DIRTYFRAG_FLAG_PATH' => $dir.'/runtime/dirtyfrag-modules-loaded',
         ];
+        if ($kernelConfig !== null) {
+            $env['PMSS_DIRTYFRAG_KERNEL_CONFIG_PATH'] = $this->pmssWriteTempFile('dirtyfrag-kernel-config', $kernelConfig);
+        }
         if ($lsmodOutput !== null) {
             $env['PMSS_LSMOD_OUTPUT_PATH'] = $this->pmssWriteTempFile('lsmod', $lsmodOutput);
         }
