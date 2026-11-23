@@ -39,7 +39,7 @@ through `pmssDynamicIopsKernelReady()`.
   that slows down recovers within days.
 - Over budget, the enforcer writes the marker with the enforce time, as before.
 - `cgroupIopsLimitApply.php` (every 5 minutes, the only read-cap writer) gives a
-  marked account a `/home` read cap of `max(25, budget / 30 days)` IOPS, or the
+  marked account a `/home` read cap of `max(30, budget / 30 days)` IOPS, or the
   lower of that and any other cap it computed. Audit rows carry the reason
   `monthly-iops-budget`. It writes the cap only where
   `pmssDynamicIopsKernelReady()` holds; elsewhere the account is marked and logged
@@ -51,6 +51,8 @@ through `pmssDynamicIopsKernelReady()`.
   holds no read cap.
 - The floor, the hold and the window are constants in `iopsLimit.php`, not policy
   keys: one fleet value, no per-host override (ADR 0233).
+- The floor is a whole ten: blk-throttle delivers whole tens per 100 ms slice
+  (`pmssReadLimitDelivered`, ADR 0232), so a floor of 30 is the rate delivered.
 - Writes stay as they are: v1 throttles do not bind buffered writes.
 
 ## Consequences
@@ -58,8 +60,9 @@ through `pmssDynamicIopsKernelReady()`.
   over budget at a low rate sees no change until its usage falls.
 - No account gets a cap until a budget value is set for it through provisioning;
   the published terms state the budget before values are set.
-- The panel read-limit status (`~/.readLimit`) still reflects the dynamic cycle
-  only; the user log carries the budget cap.
+- Where the budget cap is the one written, the cap writer publishes it to the panel
+  read-limit status after the dynamic cycle, with `reason: monthly-budget`, and the
+  panel names the budget instead of disk contention.
 - The v2 branch keeps its 100 IOPS clamp; no PMSS host runs v2.
 
 Tests: `scripts/lib/tests/development/IopsBudgetHoldTest.php`.

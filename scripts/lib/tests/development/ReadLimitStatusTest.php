@@ -60,6 +60,24 @@ class ReadLimitStatusTest extends TestCase
         ], \pmssReadLimitHtmlBuild(['limit' => 20, 'held' => true]));
     }
 
+    public function testBudgetStatusNamesTheMonthlyBudgetNotDiskContention(): void
+    {
+        $root = $this->pmssMakeTempDir('read-limit-budget-');
+        $now = 1800000000;
+        file_put_contents($root.'/budget', \pmssReadLimitStatusJson(30, false, $now, 'monthly-budget'));
+        file_put_contents($root.'/plain', \pmssReadLimitStatusJson(30, false, $now));
+        $this->assertSame(['limit' => 30, 'held' => false, 'budget' => true], \pmssReadLimitStatusRead($root.'/budget', $now));
+        $this->assertSame(['limit' => 30, 'held' => false], \pmssReadLimitStatusRead($root.'/plain', $now));
+        $this->assertStringContainsAndOmitsStrings([
+            '<strong>Disk read limit</strong>', 'over its monthly disk I/O budget', 'up to 30 disk reads per second',
+            'at least 3 days', 'Writes are not limited.',
+        ], ['While the shared disk is busy', 'follows how busy the shared disk is'],
+            \pmssReadLimitHtmlBuild(\pmssReadLimitStatusRead($root.'/budget', $now)));
+        $source = (string) file_get_contents(dirname(__DIR__, 3).'/cron/cgroupIopsLimitApply.php');
+        $this->assertTrue(strpos($source, "pmssReadLimitStatusPublish(\$budgetBound, [], time(), 'monthly-budget')")
+            > strpos($source, 'pmssDynamicIopsShadowCycle('), 'budget status is published after the dynamic cycle');
+    }
+
     public function testSlicePrivacyRefusesSystemIdsAndNeverTouchesNonRootDirectories(): void
     {
         $root = $this->pmssMakeTempDir('pmss-slice-privacy-', 0700);

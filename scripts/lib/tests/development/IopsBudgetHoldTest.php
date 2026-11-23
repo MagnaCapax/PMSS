@@ -7,12 +7,12 @@ require_once dirname(__DIR__, 2).'/user/iopsLimitEnforcer.php';
 
 /**
  * Monthly IOPS budget (#1307): judged on the last 7 days scaled to 30, an over-budget account is held at least
- * 3 days, and the held /home read cap is the budget's own rate with a floor of 25, only where the kernel can hold it.
- * Expected values come from the budget as ruled: 10.5M operations per 30 days (350K per day).
+ * 3 days, and the held /home read cap is the budget's own rate with a floor of 30, only where the kernel can hold it.
+ * Expected values come from the budget as published: 10M operations per 30 days for the storage series.
  */
 class IopsBudgetHoldTest extends TestCase
 {
-    private const BUDGET = 10500000;
+    private const BUDGET = 10000000;
 
     private function stats(float $weekRead, float $weekWrite, float $month = 0.0): string
     {
@@ -24,7 +24,7 @@ class IopsBudgetHoldTest extends TestCase
 
     public function testBudgetUsageIsTheLastSevenDaysScaledToThirty(): void
     {
-        // 400K ops/day for a week: 2.8M -> 12M per 30 days, over a 10.5M budget.
+        // 400K ops/day for a week: 2.8M -> 12M per 30 days, over a 10M budget.
         $this->assertSame(12000000, \pmssIopsBudgetUsage($this->stats(2000000, 800000)));
         // 300K ops/day: 2.1M -> 9M, within budget, even with a heavy older month total.
         $this->assertSame(9000000, \pmssIopsBudgetUsage($this->stats(2100000, 0, 40000000)));
@@ -49,9 +49,9 @@ class IopsBudgetHoldTest extends TestCase
         $this->assertSame('restore', \pmssIopsLimitEnforcementPlan(0, 12000000, true, 60)['action']);
     }
 
-    public function testHeldReadCapIsTheBudgetRateWithAFloorOf25(): void
+    public function testHeldReadCapIsTheBudgetRateWithAFloorOf30(): void
     {
-        $this->assertSame(25, \pmssIopsBudgetReadCap(self::BUDGET));      // ~4 IOPS average -> floor
+        $this->assertSame(30, \pmssIopsBudgetReadCap(self::BUDGET));      // ~4 IOPS average -> floor
         $this->assertSame(300, \pmssIopsBudgetReadCap(777000000));       // a large budget keeps its own rate
     }
 
@@ -66,7 +66,7 @@ class IopsBudgetHoldTest extends TestCase
         // Budget set, no marker: no cap.
         $this->assertSame(null, \pmssIopsBudgetHeldReadCap('acct2', true, $runtime));
         file_put_contents($runtime.'/iopsLimitEnforced/acct1', (string) (time() - 3600));
-        $this->assertSame(25, \pmssIopsBudgetHeldReadCap('acct1', true, $runtime));
+        $this->assertSame(30, \pmssIopsBudgetHeldReadCap('acct1', true, $runtime));
         // A kernel that cannot hold read caps gets none.
         $this->assertSame(null, \pmssIopsBudgetHeldReadCap('acct1', false, $runtime));
         // Marked but budget removed: no cap.
@@ -88,11 +88,11 @@ class IopsBudgetHoldTest extends TestCase
 
     public function testEnforceLogLineStatesTheCapOnlyWhereOneIsHeld(): void
     {
-        $held = \pmssIopsLimitLogLine('enforce', false, self::BUDGET, 12000000, 100, 25, 1764000000);
-        $this->assertTrue(strpos($held, '/home read cap 25 IOPS, held at least until 2025-11-24 16:00 UTC') !== false, $held);
+        $held = \pmssIopsLimitLogLine('enforce', false, self::BUDGET, 12000000, 100, 30, 1764000000);
+        $this->assertTrue(strpos($held, '/home read cap 30 IOPS, held at least until 2025-11-24 16:00 UTC') !== false, $held);
         $none = \pmssIopsLimitLogLine('enforce', false, self::BUDGET, 12000000, 100);
         $this->assertTrue(strpos($none, 'no read cap on this kernel') !== false, $none);
-        $this->assertFalse(strpos($none, 'cap 25') !== false);
+        $this->assertFalse(strpos($none, 'cap 30') !== false);
     }
 
     public function testCapWriterAppliesTheBudgetCapBeforeTheClearBranch(): void

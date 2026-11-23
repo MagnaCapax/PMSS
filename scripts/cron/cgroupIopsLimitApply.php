@@ -34,6 +34,7 @@ require_once __DIR__.'/../lib/cgroup/ioCeilingHistory.php';
 require_once __DIR__.'/../lib/cgroup/iopsCensus.php';
 require_once __DIR__.'/../lib/cgroup/dynamicIopsPolicy.php';
 require_once __DIR__.'/../lib/user/iopsLimit.php';
+require_once __DIR__.'/../lib/cgroup/readLimitStatus.php';
 
 const PMSS_IOPS_USERS_DIR = '/etc/seedbox/config/users';
 
@@ -72,6 +73,7 @@ $derivationAllowed = !$homeMdBacked && pmssCgroupPolicyReadIopsDerivationAllowed
 
 // Accounts the hourly enforcer marked over their monthly budget get a held read cap where the kernel can hold one (#1307).
 $budgetKernelReady = pmssDynamicIopsKernelReady();
+$budgetBound = [];
 
 // Only this cron owns dynamic throttle writes. Enforce is the default; malformed knobs keep kernel caps.
 $dynamicSettings = pmssDynamicIopsSettings($policy);
@@ -128,6 +130,7 @@ foreach ($userConfigs as $user => $json) {
     }
     $budgetCap = pmssIopsBudgetHeldReadCap((string) $user, $budgetKernelReady);
     if ($budgetCap !== null) $readIops = $readIops === null ? $budgetCap : min($readIops, $budgetCap);
+    if ($budgetCap !== null && $readIops === $budgetCap) $budgetBound[$user] = $budgetCap;
     // Off leaves no dynamic read cap behind: a slice without a configured or derived cap is cleared.
     if (!$dynamicEnforce && $readIops === null && !$CENSUS && $dynamicSettings !== null) {
         $clearUid = pmssCgroupDirectUserUidOrError($user, $errors);
@@ -188,4 +191,6 @@ foreach ($userConfigs as $user => $json) {
 }
 
 if ($CENSUS) { closelog(); exit($errors > 0 ? 1 : 0); }
+// The panel shows the budget cap where it binds; published after the dynamic cycle's status so it wins.
+if (!$DRY_RUN && $budgetBound) pmssReadLimitStatusPublish($budgetBound, [], time(), 'monthly-budget');
 exit(pmssCgroupDirectFinishCycle($DRY_RUN, $total, $written, $skippedNoSlice, $errors));

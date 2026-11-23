@@ -81,8 +81,8 @@ function pmssReadUserMonthlyIopsUsage(string $path, string $window = 'month'): i
 const PMSS_IOPS_BUDGET_WINDOW_SCALE = 30 / 7;
 /** An over-budget account keeps its read cap at least this long after the enforce time. */
 const PMSS_IOPS_BUDGET_HOLD_SECONDS = 3 * 86400;
-/** The held read cap never goes below this, whatever the budget. */
-const PMSS_IOPS_BUDGET_READ_CAP_FLOOR = 25;
+/** The held read cap never goes below this, whatever the budget; a whole ten, as blk-throttle delivers whole tens per 100 ms slice (pmssReadLimitDelivered). */
+const PMSS_IOPS_BUDGET_READ_CAP_FLOOR = 30;
 
 function pmssIopsBudgetUsage(string $statsPath): int
 {

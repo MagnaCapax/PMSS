@@ -23,14 +23,16 @@ function pmssReadLimitDelivered(?int $cap): ?int
     return $cap < 10 ? $cap : 10 * intdiv($cap, 10);
 }
 
-/** One status document for the panel. */
-function pmssReadLimitStatusJson(int $limit, bool $held, int $now): string
+/** One status document for the panel; $reason 'monthly-budget' marks a cap held by the monthly IOPS budget (ADR 0325). */
+function pmssReadLimitStatusJson(int $limit, bool $held, int $now, ?string $reason = null): string
 {
-    return json_encode(['read_limit' => $limit, 'held' => $held, 'updated' => $now])."\n";
+    $doc = ['read_limit' => $limit, 'held' => $held, 'updated' => $now];
+    if ($reason !== null) $doc['reason'] = $reason;
+    return json_encode($doc)."\n";
 }
 
 /** Publish every account's status; failures warn and never affect the caps. */
-function pmssReadLimitStatusPublish(array $caps, array $held, int $now): int
+function pmssReadLimitStatusPublish(array $caps, array $held, int $now, ?string $reason = null): int
 {
     $home = rtrim((string) (getenv('PMSS_HOME_DIR') ?: '/home'), '/');
     $failed = 0;
@@ -38,7 +40,7 @@ function pmssReadLimitStatusPublish(array $caps, array $held, int $now): int
         $limit = pmssReadLimitDelivered(is_int($cap) ? $cap : null);
         if ($limit === null) continue;
         $path = $home.'/'.$user.'/'.PMSS_READ_LIMIT_STATUS_FILE;
-        if (!pmssRootStageFileWrite($path, pmssReadLimitStatusJson($limit, !empty($held[$user]), $now), (string) $user, 0640)) {
+        if (!pmssRootStageFileWrite($path, pmssReadLimitStatusJson($limit, !empty($held[$user]), $now, $reason), (string) $user, 0640)) {
             $failed++;
             syslog(LOG_WARNING, "read-limit status $user: publish failed");
         }

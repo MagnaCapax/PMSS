@@ -19,7 +19,9 @@ if (!function_exists('pmssReadLimitStatusRead')) {
             || !is_int($data['updated'] ?? null) || $data['read_limit'] <= 0) return null;
         // The cycle runs every five minutes; a status three cycles old is no longer the current limit.
         if ($data['updated'] > $now + 60 || $data['updated'] < $now - 900) return null;
-        return array('limit' => $data['read_limit'], 'held' => $data['held']);
+        $status = array('limit' => $data['read_limit'], 'held' => $data['held']);
+        if (($data['reason'] ?? null) === 'monthly-budget') $status['budget'] = true;
+        return $status;
     }
 }
 
@@ -29,6 +31,11 @@ if (!function_exists('pmssReadLimitHtmlBuild')) {
     {
         if (!is_array($status)) return '';
         $limit = htmlspecialchars(number_format((int) $status['limit']), ENT_QUOTES, 'UTF-8');
+        if (!empty($status['budget'])) {
+            return '<div class="pmss-raid-notice pmss-storage-status-neutral pmss-read-limit"><strong>Disk read limit</strong>'
+                .'<p>Your account is over its monthly disk I/O budget, so it can make up to '.$limit.' disk reads per second.</p>'
+                .'<p>The limit stays at least 3 days and is lifted once your last 7 days of disk use, scaled to 30 days, is back within the budget. Writes are not limited.</p></div>';
+        }
         $text = '<strong>Disk read limit</strong>'
             .'<p>While the shared disk is busy, your account can make up to '.$limit.' small disk reads per second.</p>'
             .'<p>This limit follows how busy the shared disk is and is recalculated every few minutes.</p>';
