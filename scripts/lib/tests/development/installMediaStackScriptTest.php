@@ -50,6 +50,68 @@ class installMediaStackScriptTest extends TestCase
         $this->assertStringContainsAndOmitsStrings(['real_rc=1'], ['unreachable'], $output);
     }
 
+    /** GH #1004: the account ceiling sits on user-<uid>.slice; the guard must find it from any cgroup. */
+    public function testMemoryLimitDetectionReadsTheAccountSliceByUid(): void
+    {
+        $unlimited = '9223372036854771712';
+        $mib = static function (int $n): string { return (string) ($n * 1024 * 1024); };
+        $slice = 'memory/user.slice/user-1000.slice/';
+        // [label, /proc/self/cgroup, files under the cgroup root, expected detection]
+        $cases = array(
+            // The reported account: the installer runs outside the slice (here under a service), limits on the slice.
+            array('outside the slice', "4:memory:/system.slice/ssh.service\n", array(
+                'memory/system.slice/ssh.service/memory.limit_in_bytes' => $unlimited,
+                $slice.'memory.soft_limit_in_bytes' => $mib(1000), $slice.'memory.limit_in_bytes' => $mib(1250),
+            ), $mib(1000)),
+            // Inside a session scope below the slice: unchanged result.
+            array('inside the slice', "4:memory:/user.slice/user-1000.slice/session-3.scope\n", array(
+                'memory/user.slice/user-1000.slice/session-3.scope/memory.limit_in_bytes' => $unlimited,
+                $slice.'memory.limit_in_bytes' => $mib(1250),
+            ), $mib(1250)),
+            // A tighter limit on the own cgroup still wins over the slice.
+            array('tighter own cgroup', "4:memory:/user.slice/user-1000.slice/session-3.scope\n", array(
+                'memory/user.slice/user-1000.slice/session-3.scope/memory.limit_in_bytes' => $mib(700),
+                $slice.'memory.limit_in_bytes' => $mib(1250),
+            ), $mib(700)),
+            // Another account's slice is never read.
+            array('other uid', "4:memory:/system.slice/ssh.service\n", array(
+                'memory/user.slice/user-1001.slice/memory.limit_in_bytes' => '1048576',
+            ), ''),
+            // Unified layout, limit written on the slice.
+            array('unified', "0::/system.slice/ssh.service\n", array(
+                'user.slice/user-1000.slice/memory.high' => $mib(2048), 'user.slice/user-1000.slice/memory.max' => 'max',
+            ), $mib(2048)),
+            // Nothing readable anywhere: still no detection, so the guard keeps its warn-and-continue branch.
+            array('nothing', "4:memory:/system.slice/ssh.service\n", array(), ''),
+        );
+        $functions = $this->pmssExtractShellFunctions($this->script, array(
+            'media_stack_memory_value_is_finite',
+            'media_stack_cgroup_limit_file_read',
+            'media_stack_cgroup_limits_from_path',
+            'media_stack_detected_memory_limit_bytes',
+        ));
+        foreach ($cases as list($label, $procCgroup, $files, $expected)) {
+            $root = $this->pmssMakeTempDir('pmss-media-stack-cgroup-root-');
+            $this->pmssEnsureDir($root);
+            foreach ($files as $relative => $value) {
+                $this->pmssWriteFile($root.'/'.$relative, $value."\n");
+            }
+            $procFile = $this->pmssWriteFile($root.'/proc-self-cgroup', $procCgroup);
+            $output = $this->pmssRunShellHarness(implode("\n", array(
+                '#!/usr/bin/env bash',
+                'set -euo pipefail',
+                'MEDIA_STACK_UNLIMITED_MEMORY_BYTES=$((1024 * 1024 * 1024 * 1024 * 1024))',
+                'id() { echo 1000; }',
+                'export PMSS_MEDIA_STACK_CGROUP_FILE='.escapeshellarg($procFile),
+                'export PMSS_MEDIA_STACK_CGROUP_ROOT='.escapeshellarg($root),
+                $functions,
+                'echo "limit=$(media_stack_detected_memory_limit_bytes)"',
+                '',
+            )));
+            $this->assertSame('limit='.$expected, trim($output), $label);
+        }
+    }
+
     public function testServarrBranchDefaultsAndOverridesPresent(): void
     {
         $this->assertStringContainsAllStrings(array(

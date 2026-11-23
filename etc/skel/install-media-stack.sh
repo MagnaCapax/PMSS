@@ -1275,7 +1275,7 @@ media_stack_cgroup_limits_from_path() {
 media_stack_detected_memory_limit_bytes() {
 	local cgroup_file="${PMSS_MEDIA_STACK_CGROUP_FILE:-/proc/self/cgroup}"
 	local cgroup_root="${PMSS_MEDIA_STACK_CGROUP_ROOT:-/sys/fs/cgroup}"
-	local hierarchy controllers rel candidate min_limit=""
+	local hierarchy controllers rel candidate uid min_limit=""
 
 	[[ -r "$cgroup_file" ]] || return 0
 	while IFS=: read -r hierarchy controllers rel; do
@@ -1297,6 +1297,23 @@ media_stack_detected_memory_limit_bytes() {
 			done < <(media_stack_cgroup_limits_from_path "$cgroup_root/memory" "$rel" memory.soft_limit_in_bytes memory.limit_in_bytes)
 		fi
 	done <"$cgroup_file"
+
+	# PMSS sets the account's ceiling on user-<uid>.slice. The walk above finds it only when this
+	# process sits under that slice; an installer started from elsewhere (a service-started shell, a
+	# panel launch) walks past it and would skip the guard. Read the slice by uid as well; the smallest
+	# finite value still wins, so a process already inside the slice is not affected (GH #1004).
+	uid=$(id -u 2>/dev/null || true)
+	if [[ "$uid" =~ ^[0-9]+$ ]]; then
+		while read -r candidate; do
+			[[ -n "$candidate" ]] || continue
+			if [[ -z "$min_limit" || "$candidate" -lt "$min_limit" ]]; then
+				min_limit="$candidate"
+			fi
+		done < <(
+			media_stack_cgroup_limits_from_path "$cgroup_root/memory" "/user.slice/user-${uid}.slice" memory.soft_limit_in_bytes memory.limit_in_bytes
+			media_stack_cgroup_limits_from_path "$cgroup_root" "/user.slice/user-${uid}.slice" memory.high memory.max
+		)
+	fi
 
 	if [[ -n "$min_limit" ]]; then
 		printf '%s\n' "$min_limit"
