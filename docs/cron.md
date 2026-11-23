@@ -78,7 +78,10 @@ append logs to `/var/log/pmss/<script>.log`. Highlights include:
   it exceeds 100 MiB so long-lived reverse-proxied web UIs do not silently
   consume user quota, or once its oldest entry is older than 30 days so visitor
   addresses are not kept indefinitely (ADR 0337). The root cron template runs it
-  hourly and logs trims to `/var/log/pmss/lighttpdAccessLogTrim.log`.
+  hourly and logs trims to `/var/log/pmss/lighttpdAccessLogTrim.log`. Missing or
+  invalid timestamps (including date-parser warnings), and NUL-containing first
+  lines use the file mtime instead; normalized invalid dates cannot authorize a
+  trim. Valid timestamps and size-cap precedence are unchanged.
 - `checkQbittorrentInstances.php` – Restart qBittorrent if processes exit.
   Reconcile WebUI settings (ADR 0102) before the stopped-config and restart
   steps. A changed file causes one bounded native-daemon stop; the existing

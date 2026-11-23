@@ -21,7 +21,8 @@ if (!defined('PMSS_LIGHTTPD_ACCESS_LOG_MAX_AGE_SECONDS')) {
  *
  * The first line is the oldest entry (the log is append-only), so its own timestamp bounds retention even while
  * the log is still being written; a first line without the default `[dd/Mon/yyyy:HH:MM:SS +zzzz]` stamp falls
- * back to the file mtime. An empty log or a disabled cap is never stale.
+ * back to the file mtime, as do corrupt lines and timestamps requiring date normalization.
+ * An empty log or a disabled cap is never stale.
  *
  * @param resource $handle Locked handle positioned anywhere; it is rewound to the start.
  * @param array<string, int> $handleStat fstat() of the same handle.
@@ -30,8 +31,14 @@ function pmssLighttpdAccessLogIsStale($handle, array $handleStat, ?int $maxAgeSe
 {
     if ($maxAgeSeconds === null || $maxAgeSeconds <= 0 || (int) ($handleStat['size'] ?? 0) === 0) return false;
     $line = @fseek($handle, 0) === 0 ? @fgets($handle, 4096) : false;
-    $stamp = is_string($line) && preg_match('~\[(\d{2}/[A-Za-z]{3}/\d{4}:\d{2}:\d{2}:\d{2} [+-]\d{4})\]~', $line, $match) === 1
+    $stamp = is_string($line) && strpos($line, "\0") === false
+        && preg_match('~\[(\d{2}/[A-Za-z]{3}/\d{4}:\d{2}:\d{2}:\d{2} [+-]\d{4})\]~', $line, $match) === 1
         ? \DateTime::createFromFormat('d/M/Y:H:i:s O', $match[1]) : false;
+    if ($stamp !== false) {
+        // PHP normalizes impossible dates/times; they must not authorize truncation.
+        $errors = \DateTime::getLastErrors();
+        if ($errors !== false && ($errors['warning_count'] > 0 || $errors['error_count'] > 0)) $stamp = false;
+    }
     $oldest = $stamp !== false ? $stamp->getTimestamp() : (int) ($handleStat['mtime'] ?? 0);
     return $oldest < ($now ?? time()) - $maxAgeSeconds;
 }
