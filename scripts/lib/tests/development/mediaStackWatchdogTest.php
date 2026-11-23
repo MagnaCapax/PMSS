@@ -99,6 +99,62 @@ class MediaStackWatchdogTest extends TestCase
         $this->assertEquals($status, \pmssJsonFileReadAssoc($home.'/.media-stack-status.json', true));
     }
 
+    public function testInstallThatSkippedJellyfinIsObservedThroughItsAliasBlock(): void
+    {
+        // The installer continues without Jellyfin when no usable FFmpeg 4.4+ exists, so no network.xml,
+        // but it always writes the "PMSS Media stack aliases" block into ~/.bashrc.custom.
+        $homeRoot = $this->pmssMakeTempDir('media-stack-watchdog-nojellyfin-');
+        $home = $homeRoot.'/fixtur01';
+        $this->pmssWriteFiles($home, ['.config/sonarr/config.xml' => '<Config />',
+            '.bashrc.custom' => "export FOO=1\n# PMSS Media stack aliases (updated Nov 2025)\nalias sonarr='true'\n"]);
+
+        $status = \pmssMediaStackWatchdogRunUser('fixtur01', $homeRoot, self::pmssMakeCallbacks(['probe' => true])['probe']);
+
+        $this->assertSame('healthy', $status['state']);
+        $this->assertSame(array('sonarr'), array_keys($status['apps']));
+        $this->assertEquals($status, \pmssJsonFileReadAssoc($home.'/.media-stack-status.json', true));
+    }
+
+    public function testJellyfinInstallWithoutAliasBlockIsStillObserved(): void
+    {
+        $homeRoot = $this->pmssMakeTempDir('media-stack-watchdog-noaliases-');
+        $home = $homeRoot.'/fixtur01';
+        $this->pmssWriteFiles($home, ['.config/jellyfin/config/network.xml' => '<NetworkConfiguration />',
+            '.config/sonarr/config.xml' => '<Config />', '.bashrc.custom' => "export FOO=1\n"]);
+
+        $status = \pmssMediaStackWatchdogRunUser('fixtur01', $homeRoot, self::pmssMakeCallbacks(['probe' => true])['probe']);
+
+        $this->assertSame('running', $status['apps']['sonarr']['state']);
+        $this->assertTrue(is_file($home.'/.media-stack-status.json'));
+    }
+
+    public function testAppDirectoriesWithNeitherMarkerAreNotObserved(): void
+    {
+        $homeRoot = $this->pmssMakeTempDir('media-stack-watchdog-nomarker-');
+        $home = $homeRoot.'/fixtur01';
+        $this->pmssWriteFiles($home, ['.config/sonarr/config.xml' => '<Config />', '.bashrc.custom' => "alias ll='ls -l'\n"]);
+        $bare = $homeRoot.'/fixtur02';
+        $this->pmssWriteFiles($bare, ['.config/radarr/config.xml' => '<Config />']);
+
+        $this->assertSame(null, \pmssMediaStackWatchdogRunUser('fixtur01', $homeRoot, self::pmssMakeCallbacks(['probe' => true])['probe']));
+        $this->assertSame(null, \pmssMediaStackWatchdogRunUser('fixtur02', $homeRoot, self::pmssMakeCallbacks(['probe' => true])['probe']));
+        $this->assertFalse(file_exists($home.'/.media-stack-status.json'));
+        $this->assertFalse(file_exists($bare.'/.media-stack-status.json'));
+    }
+
+    public function testSymlinkedAliasFileIsNotTrusted(): void
+    {
+        // The alias file is account-editable and read as root: a symlink must never be followed.
+        $homeRoot = $this->pmssMakeTempDir('media-stack-watchdog-symlink-');
+        $home = $homeRoot.'/fixtur01';
+        $this->pmssWriteFiles($home, ['.config/sonarr/config.xml' => '<Config />']);
+        $this->pmssWriteFiles($homeRoot, ['elsewhere/aliases' => "# PMSS Media stack aliases (updated Nov 2025)\n"]);
+        $this->assertTrue(symlink($homeRoot.'/elsewhere/aliases', $home.'/.bashrc.custom'));
+
+        $this->assertSame(null, \pmssMediaStackWatchdogRunUser('fixtur01', $homeRoot, self::pmssMakeCallbacks(['probe' => true])['probe']));
+        $this->assertFalse(file_exists($home.'/.media-stack-status.json'));
+    }
+
     public function testRootCronSchedulesTheContextFirstWatchdogEntrypoint(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('etc/seedbox/config/root.cron', [
