@@ -21,14 +21,17 @@ function pmssIntegerSettingFileRead($path, $parser) {
     $GLOBALS['observed']['limit'] = $path;
     return 1000;
 }
-function pmssReadUserMonthlyIopsUsage($path) {
+function pmssIopsBudgetUsage($path) {
     $GLOBALS['observed']['usage'] = $path;
     return $GLOBALS['usage'];
 }
-function pmssRegularFilePathIsReadable($path) {
+function pmssIopsBudgetMarkerTime($path) {
     $GLOBALS['observed']['marker'] = $path;
-    return false;
+    return null;
 }
+function pmssDynamicIopsKernelReady() { return false; }
+// Pin the unified branch: its clamp command is what these assertions count, and v1 would publish a marker.
+function pmssCgroupModeWithDefault($default) { return 'v2'; }
 function pmssBuildCommand($binary, $args) { return $binary.' '.implode(' ', $args); }
 function runStep($message, $command) {
     $GLOBALS['observed']['commands'][] = $command;

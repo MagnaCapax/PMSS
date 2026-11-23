@@ -58,7 +58,8 @@ function pmssIopsLimitMonthlyUsageValue($raw): float
         : 0.0;
 }
 
-function pmssReadUserMonthlyIopsUsage(string $path): int
+/** Sums read and write operations of one stats window (month = last 30 days, week = last 7 days). */
+function pmssReadUserMonthlyIopsUsage(string $path, string $window = 'month'): int
 {
     $data = pmssReadSerializedArrayFile($path);
     if ($data === null) {
@@ -70,8 +71,55 @@ function pmssReadUserMonthlyIopsUsage(string $path): int
         // Decoding an array does not guarantee that its nested counters are arrays.
         $counter = $data[$direction] ?? null;
         $raw = is_array($counter) ? ($counter['raw'] ?? null) : null;
-        $usage += pmssIopsLimitMonthlyUsageValue(is_array($raw) ? ($raw['month'] ?? null) : null);
+        $usage += pmssIopsLimitMonthlyUsageValue(is_array($raw) ? ($raw[$window] ?? null) : null);
     }
 
     return (int) round($usage);
+}
+
+/** A budget is judged on the last 7 days scaled to 30, so a burst trips within days and a capped account can recover. */
+const PMSS_IOPS_BUDGET_WINDOW_SCALE = 30 / 7;
+/** An over-budget account keeps its read cap at least this long after the enforce time. */
+const PMSS_IOPS_BUDGET_HOLD_SECONDS = 3 * 86400;
+/** The held read cap never goes below this, whatever the budget. */
+const PMSS_IOPS_BUDGET_READ_CAP_FLOOR = 25;
+
+function pmssIopsBudgetUsage(string $statsPath): int
+{
+    return (int) round(pmssReadUserMonthlyIopsUsage($statsPath, 'week') * PMSS_IOPS_BUDGET_WINDOW_SCALE);
+}
+
+function pmssIopsBudgetMarkerPath(string $username, ?string $runtimeDir = null): string
+{
+    return pmssIntegerSettingRuntimeUserPath('iopsLimitEnforced', $username, $runtimeDir);
+}
+
+/** The enforce time stored in the marker; a marker without one counts from its mtime. Null = no marker. */
+function pmssIopsBudgetMarkerTime(string $markerPath): ?int
+{
+    if (!pmssRegularFilePathIsReadable($markerPath)) {
+        return null;
+    }
+    $raw = trim((string) pmssReadRegularFileContents($markerPath));
+    if (ctype_digit($raw) && (int) $raw > 0) {
+        return (int) $raw;
+    }
+    $mtime = @filemtime($markerPath);
+    return $mtime === false ? 0 : (int) $mtime;
+}
+
+/** The budget's own average rate, never below the floor. */
+function pmssIopsBudgetReadCap(int $monthlyLimit): int
+{
+    return max(PMSS_IOPS_BUDGET_READ_CAP_FLOOR, (int) round($monthlyLimit / (30 * 86400)));
+}
+
+/** Read cap for an account the hourly enforcer marked over budget; null when unmarked, unbudgeted or the kernel cannot hold read caps. */
+function pmssIopsBudgetHeldReadCap(string $username, bool $kernelReady, ?string $runtimeDir = null): ?int
+{
+    if (!$kernelReady || pmssIopsBudgetMarkerTime(pmssIopsBudgetMarkerPath($username, $runtimeDir)) === null) {
+        return null;
+    }
+    $limit = pmssIntegerSettingFileRead(pmssIopsLimitRuntimePath($username, $runtimeDir), 'pmssIopsLimitParseMonthlyOperations');
+    return $limit > 0 ? pmssIopsBudgetReadCap($limit) : null;
 }

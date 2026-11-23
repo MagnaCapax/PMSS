@@ -1132,7 +1132,8 @@ iptables helpers:
   `/etc/seedbox/runtime` default. `IopsLimitUsagePathTest` covers both defaults,
   runtime overrides and the enforcement threshold without host reads or writes.
   `pmssReadUserMonthlyIopsUsage()` checks each counter and its `raw` container
-  before reading `month`; malformed containers contribute zero through the
+  before reading the requested window (`month` by default; the enforcer reads
+  `week` through `pmssIopsBudgetUsage()` and scales it to 30 days, ADR 0325); malformed containers contribute zero through the
   existing invalid-value fallback while an independent valid counter survives.
   Valid values, sentinel ceilings and rounding after addition stay unchanged.
   `IopsLimitInputSafetyTest` covers these serialized-cache boundaries.

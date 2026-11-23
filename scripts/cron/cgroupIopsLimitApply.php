@@ -33,6 +33,7 @@ require_once __DIR__.'/../lib/cgroup/policy.php';
 require_once __DIR__.'/../lib/cgroup/ioCeilingHistory.php';
 require_once __DIR__.'/../lib/cgroup/iopsCensus.php';
 require_once __DIR__.'/../lib/cgroup/dynamicIopsPolicy.php';
+require_once __DIR__.'/../lib/user/iopsLimit.php';
 
 const PMSS_IOPS_USERS_DIR = '/etc/seedbox/config/users';
 
@@ -68,6 +69,9 @@ $derivationAllowed = !$homeMdBacked && pmssCgroupPolicyReadIopsDerivationAllowed
     count($userConfigs),
     static function (string $message): void { syslog(LOG_WARNING, $message); }
 );
+
+// Accounts the hourly enforcer marked over their monthly budget get a held read cap where the kernel can hold one (#1307).
+$budgetKernelReady = pmssDynamicIopsKernelReady();
 
 // Only this cron owns dynamic throttle writes. Enforce is the default; malformed knobs keep kernel caps.
 $dynamicSettings = pmssDynamicIopsSettings($policy);
@@ -122,6 +126,8 @@ foreach ($userConfigs as $user => $json) {
             $derivationAllowed
         );
     }
+    $budgetCap = pmssIopsBudgetHeldReadCap((string) $user, $budgetKernelReady);
+    if ($budgetCap !== null) $readIops = $readIops === null ? $budgetCap : min($readIops, $budgetCap);
     // Off leaves no dynamic read cap behind: a slice without a configured or derived cap is cleared.
     if (!$dynamicEnforce && $readIops === null && !$CENSUS && $dynamicSettings !== null) {
         $clearUid = pmssCgroupDirectUserUidOrError($user, $errors);
@@ -173,7 +179,8 @@ foreach ($userConfigs as $user => $json) {
             syslog(LOG_INFO, "$dir-iops $user uid=$uid: $majMin $iops");
             pmssCgroupDirectAudit($user, $uid, $dir.'_iops',
                 pmssCgroupDirectDeviceValueParse($res['cur'], $majMin), $iops,
-                $dynamicEnforce && $dir === 'read' ? 'dynamic-iops' : __FILE__);
+                $dir === 'read' && $budgetCap !== null && $iops === $budgetCap ? 'monthly-iops-budget'
+                    : ($dynamicEnforce && $dir === 'read' ? 'dynamic-iops' : __FILE__));
         } elseif ($res['reason'] === 'dry-run' && $DRY_RUN) {
             printf("[DRY-RUN] %-20s uid=%d %s: %s %d\n", $user, $uid, $dir, $majMin, $iops);
         }

@@ -7,7 +7,7 @@
  */
 
 require_once __DIR__.'/../update/runtime/commands.php';
-pmssRequireRelativeFiles(__DIR__, ['../userLifecycle.php', 'userConfigCli.php', 'userConfigStore.php', 'iopsLimit.php']);
+pmssRequireRelativeFiles(__DIR__, ['../userLifecycle.php', 'userConfigCli.php', 'userConfigStore.php', 'iopsLimit.php', '../cgroup/dynamicIopsPolicy.php']);
 
 function pmssIopsLimitBuildThrottleCommand(string $username, int $iops): string
 {
@@ -42,26 +42,39 @@ function pmssIopsLimitClampApplies(string $cgroupMode): bool
     return $cgroupMode === 'v2';
 }
 
-/** The user-log line states only what was applied. */
-function pmssIopsLimitLogLine(string $action, bool $clamp, int $limit, int $usage, int $cap): string
+/**
+ * The user-log line states only what was applied. Usage is the last 7 days scaled to 30; on cgroup v1 the
+ * held read cap is written by cgroupIopsLimitApply.php, so $budgetCap is set only where that kernel can hold it.
+ */
+function pmssIopsLimitLogLine(string $action, bool $clamp, int $limit, int $usage, int $cap, ?int $budgetCap = null, int $holdUntil = 0): string
 {
     if ($action === 'enforce') {
-        return $clamp
-            ? sprintf('monthly IOPS throttle enabled (limit=%d usage=%d cap=%d)', $limit, $usage, $cap)
-            : sprintf('monthly IOPS budget exceeded (limit=%d usage=%d); no IOPS throttle on cgroup v1', $limit, $usage);
+        if ($clamp) {
+            return sprintf('monthly IOPS throttle enabled (limit=%d usage=%d cap=%d)', $limit, $usage, $cap);
+        }
+        return $budgetCap === null
+            ? sprintf('monthly IOPS budget exceeded (limit=%d usage=%d); no read cap on this kernel', $limit, $usage)
+            : sprintf('monthly IOPS budget exceeded (limit=%d usage=%d); /home read cap %d IOPS, held at least until %s',
+                $limit, $usage, $budgetCap, gmdate('Y-m-d H:i', $holdUntil).' UTC');
     }
     return $clamp
         ? sprintf('monthly IOPS throttle removed (limit=%d usage=%d)', $limit, $usage)
         : sprintf('monthly IOPS usage back within budget (limit=%d usage=%d)', $limit, $usage);
 }
 
-/** @return array{action:string,limit:int,usage:int} */
-function pmssIopsLimitEnforcementPlan(int $limit, int $usage, bool $markerExists): array
+/**
+ * An enforced account is released only once it is back within budget and the marker is PMSS_IOPS_BUDGET_HOLD_SECONDS
+ * old; a budget removed (0) releases at once.
+ * @return array{action:string,limit:int,usage:int}
+ */
+function pmssIopsLimitEnforcementPlan(int $limit, int $usage, bool $markerExists, int $markerAge = PHP_INT_MAX): array
 {
     $overLimit = $limit > 0 && $usage > $limit;
     $action = 'none';
-    if ($overLimit !== $markerExists) {
-        $action = $overLimit ? 'enforce' : 'restore';
+    if ($overLimit && !$markerExists) {
+        $action = 'enforce';
+    } elseif (!$overLimit && $markerExists && ($limit <= 0 || $markerAge >= PMSS_IOPS_BUDGET_HOLD_SECONDS)) {
+        $action = 'restore';
     }
     return ['action' => $action, 'limit' => $limit, 'usage' => $usage];
 }
@@ -75,13 +88,15 @@ function pmssIopsLimitsRun(): int
     }
     $store = new UserConfigStore();
     $clamp = pmssIopsLimitClampApplies(pmssCgroupModeWithDefault('v1'));
+    $kernelReady = !$clamp && pmssDynamicIopsKernelReady();
+    $now = time();
 
     foreach ($users as $user) {
         $limit = pmssIntegerSettingFileRead(pmssIopsLimitRuntimePath($user), 'pmssIopsLimitParseMonthlyOperations');
-        $usage = pmssReadUserMonthlyIopsUsage(pmssRuntimeDir().'/resourceStats/'.$user);
-        $markerPath = pmssIntegerSettingRuntimeUserPath('iopsLimitEnforced', $user);
-        $markerExists = pmssRegularFilePathIsReadable($markerPath);
-        $plan = pmssIopsLimitEnforcementPlan($limit, $usage, $markerExists);
+        $usage = pmssIopsBudgetUsage(pmssRuntimeDir().'/resourceStats/'.$user);
+        $markerPath = pmssIopsBudgetMarkerPath($user);
+        $markerTime = pmssIopsBudgetMarkerTime($markerPath);
+        $plan = pmssIopsLimitEnforcementPlan($limit, $usage, $markerTime !== null, $markerTime === null ? 0 : $now - $markerTime);
 
         if ($plan['action'] === 'enforce') {
             $throttleIops = 100;
@@ -92,9 +107,10 @@ function pmssIopsLimitsRun(): int
             if ($rc === 0) {
                 pmssIntegerSettingStorageDirEnsure(dirname($markerPath), 0700)
                     && function_exists('pmssAtomicWriteFile')
-                    && pmssAtomicWriteFile($markerPath, (string) time(), 0600)
+                    && pmssAtomicWriteFile($markerPath, (string) $now, 0600)
                     && pmssIntegerSettingPathModeConverge($markerPath, 0600);
-                pmssUserLog($user, pmssIopsLimitLogLine('enforce', $clamp, $limit, $usage, $throttleIops));
+                pmssUserLog($user, pmssIopsLimitLogLine('enforce', $clamp, $limit, $usage, $throttleIops,
+                    $kernelReady ? pmssIopsBudgetReadCap($limit) : null, $now + PMSS_IOPS_BUDGET_HOLD_SECONDS));
             }
             continue;
         }
