@@ -32,9 +32,15 @@ from experimental to supported without widening scope during the capture work.
    before capturing the baseline.
 4. Export install-only selections from the converged host, verify replay on the
    same host, and land the resulting file as
-   `scripts/lib/update/dpkg/selections-debian13.txt`.
+   `scripts/lib/update/dpkg/selections-debian13.txt`. Confirm the captured file
+   lists `openvpn` and `easy-rsa`: `configureOpenvpn.php` runs on every release
+   and needs both, and until promotion Debian 13 hosts are served the Debian 12
+   baseline, which carries them (pinned by `dpkgBaselineSelectionTest.php`).
 5. Provision a second clean Debian 13 host, replay the captured baseline, and
    run `/scripts/util/systemTest.php` to confirm the baseline converges.
+   Exercise OpenVPN end to end on it too, since the `openvpn` and `easy-rsa`
+   versions can differ from Debian 12: fresh PKI init, `openvpn@openvpn` start,
+   a username/password client connect, and the server-leaf renewal path.
 6. Only after the baseline exists and replay succeeds should PMSS docs and rails
    promote Debian 13 beyond experimental.
 
