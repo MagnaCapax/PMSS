@@ -136,7 +136,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
         require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
         $templates = \pmssNginxUserSubdomainTemplates();
         $this->assertSame(['public', 'publicSuspended', 'publicMoved'], array_keys($templates));
-        $this->assertSame('8a5868a4981d0f3be1cb2d206d015319158d401562e5b691d2b34a20e3529bbc', hash('sha256', $templates['public']));
+        $this->assertSame('d4462fdab1fe540418d45904e2704e5ebaebf9533562ef99413e7071105ddefd', hash('sha256', $templates['public']));
         $this->assertSame('fbad0d59cc6f243a41b0aa7a142a8766f49c795a779c6a236f92675c9bfcc5e5', hash('sha256', $templates['publicSuspended']));
     }
 
