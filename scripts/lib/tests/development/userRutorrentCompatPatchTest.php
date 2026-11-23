@@ -203,6 +203,26 @@ class UserRutorrentCompatPatchTest extends TestCase
             ['var $accept			=	"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8";'], ['image/x-xbitmap']);
     }
 
+    public function testSkeletonSnoopyInflatesOnAnyHeaderCasing(): void
+    {
+        // HTTP header names are case-insensitive and HTTP/2 sends them lowercase, so the plain
+        // HTTP path ($currentHeader) and the curl-dumped HTTPS path ($header) must both match.
+        $source = $this->pmssReadRepoFile('etc/skel/www/rutorrent/php/Snoopy.class.inc');
+        foreach (['currentHeader', 'header'] as $variable) {
+            $this->assertSame(1, preg_match_all('/preg_match\("(\/[^"]*Content-Encoding[^"]*\/[a-z]*)", \$'.$variable.'\)/', $source, $found), $variable);
+            $pattern = $found[1][0];
+            foreach (["Content-Encoding: gzip\r\n", "content-encoding: gzip\r\n", "CONTENT-ENCODING: gzip\r\n",
+                "content-encoding:gzip\r\n", "Content-Encoding:   gzip\n"] as $line) {
+                $this->assertSame(1, preg_match($pattern, $line), $variable.' must inflate for '.json_encode($line));
+            }
+            foreach (["Content-Encoding: identity\r\n", "X-Content-Encoding: gzip\r\n", "Accept-Encoding: gzip\r\n"] as $line) {
+                $this->assertSame(0, preg_match($pattern, $line), $variable.' must not inflate for '.json_encode($line));
+            }
+        }
+        // curl --compressed would decode the body while the dumped header still says gzip: inflating twice.
+        $this->pmssAssertStringNotContainsString('--compressed', $source);
+    }
+
     public function testCompatibilityRebuildsSkeletonFilesAndIsIdempotent(): void
     {
         $cases = $this->compatPatchCases();
@@ -488,6 +508,22 @@ PHP;
                 'patched' => "prefix\n\tvar \$accept\t\t\t=\t\"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8\";\nsuffix\n",
                 'expected' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
                 'unexpected' => 'image/x-xbitmap',
+            ],
+            [
+                'dir' => 'www/rutorrent/php',
+                'path' => 'www/rutorrent/php/Snoopy.class.inc',
+                'legacy' => "prefix\n\t\t\tif (preg_match(\"/Content-Encoding: gzip/\", \$currentHeader) )\nsuffix\n",
+                'patched' => "prefix\n\t\t\tif (preg_match(\"/^Content-Encoding:\\s*gzip/im\", \$currentHeader) )\nsuffix\n",
+                'expected' => 'preg_match("/^Content-Encoding:\s*gzip/im", $currentHeader)',
+                'unexpected' => '"/Content-Encoding: gzip/"',
+            ],
+            [
+                'dir' => 'www/rutorrent/php',
+                'path' => 'www/rutorrent/php/Snoopy.class.inc',
+                'legacy' => "prefix\n\t\t\t\tif (preg_match(\"/Content-Encoding: gzip/\", \$header) )\nsuffix\n",
+                'patched' => "prefix\n\t\t\t\tif (preg_match(\"/^Content-Encoding:\\s*gzip/im\", \$header) )\nsuffix\n",
+                'expected' => 'preg_match("/^Content-Encoding:\s*gzip/im", $header)',
+                'unexpected' => '"/Content-Encoding: gzip/"',
             ],
             [
                 'dir' => 'www/rutorrent/plugins/hddquota',

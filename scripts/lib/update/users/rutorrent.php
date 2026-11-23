@@ -122,7 +122,7 @@ PHP;
         ['plugins/throttle/throttle.php', 'new rXMLRPCCommand( "set_download_rate", MAX_SPEED )', 'new rXMLRPCCommand( "set_download_rate", 327625*1024 )'],
         ['plugins/throttle/throttle.php', 'new rXMLRPCCommand( "set_upload_rate", 0 )', 'new rXMLRPCCommand( "set_upload_rate", 327625*1024 )'],
         ['plugins/throttle/throttle.php', 'new rXMLRPCCommand( "set_download_rate", 0 )', 'new rXMLRPCCommand( "set_download_rate", 327625*1024 )'],
-    ], pmssUserRutorrentRpcCompatibilityPatches(), pmssUserRutorrentCreatePluginPatches()) as [$path, $legacy, $patched]) {
+    ], pmssUserRutorrentRpcCompatibilityPatches(), pmssUserRutorrentCreatePluginPatches(), pmssUserRutorrentSnoopyGzipPatches()) as [$path, $legacy, $patched]) {
         pmssUserPatchWritableStrings($ctx['home'].'/www/rutorrent/'.$path, [['legacy' => $legacy, 'patched' => $patched]]);
     }
 }
@@ -237,4 +237,25 @@ function pmssUserRutorrentCreatePluginPatches(): array
         "\$useExternal = false;\t\t// Valid choices:",
         "\$useExternal = is_executable('/usr/bin/mktorrent') ? 'mktorrent' : false;\t\t// Valid choices:",
     ]];
+}
+
+/**
+ * Compatibility patches that make Snoopy inflate on any Content-Encoding header casing.
+ *
+ * HTTP header names are case-insensitive (HTTP/2 sends them lowercase), but older Snoopy
+ * copies match "Content-Encoding: gzip" case-sensitively and hand raw gzip to the parser.
+ *
+ * @return array<int, array{0: string, 1: string, 2: string}> [path under www/rutorrent, legacy, patched]
+ */
+function pmssUserRutorrentSnoopyGzipPatches(): array
+{
+    $patches = [];
+    foreach (['$currentHeader', '$header'] as $variable) {
+        $patches[] = [
+            'php/Snoopy.class.inc',
+            'preg_match("/Content-Encoding: gzip/", '.$variable.')',
+            'preg_match("/^Content-Encoding:\s*gzip/im", '.$variable.')',
+        ];
+    }
+    return $patches;
 }

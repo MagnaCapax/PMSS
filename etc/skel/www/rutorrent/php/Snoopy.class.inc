@@ -427,7 +427,7 @@ class Snoopy
 				$this->response_code = $currentHeader;
 			}
 			
-			if (preg_match("/Content-Encoding: gzip/", $currentHeader) )
+			if (preg_match("/^Content-Encoding:\s*gzip/im", $currentHeader) )
 				$is_gzipped = true;
 			
 			$this->headers[] = $currentHeader;
@@ -572,7 +572,7 @@ class Snoopy
 					if(preg_match("|^HTTP/[^\s]*\s(.*?)\s|",$this->response_code, $match))
 						$this->status= $match[1];
 				}
-				if (preg_match("/Content-Encoding: gzip/", $header) )
+				if (preg_match("/^Content-Encoding:\s*gzip/im", $header) )
 					$is_gzipped = true;
 				$this->headers[] = $header;
 			}
