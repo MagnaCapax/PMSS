@@ -14,15 +14,15 @@ class ArpKeepaliveTest extends TestCase
         return $content === null ? $path : $this->pmssWriteFile($path, $content);
     }
 
-    private function runKeepalive(string $marker, string $route, string $arp, bool &$sent = null): string
+    private function runKeepalive(string $marker, string $route, string $arp, ?array &$sent = null): string
     {
-        $sent = false;
+        $sent = [];
         $readers = self::pmssMakeCallbacks(['route' => $route, 'arp' => $arp]);
         return \pmssArpKeepaliveRun(
             $marker,
             $readers['route'],
             $readers['arp'],
-            static function (string $ip) use (&$sent): bool { $sent = true; return true; }
+            self::pmssMakeCallbacks(['send' => true], $sent)['send']
         );
     }
 
@@ -30,7 +30,7 @@ class ArpKeepaliveTest extends TestCase
     {
         $out = $this->runKeepalive($this->marker(null), "10.0.0.9 dev eth0 src 10.0.0.2\n", self::ARP_HEADER, $sent);
         $this->assertEquals('', $out);
-        $this->assertFalse($sent);
+        $this->assertSame([], $sent);
     }
 
     public function testInvalidMarkerContentIsRejectedWithoutSending(): void
@@ -38,7 +38,7 @@ class ArpKeepaliveTest extends TestCase
         foreach (['not-an-ip', '10.0.0.9; rm -rf /', "10.0.0.9\n10.0.0.8", '::1', '999.1.1.1', ''] as $bad) {
             $out = $this->runKeepalive($this->marker($bad), "10.0.0.9 dev eth0\n", self::ARP_HEADER, $sent);
             $this->assertStringContainsString('skip: marker does not hold a single IPv4 address', $out, 'rejects '.json_encode($bad));
-            $this->assertFalse($sent);
+            $this->assertSame([], $sent);
         }
     }
 
@@ -46,7 +46,7 @@ class ArpKeepaliveTest extends TestCase
     {
         $out = $this->runKeepalive($this->marker("10.0.0.9\n"), "10.0.0.9 via 10.0.0.1 dev eth0 src 10.0.0.2\n", self::ARP_HEADER, $sent);
         $this->assertStringContainsString('is not on-link', $out);
-        $this->assertFalse($sent);
+        $this->assertSame([], $sent);
     }
 
     public function testNulMarkerBytesAreRejectedBeforeNormalizationCanAuthorizeSend(): void
@@ -54,7 +54,7 @@ class ArpKeepaliveTest extends TestCase
         foreach (["\0".'10.0.0.9', "10.0.0.9\0", " \0 10.0.0.9 \n", "10.0.0.9\0\n", "10.0.\0.9"] as $raw) {
             $out = $this->runKeepalive($this->marker($raw), "10.0.0.9 dev eth0\n", self::ARP_HEADER, $sent);
             $this->assertStringContainsString('skip: marker does not hold a single IPv4 address', $out);
-            $this->assertFalse($sent);
+            $this->assertSame([], $sent);
         }
     }
 
@@ -120,14 +120,14 @@ PHP;
         $arp = self::ARP_HEADER."10.0.0.9         0x1         0x2         52:54:00:aa:bb:cc     *        eth0\n";
         $out = $this->runKeepalive($this->marker('10.0.0.9'), "10.0.0.9 dev eth0 src 10.0.0.2\n", $arp, $sent);
         $this->assertStringContainsString('WARN: target 10.0.0.9 answers', $out);
-        $this->assertFalse($sent);
+        $this->assertSame([], $sent);
     }
 
     public function testUnansweredOnLinkTargetSendsOneDatagram(): void
     {
         $arp = self::ARP_HEADER."\n \t\n10.0.0.9\t0x1 0x0\n 10.0.0.9\t0x1\t0x0 00:00:00:00:00:00 * eth0 \r\n";
         $out = $this->runKeepalive($this->marker(" 10.0.0.9 \n"), "10.0.0.9 dev eth0 src 10.0.0.2\n", $arp, $sent);
-        $this->assertTrue($sent);
+        $this->assertSame(['send'], $sent);
         $this->assertStringContainsString('arp-keepalive sent target=10.0.0.9 neighbour=incomplete', $out);
     }
 

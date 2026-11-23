@@ -28,15 +28,15 @@ final class QbittorrentNativeStopWaitTest extends TestCase
             [null, 2, false, 2, 2], [false, 2, false, 2, 2],
             [[], 0, false, 0, 0], [[], -1, false, 0, 0],
         ] as [$result, $budget, $expected, $probes, $sleeps]) {
-            $calls = []; $pauses = 0;
+            $calls = []; $pauses = [];
             $pids = static function (...$args) use (&$calls, $result) {
                 $calls[] = $args;
                 return $result;
             };
-            $pause = static function () use (&$pauses): void { $pauses++; };
+            $pause = self::pmssMakeCallbacks(['pause' => null], $pauses)['pause'];
             $this->assertSame($expected, \pmssCustomerNativeWaitForExit($pids, ['/fixture/t', 'deluge'], $budget, $pause));
             $this->assertSame(array_fill(0, $probes, ['/fixture/t', 'deluge']), $calls);
-            $this->assertSame($sleeps, $pauses);
+            $this->assertSame(array_fill(0, $sleeps, 'pause'), $pauses);
         }
     }
 

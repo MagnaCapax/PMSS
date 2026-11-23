@@ -7,20 +7,18 @@ require_once dirname(__DIR__, 2).'/user/userCgroupSliceDropins.php';
 class UserCgroupSliceDropinsTest extends TestCase
 {
     private $messages = [];
-    private $reloads = 0;
+    private $reloads = [];
 
     protected function setUp(): void
     {
         $this->messages = [];
-        $this->reloads = 0;
+        $this->reloads = [];
     }
 
     private function repair(string $base, int $reloadRc = 0, ?int $owner = null): bool
     {
-        return \pmssUserCgroupSliceDropinsRepair($this->pmssMakeArrayLogger($this->messages), function () use ($reloadRc): int {
-            $this->reloads++;
-            return $reloadRc;
-        }, $base, $owner ?? posix_geteuid());
+        return \pmssUserCgroupSliceDropinsRepair($this->pmssMakeArrayLogger($this->messages),
+            self::pmssMakeCallbacks(['reload' => $reloadRc], $this->reloads)['reload'], $base, $owner ?? posix_geteuid());
     }
 
     public function testBatchPreservesBytesBackupsAndLegacyOrderBeforeCanonicalProperties(): void
@@ -71,7 +69,7 @@ class UserCgroupSliceDropinsTest extends TestCase
         }
         $this->assertFalse($this->repair($base));
         foreach (glob($base.'/*/99-pmss.conf') as $file) $this->assertSame('untouched', file_get_contents($file));
-        $this->assertSame(0, $this->reloads);
+        $this->assertSame([], $this->reloads);
     }
 
     public function testRerunDoesNotCreateBackupsOrReload(): void
@@ -82,7 +80,7 @@ class UserCgroupSliceDropinsTest extends TestCase
         $paths = glob($base.'/user-1234.slice.d/*');
         $this->assertFalse($this->repair($base));
         $this->assertSame($paths, glob($base.'/user-1234.slice.d/*'));
-        $this->assertSame(1, $this->reloads);
+        $this->assertSame(['reload'], $this->reloads);
     }
 
     public function testRefusesSymlinksSpecialFilesAndOccupiedDestinations(): void
@@ -105,7 +103,7 @@ class UserCgroupSliceDropinsTest extends TestCase
             $this->assertSame([], glob($dir.'/*.pmss-backup-*'));
             $this->assertTrue(file_exists($source));
         }
-        $this->assertSame(0, $this->reloads);
+        $this->assertSame([], $this->reloads);
     }
 
     public function testRefusesWrongOwnerAndWritableFilesOrDirectories(): void
@@ -128,10 +126,10 @@ class UserCgroupSliceDropinsTest extends TestCase
         for ($i = 0; $i < 10; $i++) $this->pmssWriteFile(\pmssManagedPathBackupCandidate($file, $timestamp, $i), 'occupied');
         $this->assertFalse($this->repair($base));
         $this->assertSame('legacy', file_get_contents($file));
-        $this->assertSame(0, $this->reloads);
+        $this->assertSame([], $this->reloads);
         $this->pmssWriteFile($base.'/user-2345.slice.d/99-pmss.conf', 'legacy');
         $this->assertFalse($this->repair($base, 7));
-        $this->assertSame(1, $this->reloads);
+        $this->assertSame(['reload'], $this->reloads);
         $this->pmssAssertMessagesContain($this->messages, 'daemon-reload failed');
     }
 
@@ -143,6 +141,6 @@ class UserCgroupSliceDropinsTest extends TestCase
             $this->assertFalse($this->repair($base));
         });
         $this->assertSame('legacy', file_get_contents($file));
-        $this->assertSame(0, $this->reloads);
+        $this->assertSame([], $this->reloads);
     }
 }

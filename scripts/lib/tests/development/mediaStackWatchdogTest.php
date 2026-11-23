@@ -77,14 +77,12 @@ class MediaStackWatchdogTest extends TestCase
         $this->pmssWriteFile($home.'/.sonarrDisable', '');
         $apps = array('sonarr' => \pmssMediaStackWatchdogAppDefinitions()['sonarr']);
         $previous = array('apps' => array('sonarr' => array('state' => 'failed', 'consecutiveFailures' => 9)));
-        $probes = 0;
-        $status = \pmssMediaStackWatchdogSnapshot('fixtur01', $apps, $previous, static function () use (&$probes): bool {
-            $probes++;
-            return false;
-        }, $home);
+        $probes = [];
+        $status = \pmssMediaStackWatchdogSnapshot('fixtur01', $apps, $previous,
+            self::pmssMakeCallbacks(['probe' => false], $probes)['probe'], $home);
         $this->pmssAssertArraySubsetSame(['state' => 'off', 'consecutiveFailures' => 0], $status['apps']['sonarr']);
         $this->assertSame('healthy', $status['state']);
-        $this->assertSame(0, $probes);
+        $this->assertSame([], $probes);
     }
 
     public function testRunUserPublishesTheObservedAccountSnapshot(): void

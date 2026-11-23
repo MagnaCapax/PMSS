@@ -61,12 +61,12 @@ final class DelugeConfigCharacterizationTest extends TestCase
     public function testBadInputNeverInvokesMutatorAndThrowsRemainVisible(): void
     {
         $path = $this->pmssMakeTempDir('pmss-deluge-characterization-bad-').'/core.conf';
-        $calls = 0;
-        $mutator = static function () use (&$calls) { $calls++; return []; };
+        $calls = [];
+        $mutator = self::pmssMakeCallbacks(['mutate' => []], $calls)['mutate'];
         $this->assertFalse(\pmssDelugeConfigMutate('fixtur01', $mutator, $path));
         $this->pmssWriteFile($path, '{}broken');
         $this->assertFalse(\pmssDelugeConfigMutate('fixtur01', $mutator, $path));
-        $this->assertSame(0, $calls);
+        $this->assertSame([], $calls);
         $this->pmssWriteFile($path, '{}{}');
         try {
             \pmssDelugeConfigMutate('fixtur01', static function () { throw new \RuntimeException('mutation rejected'); }, $path);
