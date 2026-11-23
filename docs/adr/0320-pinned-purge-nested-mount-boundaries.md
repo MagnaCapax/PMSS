@@ -114,6 +114,28 @@ and web endpoints are unchanged. Devbox verification is changed-file PHP/Bash
 syntax only; fixtures run on the testing machine/CI. No live unmount, purge or
 dry run was executed here.
 
+## Mandatory mount tail safety follow-up
+
+After the separator, discovery requires exactly three nonempty fields: filesystem
+type, mount source and superblock options, as defined by the
+[kernel mountinfo format](https://www.kernel.org/doc/Documentation/filesystems/proc.txt).
+A separator followed by an incomplete or overlong tail refuses the complete
+snapshot before queued detaches or recursive work. Previously the separator alone
+could let such a newline-terminated row authorize cleanup. Optional fields before
+the separator remain ignored, including unknown tags; escaped sources, valid
+kernel rows, ordering and unmount command bytes retain their contracts.
+
+`PinnedPurgeMountTailSafetyTest` covers missing and extra tail fields, unrelated
+rows, and corruption before and after queued descendants, using only private
+fixtures and a recording unmount stub. Positive cases retain propagation tags,
+unknown optional tags, escaped sources, a dash source and whitespace handling.
+The existing purge-pass failure coverage remains in `TerminateUserMountBoundaryTest`.
+The CVE-2021-3995/CVE-2021-3996 analysis above still applies: incorrect unmounts can
+disrupt other accounts. No account/service credentials, secret permissions,
+logging/redaction, binds, ports or web endpoints change. Devbox verification is
+changed-file PHP/Bash syntax only; tests run on the testing machine/CI.
+No live unmount, recursive purge or dry run was executed here.
+
 ## References
 - ADRs 0062, 0092, 0115, 0191, 0206, 0282; issue #1278.
 - [GNU rm filesystem boundaries](https://www.gnu.org/software/coreutils/manual/html_node/rm-invocation.html).
