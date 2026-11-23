@@ -19,7 +19,8 @@ function pmssNginxUserSubdomainTemplates(): array
         proxy_http_version 1.1;
         limit_rate_after 100m;
         limit_rate 32768k;
-        limit_conn addr 8;
+        limit_conn addr 16;
+        limit_conn_status 429;
 NGINX;
     $webdavProxyDefaults = <<<'NGINX'
         include /etc/nginx/webdav_proxy_params;
