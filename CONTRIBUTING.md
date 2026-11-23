@@ -37,11 +37,18 @@ Build the image:
 docker build -t pmss-dev .
 ```
 
-Run it against your checkout:
+Run it against your checkout, as your own user rather than root:
 
 ```sh
-docker run --rm -it -v "$PWD":/workspace -w /workspace pmss-dev
+docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD":/workspace -w /workspace pmss-dev
 ```
+
+Several development tests assert that an unreadable file stays unreadable or
+that a wrong-owner artifact is refused; neither can hold for uid 0, so a run as
+root reports failures that the same suite does not show for an ordinary user.
+Running with your own uid and gid also keeps files written into the bind-mounted
+checkout owned by you. `scripts/testing/check-tools.sh` warns when the suite is
+started as root.
 
 Inside the container you can run the normal validators, for example:
 
