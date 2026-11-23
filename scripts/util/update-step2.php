@@ -307,6 +307,8 @@ pmssRunProfiledCallableBatch([
     ['Applying boot-time tuning', 'pmssEnsureBootTuning', ['logmsg']],
     ['Configuring root shell defaults', 'pmssConfigureRootShellDefaults', ['logmsg']],
 ]);
+// Read-only: warns about a grub-pc upgrade the running boot predates; never writes the MBR (ADR 0340, GH #691).
+pmssRunProfiledCallable('Checking GRUB boot safety', 'pmssBootGrubStaleCoreImgCheck', ['logmsg'], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);
 runStep('Restricting world access to /home', 'chmod o-rw /home');
 
 pmssRunProfiledCallableBatch([

@@ -270,6 +270,14 @@ write and `update-grub` safeguards apply; activation requires the next boot.
 Missing or malformed observations leave the LSM boot options unchanged. See
 [ADR 0323](adr/0323-bpf-lsm-boot-defaults.md) for validation and rollback.
 
+At the end of the boot-settings steps, a read-only check warns when a `grub-pc` or `grub-pc-bin`
+package upgrade recorded in the current or previous dpkg log is newer than the
+running boot. That reboot is the first to load the new GRUB modules with whatever
+MBR `core.img` the package's own `grub-install` left, and it can hang at the GRUB
+banner if that install failed. The step never runs `grub-install` or writes the MBR;
+it only logs a `[WARN]` line, and a failure of the step is soft. See
+[ADR 0340](adr/0340-grub-boot-safety-detects-and-warns-it-does-not-write-the-mbr.md).
+
 Immediately before boot defaults, Debian 12 hosts receive the SHA-256-pinned
 7.3.4 kernel package through the verified remote-deb installer (soft-fail,
 [ADR 0324](adr/0324-pinned-kernel-delivery.md)). Existing pinned versions,

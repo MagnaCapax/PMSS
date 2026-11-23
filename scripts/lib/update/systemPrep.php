@@ -15,5 +15,5 @@ pmssRequireRelativeFiles(__DIR__, [
     'fstab.php', 'managedPath.php', 'runtime/commands.php', 'runtime/processes.php',
     'systemPrep/hostEnvironment.php', 'systemPrep/bootDefaults.php', 'systemPrep/sysctlTuning.php', 'systemPrep/systemdSlicesEnsure.php', 'systemPrep/dbusPolicyHardening.php', 'systemPrep/renderNodeAccess.php', 'systemPrep/i915DisplayPower.php', 'systemPrep/realtekNicAspm.php', 'systemPrep/socketTablePrivacy.php',
     'systemPrep/tempMount.php', 'systemPrep/bootTuning.php', 'systemPrep/locale.php', 'systemPrep/shellDefaults.php',
-    'systemPrep/kernelPin.php',
+    'systemPrep/kernelPin.php', 'systemPrep/bootGrubStale.php',
 ]);
