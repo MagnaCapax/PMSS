@@ -187,7 +187,8 @@ install-openclaw uninstall --purge
 
 The cron check stops trying after five consecutive failed starts. `start`
 resets that state; read `~/.openclaw/logs/gateway.log` first. `uninstall`
-keeps `~/.openclaw` for recovery. `--purge` removes it, including credentials
+also removes the action lock, the panel's installer log and pid file and an
+empty `~/.cache/openclaw`, and keeps `~/.openclaw` for recovery. `--purge` removes it, including credentials
 and workspace data.
 
 Operators can provision an OpenClaw-focused account with

@@ -354,6 +354,19 @@ function ocInstallNode(array $paths): void
     ocRemoveTree($work);
 }
 
+/** After uninstall nothing of ours should linger: the action lock, the panel's log and pid, an empty cache dir. */
+function ocUninstallLeftoversRemove(array $paths): void
+{
+    foreach (array('.openclaw-action.lock', '.install-openclaw.log', '.install-openclaw-web.pid') as $name) {
+        $file = $paths['home'].'/'.$name;
+        if (is_file($file) || is_link($file)) {
+            @unlink($file);
+        }
+    }
+    // rmdir only succeeds on an empty directory, so a cache OpenClaw still fills is left alone.
+    @rmdir($paths['home'].'/.cache/openclaw');
+}
+
 /** Remove only the installer's fixed directories; never traverse symlinks. */
 function ocRemoveTree(string $path): void
 {
@@ -971,6 +984,8 @@ function ocMain(array $args): int
             ocRemoveTree($paths['state']);
             echo "OpenClaw configuration and data removed.\n";
         }
+        // Last, so the action lock still guards every removal above.
+        ocUninstallLeftoversRemove($paths);
         return 0;
     }
     if ($command === 'status') {

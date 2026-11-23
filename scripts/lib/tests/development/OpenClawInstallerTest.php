@@ -392,6 +392,32 @@ LIGHTTPD;
         fclose($again);
     }
 
+    public function testUninstallLeftoversRemoveLockPanelLogPidAndEmptyCacheOnly(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-oc-leftovers-');
+        $paths = \ocPaths($home);
+        $this->pmssWriteFile($home.'/.openclaw-action.lock', '');
+        $this->pmssWriteFile($home.'/.install-openclaw.log', 'started');
+        $this->pmssWriteFile($home.'/.install-openclaw-web.pid', "1234\n");
+        $this->pmssWriteFile($home.'/bin/install-openclaw', '<?php');
+        mkdir($home.'/.cache/openclaw', 0700, true);
+        \ocUninstallLeftoversRemove($paths);
+        foreach (array('.openclaw-action.lock', '.install-openclaw.log', '.install-openclaw-web.pid', '.cache/openclaw') as $name) {
+            $this->assertFalse(file_exists($home.'/'.$name), $name.' should be gone after uninstall');
+        }
+        // What PMSS ships and the shared ~/.cache directory stay.
+        $this->assertTrue(is_file($home.'/bin/install-openclaw'));
+        $this->assertTrue(is_dir($home.'/.cache'));
+        // A cache OpenClaw still fills, or a link, is not removed; a second run is harmless.
+        $this->pmssWriteFile($home.'/.cache/openclaw/kept', 'x');
+        \ocUninstallLeftoversRemove($paths);
+        $this->assertTrue(is_file($home.'/.cache/openclaw/kept'));
+        symlink($home.'/bin/install-openclaw', $home.'/.install-openclaw.log');
+        \ocUninstallLeftoversRemove($paths);
+        $this->assertFalse(is_link($home.'/.install-openclaw.log'));
+        $this->assertTrue(is_file($home.'/bin/install-openclaw'), 'a link is removed, never its target');
+    }
+
     public function testCommandPathPrefersPathThenFindsSbinOutsideAccountPath(): void
     {
         // A panel-launched install inherits the account login PATH, which has no /usr/sbin (lighttpd lives there).
