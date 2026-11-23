@@ -240,7 +240,13 @@ function utf8ize($mixed)
 function safe_json_encode($value)
 {
 	$encoded = json_encode($value);
-	return(!function_exists('json_last_error') || json_last_error()==JSON_ERROR_NONE ? $encoded : json_encode(utf8ize($value)));
+	if(!function_exists('json_last_error') || json_last_error()==JSON_ERROR_NONE)
+		return($encoded);
+	$value = utf8ize($value);
+	$encoded = json_encode($value);
+	// A UTF-16 surrogate pair written as two 3-byte sequences (CESU-8) looks well-formed to utf8ize() and
+	// still fails; substitute it so the response is never an empty body.
+	return($encoded===false ? json_encode($value, JSON_INVALID_UTF8_SUBSTITUTE) : $encoded);
 }
 
 function sortArrayTime( $a, $b )

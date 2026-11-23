@@ -122,7 +122,7 @@ PHP;
         ['plugins/throttle/throttle.php', 'new rXMLRPCCommand( "set_download_rate", MAX_SPEED )', 'new rXMLRPCCommand( "set_download_rate", 327625*1024 )'],
         ['plugins/throttle/throttle.php', 'new rXMLRPCCommand( "set_upload_rate", 0 )', 'new rXMLRPCCommand( "set_upload_rate", 327625*1024 )'],
         ['plugins/throttle/throttle.php', 'new rXMLRPCCommand( "set_download_rate", 0 )', 'new rXMLRPCCommand( "set_download_rate", 327625*1024 )'],
-    ], pmssUserRutorrentRpcCompatibilityPatches(), pmssUserRutorrentCreatePluginPatches(), pmssUserRutorrentSnoopyGzipPatches(), pmssUserRutorrentPluginCompatibilityPatches()) as [$path, $legacy, $patched]) {
+    ], pmssUserRutorrentRpcCompatibilityPatches(), pmssUserRutorrentCreatePluginPatches(), pmssUserRutorrentSnoopyGzipPatches(), pmssUserRutorrentPluginCompatibilityPatches(), pmssUserRutorrentJsonEncodePatches()) as [$path, $legacy, $patched]) {
         pmssUserPatchWritableStrings($ctx['home'].'/www/rutorrent/'.$path, [['legacy' => $legacy, 'patched' => $patched]]);
     }
 }
@@ -273,4 +273,26 @@ function pmssUserRutorrentPluginCompatibilityPatches(): array
     return [
         ['plugins/spectrogram/init.js', 'plugin.markLoaded();', "$('.soxplay').hide();\n\t\tplugin.markLoaded();"],
     ];
+}
+
+/**
+ * Return the edit that keeps ruTorrent's JSON reply from becoming an empty body.
+ *
+ * A torrent name no encoder pass can repair (a UTF-16 surrogate pair written as two 3-byte sequences)
+ * made safe_json_encode() return false, and the list and history views then failed to parse.
+ * This is not part of the RPC trust catalog (ADR 0196), so its snapshot stays untouched.
+ *
+ * @return array<int, array{0:string,1:string,2:string}> Exact legacy-to-skeleton edit.
+ */
+function pmssUserRutorrentJsonEncodePatches(): array
+{
+    $legacy = "\t\$encoded = json_encode(\$value);\n"
+        ."\treturn(!function_exists('json_last_error') || json_last_error()==JSON_ERROR_NONE ? \$encoded : json_encode(utf8ize(\$value)));\n";
+    $patched = "\t\$encoded = json_encode(\$value);\n"
+        ."\tif(!function_exists('json_last_error') || json_last_error()==JSON_ERROR_NONE)\n\t\treturn(\$encoded);\n"
+        ."\t\$value = utf8ize(\$value);\n\t\$encoded = json_encode(\$value);\n"
+        ."\t// A UTF-16 surrogate pair written as two 3-byte sequences (CESU-8) looks well-formed to utf8ize() and\n"
+        ."\t// still fails; substitute it so the response is never an empty body.\n"
+        ."\treturn(\$encoded===false ? json_encode(\$value, JSON_INVALID_UTF8_SUBSTITUTE) : \$encoded);\n";
+    return [['php/util.php', $legacy, $patched]];
 }
