@@ -4,6 +4,10 @@
 /** Pair tar names and types only after both caller-supplied listing commands succeed. */
 function pmssPinnedRemoteArchiveMembersRead(string $pathsCommand, string $detailsCommand): array
 {
+    // Validate both commands before a partial listing or malformed exec() argument.
+    foreach ([$pathsCommand, $detailsCommand] as $command) {
+        if ($command === '' || strpos($command, "\0") !== false) return [];
+    }
     $paths = $details = [];
     $rc = 1;
     exec($pathsCommand, $paths, $rc);
