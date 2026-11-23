@@ -138,6 +138,13 @@ rollback, pin the target explicitly, e.g. `release:2026-01-21` or
 
 ## Phase 2 – `scripts/util/update-step2.php`
 
+Quota mount configuration adds journaled-quota options and `commit=60` only to
+fstab entries whose filesystem type is `ext4`. Other types are left untouched
+by those two policies and produce a warning that PMSS per-user quota is not
+enforced on the host. The boot-recovery `nofail` policy still applies to every
+filesystem type. This does not add native quota support for other filesystems
+or remove incompatible options written by earlier updates.
+
 Quota recovery after a failed `quotaoff` rejects a declared type's contradictory
 on/off rows in the combined `quotaon -p /home` observation (ADR 0159). An off row
 and zero exit status cannot override an on row for that same type and mount.

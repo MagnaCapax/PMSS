@@ -5,7 +5,7 @@ require_once __DIR__.'/../update/fstab.php';
 require_once __DIR__.'/../update/managedPath.php';
 
 /**
- * Ensure the given mount point in /etc/fstab contains the quota options.
+ * Ensure the given ext4 mount point in /etc/fstab contains the quota options.
  */
 function pmssEnsureQuotaOptions(string $mountPoint, ?array $requiredOptions = null, ?callable $logger = null, ?string $fstabPath = null): void
 {
@@ -37,10 +37,17 @@ function pmssQuotaFstabOptionsApply(string $mountPoint, array $requiredOptions, 
             $replacePrefixedOptions[substr($requiredOption, 0, $equalsPosition + 1)] = $requiredOption;
         }
     }
-    // nofail adds only its flag; quota and journal updates also drop a lone defaults token.
-    $plan = pmssFstabMountOptionsEnsure($lines, $mountPoint, $requiredOptions, [], $policy !== 'nofail', null, $replacePrefixedOptions);
+    // Quota and journal policies are ext4-only; nofail is valid for every filesystem.
+    $fsType = $policy === 'nofail' ? null : 'ext4';
+    $plan = pmssFstabMountOptionsEnsure($lines, $mountPoint, $requiredOptions, [], $policy !== 'nofail', $fsType, $replacePrefixedOptions);
     if ($plan === null) {
-        $log('[WARN] Mount point '.$mountPoint.' not found in '.$fstab.'; skipping '.$missing.'.');
+        $entry = pmssFstabMountEntryRead($lines, $mountPoint);
+        if ($entry !== null) {
+            $log('[WARN] '.$mountPoint.' is '.$entry['columns'][2]
+                .'; PMSS quota options are ext4-only, so per-user quota is not enforced on this host');
+        } else {
+            $log('[WARN] Mount point '.$mountPoint.' not found in '.$fstab.'; skipping '.$missing.'.');
+        }
         return;
     }
 
