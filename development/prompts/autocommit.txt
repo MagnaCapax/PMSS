@@ -36,6 +36,9 @@ COMMIT:
   git add <specific_files_only>
   git commit -m "##COMMIT_PREFIX## <scope> — <description>"
   One commit per logical change.
+  A message with a body or trailer lines (Intent:, Split-Reason:, Co-Authored-By:) has more than one line:
+  write it to a file outside the repository and run `git commit -F <file>`, or give each paragraph its own -m.
+  NEVER type \n inside one -m argument: git keeps the two characters backslash and n, not a newline.
   PREFIX = ##COMMIT_PREFIX##
 
 COMMIT MESSAGE RULE (PUBLIC REPO — BINDING):

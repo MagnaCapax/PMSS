@@ -51,5 +51,6 @@ Workflow (Do This Now):
 - From the CI logs, locate the latest LOC snapshot emitted by development/loc.sh (look for "PMSS lines of code (excluding third-party trees)" and the advisory complexity sections) and use that to understand category growth and hotspots; do not re-run loc.sh unless explicitly requested.
 - If the operator asks you to commit (no branches, no push):
   * `git add <specific_files>` (never `git add -A`) then `git commit -m "ci: <scope> — <short reason>"`
+    (a message with a body or trailer lines: write it to a file and use `git commit -F <file>`, or one -m per paragraph; never type \n inside one -m, git keeps it as backslash and n)
 
 Proceed to triage the CI summary, job logs, and artifacts. Propose a minimal patch, the verification commands you ran, and a brief summary of the latest LOC snapshot from the CI logs (key category totals and any notable hotspots based on the loc.sh output).
