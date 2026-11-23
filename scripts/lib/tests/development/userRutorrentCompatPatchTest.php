@@ -142,6 +142,48 @@ class UserRutorrentCompatPatchTest extends TestCase
         }
     }
 
+    public function testCreatePluginHashesWithMktorrentOnlyWhereTheBinaryExists(): void
+    {
+        $relative = 'www/rutorrent/plugins/create/conf.php';
+        // The stock per-user copy is the skeleton file; the ask is "use mktorrent", not "use the internal hasher".
+        $stock = $this->pmssReadRepoFile('etc/skel/'.$relative);
+        $home = $this->pmssMakeTrackedUserHomeTree('pmss-rutorrent-create-', 'fixtur01', dirname($relative));
+        $target = $this->pmssWriteRelativeFile($home, $relative, $stock);
+
+        \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
+        $patched = (string) file_get_contents($target);
+        $this->assertStringContainsString("'mktorrent'", $patched);
+        $this->assertStringNotContainsString('$useExternal = false;', $patched);
+        // Evaluated the way getPluginConf() loads it: mktorrent only when the binary is present, else the internal hasher.
+        $useExternal = null;
+        $evaluate = static function () use ($patched, &$useExternal): void {
+            eval('?>'.$patched);
+        };
+        $evaluate();
+        $this->assertSame(is_executable('/usr/bin/mktorrent') ? 'mktorrent' : false, $useExternal);
+        // Unrelated plugin settings survive the rewrite.
+        $this->assertStringContainsString('$recentTrackersMaxCount = 15;', $patched);
+
+        clearstatcache(true, $target);
+        $inode = stat($target)['ino'];
+        \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
+        clearstatcache(true, $target);
+        $this->assertSame($patched, file_get_contents($target));
+        $this->assertSame($inode, stat($target)['ino']);
+    }
+
+    public function testCreatePluginKeepsAnAccountThatChoseAnotherCreator(): void
+    {
+        $relative = 'www/rutorrent/plugins/create/conf.php';
+        $chosen = str_replace('$useExternal = false;', '$useExternal = "transmissioncreate";', $this->pmssReadRepoFile('etc/skel/'.$relative));
+        $this->assertStringContainsString('"transmissioncreate"', $chosen);
+        $home = $this->pmssMakeTrackedUserHomeTree('pmss-rutorrent-create-', 'fixtur01', dirname($relative));
+        $target = $this->pmssWriteRelativeFile($home, $relative, $chosen);
+
+        \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
+        $this->assertSame($chosen, file_get_contents($target));
+    }
+
     public function testSkeletonHddquotaActionReturnsInt(): void
     {
         $this->pmssAssertRepoFileContainsString('etc/skel/www/rutorrent/plugins/hddquota/action.php', 'return (int) $field;');
