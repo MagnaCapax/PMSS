@@ -48,7 +48,7 @@ write_hardware_summary() {
 	fi
 
 	[ -e /sys/kernel/mm/lru_gen/enabled ] && has_mglru=1
-	if [ "$swap_fast" = "1" ] && [ -f /sys/module/zswap/parameters/enabled ]; then
+	if [ "$swap_present" = "1" ] && [ -f /sys/module/zswap/parameters/enabled ]; then
 		zswap_requested=1
 	fi
 
@@ -84,31 +84,38 @@ EOF
 # Enable MGLRU when supported (kernel 6.1+).
 write_sys /sys/kernel/mm/lru_gen/enabled 7
 
-# Enable zswap only when swap is on fast storage.
+# Succeeds when the disk behind block device $1 is non-rotational. A partition has no queue/ of its
+# own (its parent disk has), and an md or dm device keeps its members under slaves/.
+sys_class_block=${PMSS_SYSCTL_SYS_CLASS_BLOCK_PATH:-/sys/class/block}
+block_is_fast() {
+	for rot_path in "$sys_class_block/$1/queue/rotational" "$sys_class_block/$1/../queue/rotational"; do
+		[ -r "$rot_path" ] && [ "$(cat "$rot_path" 2>/dev/null)" = "0" ] && return 0
+	done
+	for slave in "$sys_class_block/$1/slaves/"*; do
+		[ -e "$slave" ] || continue
+		block_is_fast "$(basename "$slave")" && return 0
+	done
+	return 1
+}
+
+# Enable zswap whenever swap exists (#1221). A compressed RAM tier in front of swap keeps repeat paging
+# off the disk, which matters most when swap is a partition on a rotational /home array member.
+# swap_fast only records whether swap sits on non-rotational storage, for hardware.json.
+swap_present=0
 swap_fast=0
 if [ -r /proc/swaps ]; then
 	while read -r path _; do
+		[ -z "$path" ] && continue
 		[ "$path" = "Filename" ] && continue
+		swap_present=1
 		[ -b "$path" ] || continue
 		dev=$(readlink -f "$path" 2>/dev/null || echo "$path")
 		dev=$(basename "$dev")
-		rot_path="/sys/class/block/$dev/queue/rotational"
-		if [ -r "$rot_path" ] && [ "$(cat "$rot_path" 2>/dev/null)" = "0" ]; then
-			swap_fast=1
-			break
-		fi
-		for slave in "/sys/class/block/$dev/slaves/"*; do
-			[ -e "$slave/queue/rotational" ] || continue
-			rot=$(cat "$slave/queue/rotational" 2>/dev/null || echo "")
-			if [ "$rot" = "0" ]; then
-				swap_fast=1
-				break 2
-			fi
-		done
+		block_is_fast "$dev" && swap_fast=1
 	done </proc/swaps
 fi
 
-if [ "$swap_fast" = "1" ] && [ -f /sys/module/zswap/parameters/enabled ]; then
+if [ "$swap_present" = "1" ] && [ -f /sys/module/zswap/parameters/enabled ]; then
 	modprobe zswap 2>/dev/null || true
 	modprobe lz4 2>/dev/null || true
 	if [ -f /sys/module/zswap/parameters/compressor ]; then
