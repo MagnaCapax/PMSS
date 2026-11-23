@@ -2269,6 +2269,12 @@ customer UID, audit result shape, live-client refusal and disk precheck remain.
     `<user>:<user> 0640`. Billing sources outside the file-type or
     ownership contract stay in the backup and are reported; a `.htpasswd`
     outside it stops the rebuild.
+    The bonus display copies `.bonus` and `.bonusTraffic` are rendered from the
+    root store (`bonusPercent`, `bonusTrafficGiB`, ADR 0213) after the restore,
+    through the managed-file writer (`root:<user> 0640`); the account-writable
+    backup copy is never read. A missing, zero, non-integer, negative or
+    over-maximum stored value writes no file, and a failed write is reported on
+    stderr without stopping the rebuild (Refs #1132).
     The home is handed to the user only after restore, before service configuration,
     nginx regeneration, and permissions. Ownership is validated, then the home
     remains account-owned for the `changePw.php` password reset. The backup stays

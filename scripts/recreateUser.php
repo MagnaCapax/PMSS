@@ -38,6 +38,7 @@ require_once __DIR__.'/lib/homeMount.php';
 require_once __DIR__.'/lib/shell.php';
 require_once __DIR__.'/lib/user/credentialProcess.php';
 require_once __DIR__.'/lib/user/recreateRestore.php';
+require_once __DIR__.'/lib/user/recreateBonusMarkers.php';
 require_once __DIR__.'/lib/user/pikkumiesPreinstallState.php';
 require_once __DIR__.'/lib/portManager.php';
 require_once __DIR__.'/lib/update.php';
@@ -191,6 +192,13 @@ try {
     }
 } catch (RuntimeException $error) {
     exit(pmssCliReturnWithStderr($error->getMessage()."\n"));
+}
+
+// Bonus display copies come from the root store, never from the account-writable backup (ADR 0213).
+foreach (pmssRecreateBonusMarkersRender($userName, $homeDir) as $marker => $written) {
+    if (!$written) {
+        fwrite(STDERR, "[!] Non-fatal: could not render {$marker} from the user store for {$userName}\n");
+    }
 }
 
 // Only the top-level handoff makes the restored tree reachable by the account.
