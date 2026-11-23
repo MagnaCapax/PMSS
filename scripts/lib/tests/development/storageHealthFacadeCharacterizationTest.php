@@ -7,7 +7,7 @@ final class StorageHealthFacadeCharacterizationTest extends TestCase
 {
     public function testSmartAndRaidPayloadSnapshot(): void
     {
-        // Freeze complete payloads, including key/flag order, temperature boundaries,
+        // Freeze scripts/lib/storageHealth/deviceParse.php payloads: key/flag order, temperature boundaries,
         // informational counter growth, failed health, and repeated RAID activity.
         $entries = [];
         foreach (['', 'OK', 'PASSED', 'FAILED', 'OK FAIL', 'BAD', 'STANDBY'] as $health) {
@@ -73,5 +73,20 @@ final class StorageHealthFacadeCharacterizationTest extends TestCase
         $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/storageHealth.php', ["storageHealth/nvme.php", "storageHealth/raid.php"], ['function pmssStorageHealthSnapshotNvme(', 'function pmssStorageHealthSnapshotRaid(']);
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/storageHealth/nvme.php', ['function pmssStorageHealthSnapshotNvme(']);
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/storageHealth/raid.php', ['function pmssStorageHealthSnapshotRaid(']);
+    }
+
+    public function testReportKeepsMixedKindEncounterOrder(): void
+    {
+        $base = ['timestamp' => '2025-01-01T00:00:00+00:00'];
+        $entries = [ // scripts/lib/storageHealth/report.php keeps NVMe and SMART in encounter order.
+            $base + ['kind' => 'raid', 'array' => 'md0', 'severity' => 'warn'],
+            $base + ['kind' => 'nvme', 'device' => '/dev/nvme0n1', 'severity' => 'fail'],
+            $base + ['kind' => 'fs', 'device' => '/', 'severity' => 'ok'],
+            $base + ['kind' => 'smart', 'device' => '/dev/sda', 'severity' => 'ok'],
+        ];
+        $jsonPath = $this->pmssMakeTempFile('pmss-storage-grouping-');
+        $this->pmssAppendFixtureLines($jsonPath, $entries);
+        $expected = implode('', array_map(static function (array $entry): string { return json_encode($entry, JSON_UNESCAPED_SLASHES).PHP_EOL; }, [$entries[1], $entries[3], $entries[0], $entries[2]]));
+        $this->assertSame($expected, $this->pmssRunRepoPhpScript('scripts/storageHealth.php', ['--json', $jsonPath, '--raw']));
     }
 }

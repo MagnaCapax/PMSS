@@ -24,10 +24,7 @@ function pmssStorageHealthSnapshotNvme(array $disk, array $last, string $timesta
     }
     $dev = (string) $disk['path'];
     // Corrupt paths use the unavailable result before shell quoting can throw.
-    if (pmssFilesystemPathHasNulByte($dev)) {
-        return null;
-    }
-    if (strpos($dev, 'nvme') === false || pmssCommandPath('nvme') === '') {
+    if (pmssFilesystemPathHasNulByte($dev) || strpos($dev, 'nvme') === false || pmssCommandPath('nvme') === '') {
         return null;
     }
 

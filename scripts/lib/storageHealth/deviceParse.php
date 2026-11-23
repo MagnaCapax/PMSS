@@ -17,9 +17,8 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
     $metrics = ['health' => 'UNKNOWN'] + array_fill_keys(['reallocated', 'pending', 'udma_crc', 'temp_c', 'power_on_hours', 'link_errors'], null);
 
     if (stripos($out, 'Device is in STANDBY') !== false || stripos($out, 'Device is in SLEEP') !== false) {
-        $entry['metrics'] = $metrics;
-        $entry['metrics']['health'] = 'STANDBY';
-        return pmssStorageHealthEntryFinalize($entry, ['standby']);
+        $metrics['health'] = 'STANDBY';
+        return pmssStorageHealthEntryFinalize($entry + ['metrics' => $metrics], ['standby']);
     }
 
     $health = null;
@@ -47,13 +46,12 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
         '/Accumulated\\s+power\\s+on\\s+time.*?([0-9]+):([0-9]+):([0-9]+)/i' => ['power_on_hours'],
     ], $metrics);
 
-    $entry['metrics'] = $metrics;
     // Null distinguishes an absent health line from an explicit, unsuccessful result.
     $flags = ($health === null || (strpos($health, 'PASSED') === false && strpos($health, 'OK') !== 0)
         || strpos($health, 'FAIL') !== false || strpos($health, 'BAD') !== false)
         ? [$health === null ? 'health_unknown' : 'health_not_ok'] : [];
 
-    return pmssStorageHealthEntryFinalize($entry, array_merge($flags, pmssStorageHealthMetricThresholdFlags($metrics, [
+    return pmssStorageHealthEntryFinalize($entry + ['metrics' => $metrics], array_merge($flags, pmssStorageHealthMetricThresholdFlags($metrics, [
         'pending' => [1 => 'pending_sectors'], 'reallocated' => [1 => 'reallocated_sectors'],
         'temp_c' => [($entry['rota'] === 1 ? 50 : 70) => ($entry['rota'] === 1 ? 'hot_hdd' : 'hot_ssd')],
     ]), pmssStorageHealthMetricIncreaseFlags($metrics, $prevMetrics, ['reallocated' => 'reallocated_increase', 'pending' => 'pending_increase', 'link_errors' => 'link_errors_increase'])));

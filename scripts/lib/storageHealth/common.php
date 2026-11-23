@@ -35,10 +35,7 @@ function pmssStorageHealthDiskInventoryFromLsblk(string $lsblkOut): array
 function pmssStorageHealthDiskInventoryRead(): array
 {
     $result = pmssCommandCapture('lsblk -dn -o KNAME,TYPE,ROTA,MODEL,SERIAL,SIZE', 30);
-    if ((int) ($result['rc'] ?? 1) !== 0) {
-        return [];
-    }
-
+    if ((int) ($result['rc'] ?? 1) !== 0) return [];
     return pmssStorageHealthDiskInventoryFromLsblk((string) ($result['stdout'] ?? ''));
 }
 

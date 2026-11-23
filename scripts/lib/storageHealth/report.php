@@ -87,9 +87,7 @@ function pmssStorageHealthReportMain(array $argv): int
     }
 
     // Retain encounter order per kind and include unknown kinds in the latest timestamp.
-    $disks = [];
-    $raid = [];
-    $fs = [];
+    $groups = ['smart' => [], 'raid' => [], 'fs' => []];
     $latestTs = '';
     foreach (pmssStorageHealthReadLastEntries($jsonPath) as $entry) {
         $ts = (string) ($entry['timestamp'] ?? '');
@@ -98,18 +96,14 @@ function pmssStorageHealthReportMain(array $argv): int
         if ($kind !== 'fs' && strcmp($ts, $latestTs) > 0) {
             $latestTs = $ts;
         }
-        if ($kind === 'fs') {
-            $fs[] = $entry;
-        } elseif ($kind === 'raid') {
-            $raid[] = $entry;
-        } elseif ($kind === 'smart' || $kind === 'nvme') {
-            $disks[] = $entry;
-        }
+        $group = $kind === 'nvme' ? 'smart' : $kind;
+        if (isset($groups[$group])) $groups[$group][] = $entry;
     }
     $onlyProblems = pmssCliOptionPresent($parsed, 'only-problems');
-    $disks = pmssStorageHealthReportFilter($disks, pmssCliOptionString($parsed, 'device', null, null), $onlyProblems);
-    $raid = pmssStorageHealthReportFilter($raid, null, $onlyProblems);
-    $fs = pmssStorageHealthReportFilter($fs, null, $onlyProblems);
+    $disks = pmssStorageHealthReportFilter($groups['smart'], pmssCliOptionString($parsed, 'device', null, null), $onlyProblems);
+    $raid = pmssStorageHealthReportFilter($groups['raid'], null, $onlyProblems);
+    $fs = pmssStorageHealthReportFilter($groups['fs'], null, $onlyProblems);
+    unset($groups);
     $perfStatus = pmssStorageHealthPerformanceStatus($raid);
 
     if (pmssCliOptionPresent($parsed, 'user-notice')) {
