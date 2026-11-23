@@ -89,14 +89,13 @@ final class TorrentClientsStoreTest extends TestCase
             [PHP_INT_MAX, PHP_INT_MAX - $reserve - 1, true],
         ] as $index => [$free, $size, $attempt]) {
             $root = $base.'/case-'.$index.'/store';
-            $calls = 0;
-            $result = \pmssTorrentClientsStoreConverge([$this->entry()], [
-                'root' => $root,
-                // Stop at the install boundary; no download or daemon is needed.
-                'install' => static function () use (&$calls): bool { $calls++; return false; },
-            ] + self::pmssMakeCallbacks(['free' => $free, 'size' => $size, 'log' => null]));
+            $calls = [];
+            // Stop at the install boundary; no download or daemon is needed.
+            $result = \pmssTorrentClientsStoreConverge([$this->entry()], ['root' => $root]
+                + self::pmssMakeCallbacks(['install' => false], $calls)
+                + self::pmssMakeCallbacks(['free' => $free, 'size' => $size, 'log' => null]));
             $this->assertSame(['rtorrent/0.9.9' => $attempt ? 'failed' : 'skipped-space'], $result);
-            $this->assertSame($attempt ? 1 : 0, $calls);
+            $this->assertSame($attempt ? ['install'] : [], $calls);
             $this->assertSame($attempt, is_dir($root));
         }
     }
@@ -145,13 +144,12 @@ final class TorrentClientsStoreTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-clients-linked-');
         mkdir($root.'/outside');
         symlink($root.'/outside', $root.'/store');
-        $calls = 0;
-        $results = \pmssTorrentClientsStoreConverge([$this->entry()], [
-            'root' => $root.'/store',
-            'install' => static function () use (&$calls): bool { $calls++; return true; },
-        ] + self::pmssMakeCallbacks(['free' => 10 * 1024 * 1024 * 1024, 'size' => 0, 'log' => null]));
+        $calls = [];
+        $results = \pmssTorrentClientsStoreConverge([$this->entry()], ['root' => $root.'/store']
+            + self::pmssMakeCallbacks(['install' => true], $calls)
+            + self::pmssMakeCallbacks(['free' => 10 * 1024 * 1024 * 1024, 'size' => 0, 'log' => null]));
         $this->assertSame(['rtorrent/0.9.9' => 'failed'], $results);
-        $this->assertSame(0, $calls);
+        $this->assertSame([], $calls);
     }
 
     public function testWritableStoreDirectoryIsRejectedBeforeInstall(): void
@@ -159,20 +157,19 @@ final class TorrentClientsStoreTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-clients-writable-');
         $store = $root.'/store';
         mkdir($store.'/rtorrent/0.9.9', 0755, true);
-        $calls = 0;
+        $calls = [];
         foreach ([
             [$root, 0775], [$store, 0777],
             [$store.'/rtorrent', 0775], [$store.'/rtorrent/0.9.9', 0777],
         ] as [$path, $mode]) {
             chmod($path, $mode);
-            $results = \pmssTorrentClientsStoreConverge([$this->entry()], [
-                'root' => $store,
-                'install' => static function () use (&$calls): bool { $calls++; return true; },
-            ] + self::pmssMakeCallbacks(['free' => 10 * 1024 * 1024 * 1024, 'size' => 0, 'log' => null]));
+            $results = \pmssTorrentClientsStoreConverge([$this->entry()], ['root' => $store]
+                + self::pmssMakeCallbacks(['install' => true], $calls)
+                + self::pmssMakeCallbacks(['free' => 10 * 1024 * 1024 * 1024, 'size' => 0, 'log' => null]));
             $this->assertSame(['rtorrent/0.9.9' => 'failed'], $results);
             chmod($path, 0755);
         }
-        $this->assertSame(0, $calls);
+        $this->assertSame([], $calls);
         $this->assertTrue(\pmssTorrentClientsStorePathChainSafe($store, 'rtorrent', '0.9.9'));
     }
 

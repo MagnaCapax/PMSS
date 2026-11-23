@@ -15,7 +15,7 @@ class StorageBenchmarkPostInstallTest extends TestCase
         $this->pmssWithEnv(['PMSS_STORAGE_BENCHMARK_INSTALL_MARKER' => $marker], function () use (&$logs, &$calls): void {
             $rc = \pmssStorageBenchmarkPostInstallRun(
                 $this->pmssMakeArrayLogger($logs),
-                static function () use (&$calls): int { $calls[] = true; return 0; },
+                self::pmssMakeCallbacks(['run' => 0], $calls)['run'],
                 self::pmssMakeCallbacks(['users' => ['fixtur01']])['users']
             );
             $this->assertSame(0, $rc);
@@ -36,7 +36,7 @@ class StorageBenchmarkPostInstallTest extends TestCase
         $this->pmssWithEnv(['PMSS_STORAGE_BENCHMARK_INSTALL_MARKER' => $marker], function () use (&$calls, &$logs): void {
             $rc = \pmssStorageBenchmarkPostInstallRun(
                 $this->pmssMakeArrayLogger($logs),
-                static function () use (&$calls): int { $calls[] = true; return 0; },
+                self::pmssMakeCallbacks(['run' => 0], $calls)['run'],
                 self::pmssMakeCallbacks(['users' => []])['users']
             );
             $this->assertSame(0, $rc);
@@ -81,9 +81,9 @@ class StorageBenchmarkPostInstallTest extends TestCase
         $logs = [];
 
         $this->pmssWithEnv(['PMSS_STORAGE_BENCHMARK_INSTALL_MARKER' => $marker], function () use (&$calls, &$logs): void {
-            $runner = static function () use (&$calls): int { $calls[] = true; return 0; };
             $probes = self::pmssMakeCallbacks(['users' => [], 'devices' => 14, 'guest' => true]);
-            $rc = \pmssStorageBenchmarkPostInstallRun($this->pmssMakeArrayLogger($logs), $runner, $probes['users'], $probes['devices'], $probes['guest']);
+            $rc = \pmssStorageBenchmarkPostInstallRun($this->pmssMakeArrayLogger($logs), self::pmssMakeCallbacks(['run' => 0], $calls)['run'],
+                $probes['users'], $probes['devices'], $probes['guest']);
             $this->assertSame(0, $rc);
         });
 
@@ -100,13 +100,12 @@ class StorageBenchmarkPostInstallTest extends TestCase
         $logs = [];
 
         $this->pmssWithEnv(['PMSS_STORAGE_BENCHMARK_INSTALL_MARKER' => $marker], function () use (&$probed, &$calls, &$logs): void {
-            $detector = static function () use (&$probed): bool { $probed[] = true; return false; };
             $rc = \pmssStorageBenchmarkPostInstallRun(
                 $this->pmssMakeArrayLogger($logs),
-                static function () use (&$calls): int { $calls[] = true; return 0; },
+                self::pmssMakeCallbacks(['run' => 0], $calls)['run'],
                 self::pmssMakeCallbacks(['users' => ['fixtur01']])['users'],
                 null,
-                $detector
+                self::pmssMakeCallbacks(['guest' => false], $probed)['guest']
             );
             $this->assertSame(0, $rc);
         });

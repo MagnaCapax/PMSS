@@ -168,7 +168,7 @@ PHP;
         $state = \rtorrentProcessWatchdogStatePaths($this->tempDir, 'fixtur01');
         \rtorrentProcessWriteEscalationState($state['escalation'], 'fixtur01', 6, time());
         $before = (string) file_get_contents($state['escalation']);
-        $attempts = 0;
+        $attempts = [];
 
         $this->pmssCaptureStdout(static function () use ($state, &$attempts): void {
             \pmssCheckRtorrentHandleEscalatedStartFailure(
@@ -178,14 +178,11 @@ PHP;
                 3600,
                 self::pmssMakeCallbacks(['log' => null])['log'],
                 false,
-                static function (string $user, callable $logCallback, string $startMarker) use (&$attempts): int {
-                    $attempts++;
-                    return 0;
-                }
+                self::pmssMakeCallbacks(['start' => 0], $attempts)['start']
             );
         });
 
-        $this->assertSame(0, $attempts, 'fresh escalation interval must not attempt a start');
+        $this->assertSame([], $attempts, 'fresh escalation interval must not attempt a start');
         $this->assertSame($before, (string) file_get_contents($state['escalation']), 'waiting must not re-arm the interval');
         $this->assertFalse(file_exists($state['startMarker']), 'waiting must not touch the start marker');
     }
@@ -195,7 +192,7 @@ PHP;
         $state = \rtorrentProcessWatchdogStatePaths($this->tempDir, 'fixtur01');
         \rtorrentProcessWriteEscalationState($state['escalation'], 'fixtur01', 6, time() - 3600);
         $before = time();
-        $attempts = 0;
+        $attempts = [];
 
         $this->pmssCaptureStdout(static function () use ($state, &$attempts): void {
             \pmssCheckRtorrentHandleEscalatedStartFailure(
@@ -205,15 +202,12 @@ PHP;
                 180,
                 self::pmssMakeCallbacks(['log' => null])['log'],
                 false,
-                static function (string $user, callable $logCallback, string $startMarker) use (&$attempts): int {
-                    $attempts++;
-                    return 1;
-                }
+                self::pmssMakeCallbacks(['start' => 1], $attempts)['start']
             );
         });
 
         $payload = json_decode((string) file_get_contents($state['escalation']), true);
-        $this->assertSame(1, $attempts, 'failed one-shot still attempts only once');
+        $this->assertSame(['start'], $attempts, 'failed one-shot still attempts only once');
         $this->assertTrue(is_array($payload), 'failed one-shot should leave a JSON escalation marker');
         $this->pmssAssertArraySubsetSame(['user' => 'fixtur01', 'count' => 7], $payload);
         $this->assertTrue((int) $payload['timestamp'] >= $before, 'failed one-shot should re-arm the interval from now');

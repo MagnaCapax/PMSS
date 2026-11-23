@@ -21,12 +21,11 @@ final class TorrentClientsP6VenvTest extends TestCase
     public function testSystemDelugeNeverInvokesStoreInstaller(): void
     {
         [$root, $entry] = $this->fixture();
-        $calls = 0;
-        $install = static function () use (&$calls): void { $calls++; };
+        $calls = [];
         $results = \pmssTorrentClientsStoreConverge([['client' => 'deluge', 'version' => 'system',
-            'kind' => 'system', 'disabled' => false]], ['root' => $root, 'install' => $install]);
+            'kind' => 'system', 'disabled' => false]], ['root' => $root] + self::pmssMakeCallbacks(['install' => null], $calls));
         $this->assertSame([], $results);
-        $this->assertSame(0, $calls);
+        $this->assertSame([], $calls);
     }
 
     public function testPinnedMirrorUsesExistingInstallerContract(): void
@@ -50,16 +49,14 @@ final class TorrentClientsP6VenvTest extends TestCase
     public function testMissingOrChangedWheelStopsBeforeInstaller(): void
     {
         [$root, $entry] = $this->fixture();
-        $calls = 0;
-        $install = static function () use (&$calls): void { $calls++; };
+        $calls = [];
         $fetched = [];
-        $fetch = $this->pmssMakeArrayLogger($fetched);
-        $ops = ['install' => $install, 'fetch' => $fetch];
+        $ops = ['fetch' => $this->pmssMakeArrayLogger($fetched)] + self::pmssMakeCallbacks(['install' => null], $calls);
         $this->pmssWriteRelativeFile($root, 'wheels/'.$entry['wheels'][0]['file'], 'changed');
         $this->assertFalse(\pmssTorrentClientsDelugeVenvInstall($entry, $root.'/deluge/2.1.1', $ops));
         unlink($root.'/wheels/'.$entry['wheels'][0]['file']);
         $this->assertFalse(\pmssTorrentClientsDelugeVenvInstall($entry, $root.'/deluge/2.1.1', $ops));
-        $this->assertSame(0, $calls);
+        $this->assertSame([], $calls);
         // A failed mirror fetch is retried on the next run and never reaches pip.
         $this->assertSame([$entry['wheels'][0]['file'], $entry['wheels'][0]['file']], $fetched);
     }
@@ -93,14 +90,10 @@ final class TorrentClientsP6VenvTest extends TestCase
             $this->pmssWriteRelativeFile($dir, 'bin/deluge-web', 'fixture');
             symlink($cli, $link);
         };
-        $cleanupCalls = 0;
-        $unlink = static function (string $path) use (&$cleanupCalls): bool {
-            $cleanupCalls++;
-            return false;
-        };
+        $cleanupCalls = [];
         $this->assertFalse(\pmssTorrentClientsDelugeVenvInstall($entry, $versionDir,
-            ['install' => $install, 'unlink' => $unlink]));
-        $this->assertSame(1, $cleanupCalls);
+            ['install' => $install] + self::pmssMakeCallbacks(['unlink' => false], $cleanupCalls)));
+        $this->assertSame(['unlink'], $cleanupCalls);
         $this->assertTrue(is_link($versionDir.'/.deluge-cli'));
     }
 

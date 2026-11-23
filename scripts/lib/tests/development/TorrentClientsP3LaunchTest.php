@@ -103,11 +103,10 @@ final class TorrentClientsP3LaunchTest extends TestCase
         [$home, $store, $projection] = $this->fixture();
         $path = $home.'/.config/transmission-daemon/settings.json';
         $this->pmssWriteFile($path, '{"rpc_whitelist_enabled":false}');
-        $calls = 0;
-        $ops = ['storeRoot' => $store, 'projection' => $projection,
-            'run' => static function () use (&$calls): void { $calls++; }];
+        $calls = [];
+        $ops = ['storeRoot' => $store, 'projection' => $projection] + self::pmssMakeCallbacks(['run' => null], $calls);
         $this->assertFalse(\pmssTransmissionLaunch($home, $ops));
-        $this->assertSame(0, $calls);
+        $this->assertSame([], $calls);
     }
 
     public function testWebHomeRequiresRealAdjacentDirectory(): void
