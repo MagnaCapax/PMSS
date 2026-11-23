@@ -36,6 +36,32 @@ class DpkgBaselineSelectionTest extends TestCase
         );
     }
 
+    public function testBaselineServedToDebian13KeepsTheOpenvpnPackages(): void
+    {
+        // configureOpenvpn.php runs on every release and needs both packages. Debian 13 hosts get the
+        // Debian 12 baseline until a captured Debian 13 file is promoted; the promoted file must keep them.
+        [$path] = $this->pmssArrayLoggerCapture(function (callable $logger): string {
+            return \pmssSelectDpkgSelectionsBaseline(13, $logger);
+        });
+        $installed = [];
+        foreach (file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $line) {
+            $columns = preg_split('/\s+/', trim($line));
+            if (count($columns) >= 2 && $columns[1] === 'install') {
+                $installed[] = $columns[0];
+            }
+        }
+
+        foreach (['openvpn', 'easy-rsa'] as $package) {
+            $this->assertTrue(in_array($package, $installed, true), basename($path).' must select '.$package);
+        }
+    }
+
+    public function testDebian13ValidationChecklistNamesTheOpenvpnChecks(): void
+    {
+        // The capture step is where a baseline can silently drop the packages, so the roadmap says to check them.
+        $this->pmssAssertRepoFileContainsAllStrings('docs/dpkg-baseline.md', ['`openvpn` and `easy-rsa`', 'server-leaf renewal']);
+    }
+
     public function testFutureMissingBaselineUsesLatestValidatedFallback(): void
     {
         [$path, $logs] = $this->pmssArrayLoggerCapture(function (callable $logger): string {
