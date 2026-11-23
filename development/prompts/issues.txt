@@ -116,18 +116,6 @@ Workflow (Do This Now):
 - Commit prefix: fix: for bugs, feat: for features, security: for security issues, wip: for partial progress on complex issues.
 - After commit: stop there. The lane publishes the commit and labels the issue complete-verify.
 
-Context to open (paths in this workspace):
- - AGENTS.md
- - AGENTS.local.md
- - docs/architecture.md
- - docs/update.md
- - docs/install.md
- - docs/refactoring.md
- - docs/contracts.md
- - docs/adr/
-
-Do not inline these; read them directly from disk.
-
 Output safety checklist:
 - If output size is unknown or large, redirect to a file and summarize with tail/head/rg.
 - Avoid unbounded commands (recursive find/grep, full log dumps, verbose fsck).

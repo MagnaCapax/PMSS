@@ -110,7 +110,7 @@ See ADRs 0055 and 0056 for the event and preservation contracts.
 All wrappers ultimately call `development/codex-run.sh run`, which builds a prompt that looks like:
 
 - the selected base prompt text (`development/prompts/*.txt` unless overridden by `--prompt`)
-- a **uniform** “Context to open” list (core rails + relevant artifacts)
+- a **uniform** “Context to open” list (AGENTS.md and AGENTS.local.md up front; docs/ and ADRs on demand)
 - optional local notes appended from `.codex-prompt`
 
 This keeps every session consistent: regardless of whether you start from CI triage or a refactor run,

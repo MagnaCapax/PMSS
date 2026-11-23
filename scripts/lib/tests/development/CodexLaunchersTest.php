@@ -135,6 +135,25 @@ class CodexLaunchersTest extends CodexLauncherTestCase
         }
     }
 
+    public function testPromptReadsOnlyTheAgentsRailsUpFrontAndDocsOnDemand(): void
+    {
+        // A mandatory read of every doc and ADR used up the context budget before the first edit.
+        $outdir = $this->tempDir.'/prompt-context';
+        $result = $this->launch('codex-run.sh', ['run', '--prompt', 'fixture', '--outdir', $outdir, '--exec', 'codex exec']);
+        $this->assertSame(0, $result['rc'], $result['output']);
+        $prompt = (string) file_get_contents($outdir.'/prompt.txt');
+        $this->assertSame(1, substr_count($prompt, 'Context to open'));
+        $this->assertStringContainsString('Open on demand', $prompt);
+        list($upFront, $onDemand) = explode('Open on demand', $prompt, 2);
+        $this->assertStringContainsAllStrings(['AGENTS.md', 'AGENTS.local.md'], $upFront);
+        $this->assertStringNotContainsString('docs/contracts.md', $upFront);
+        $this->assertStringNotContainsString('docs/adr/', $upFront);
+        $this->assertStringContainsAllStrings(['docs/architecture.md', 'docs/contracts.md', 'docs/adr/'], $onDemand);
+        $issues = $this->pmssReadRepoFile('development/prompts/issues.txt');
+        $this->assertStringNotContainsString('Context to open', $issues);
+        $this->assertStringNotContainsString('docs/contracts.md', $issues);
+    }
+
     public function testRefactorLaunchesWithoutExtraArgsAndNormalizesYolo(): void
     {
         foreach ([[], ['--yolo'], ['--ask-for-approval', 'never']] as $extra) {

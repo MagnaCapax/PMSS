@@ -603,12 +603,6 @@ codex_write_prompt() {
 Context to open (paths in this workspace):
  - AGENTS.md
  - AGENTS.local.md
- - docs/architecture.md
- - docs/update.md
- - docs/install.md
- - docs/refactoring.md
- - docs/contracts.md
- - docs/adr/
 EOF
 
 	local p
@@ -619,6 +613,11 @@ EOF
 	printf '\n' >>"$prompt_file"
 
 	cat <<'EOF' >>"$prompt_file"
+
+Open on demand, only the parts the change touches (never read them all up front):
+ - docs/architecture.md, docs/update.md, docs/install.md, docs/refactoring.md
+ - docs/contracts.md (large: search it for the subsystem you touch)
+ - docs/adr/ (many files: find the relevant ones with development/adr-list.sh <keywords> or rg)
 
 Do not inline these; read them directly from disk.
 
