@@ -65,8 +65,9 @@ function pmssPinnedRemoteArtifactTempFileUse(string $label, string $url, string 
     }
 
     // One owner covers failed downloads, rejected pins, dry runs, and callback exceptions.
+    // wget defaults (20 tries, no connect bound) let a mirror that drops packets stall update.php for most of an hour.
     try {
-        $rc = runStep($options['downloadDescription'] ?? 'Downloading '.$label, pmssBuildCommand('wget', ['-q', '-O', $tmp, $url]));
+        $rc = runStep($options['downloadDescription'] ?? 'Downloading '.$label, pmssBuildCommand('wget', ['-q', '--timeout=60', '--tries=3', '-O', $tmp, $url]));
         if ($rc !== 0) {
             pmssPinnedRemoteArtifactFailureRecord($label, 'download failed, rc='.$rc);
             return null;

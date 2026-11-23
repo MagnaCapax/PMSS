@@ -162,6 +162,7 @@ class RemoteBinaryHelperTest extends TestCase
         $this->pmssWriteExecutableFiles($binDir, [
             'wget' => <<<'SH'
 #!/bin/sh
+all="$*"
 out=''
 while [ "$#" -gt 0 ]; do
     if [ "$1" = "-O" ]; then
@@ -179,7 +180,7 @@ if [ "${PMSS_TEST_WGET_FILE:-}" != "" ]; then
 else
     printf '%s' "${PMSS_TEST_WGET_BODY}" > "$out"
 fi
-printf 'wget %s\n' "$out" >> "${PMSS_TEST_COMMAND_LOG}"
+printf 'wget %s args=%s\n' "$out" "$all" >> "${PMSS_TEST_COMMAND_LOG}"
 SH,
             'install' => <<<'SH'
 #!/bin/sh
@@ -254,6 +255,8 @@ SH
                 $this->assertTrue(is_string($path) && !file_exists($path), 'Callback temp must be removed');
             }
             $this->assertStringContainsString('wget ', $this->pmssReadFileOrEmpty($commandLog));
+            // A mirror that drops packets must fail in minutes, not stall the update for wget's 20 default tries.
+            $this->assertStringContainsAllStrings(['--timeout=60', '--tries=3'], $this->pmssReadFileOrEmpty($commandLog));
         });
     }
 

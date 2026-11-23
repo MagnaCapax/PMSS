@@ -62,7 +62,7 @@ function pmssCreatePrivateTempFile(string $prefix): ?string
 {
     return $GLOBALS['mode'] === 'temp' ? null : tempnam($GLOBALS['root'], $prefix);
 }
-function pmssBuildCommand(string $binary, array $arguments): string { return $arguments[2]; }
+function pmssBuildCommand(string $binary, array $arguments): string { return $arguments[array_search('-O', $arguments, true) + 1]; }
 function runStep(string $description, string $path): int
 {
     if ($GLOBALS['dryRun']) return 0;

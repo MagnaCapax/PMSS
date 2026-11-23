@@ -25,7 +25,7 @@ final class RcloneInstallerTest extends TestCase
 
         $commands = $this->pmssProfileCommands();
         $this->assertSame(2, count($commands), implode(' | ', $commands));
-        $this->assertMatches("~\Awget '-q' '-O' '([^']+)' 'https://downloads\.rclone\.org/v1\.69\.1/rclone-v1\.69\.1-linux-amd64\.zip'\z~", $commands[0]);
+        $this->assertMatches("~\Awget '-q' '--timeout=60' '--tries=3' '-O' '([^']+)' 'https://downloads\.rclone\.org/v1\.69\.1/rclone-v1\.69\.1-linux-amd64\.zip'\z~", $commands[0]);
         preg_match("~'-O' '([^']+)'~", $commands[0], $download);
         $install = (string) $this->pmssFindProfileCommand('Installing rclone 1.69.1');
         $this->assertStringContainsAndOmitsStrings(["unzip '-q' '".$download[1]."'",
