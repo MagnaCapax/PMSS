@@ -25,13 +25,11 @@ class QuotaFixGuardTest extends TestCase
     public function testQuotaCommandRunRejectsNulBeforeRunner(): void
     {
         foreach (["\0quotaoff -av", "quotaoff\0 -av", "quotaoff -av\0"] as $command) {
-            $called = false;
-            $result = \pmssQuotaCommandRun($command, static function () use (&$called): array {
-                $called = true;
-                return ['rc' => 0, 'stdout' => 'unexpected', 'stderr' => ''];
-            });
+            $called = [];
+            $result = \pmssQuotaCommandRun($command,
+                self::pmssMakeCallbacks(['command' => ['rc' => 0, 'stdout' => 'unexpected', 'stderr' => '']], $called)['command']);
 
-            $this->assertFalse($called);
+            $this->assertSame([], $called);
             $this->assertSame(['ok' => false, 'rc' => 1, 'output' => ''], $result);
         }
     }
@@ -253,10 +251,9 @@ class QuotaFixGuardTest extends TestCase
         ['dir' => $dir] = $this->pmssMountFixtureCreate('pmss-quota-check-', '');
         $commands = [];
         $logs = [];
-        $this->assertSame([], \pmssQuotaFixCheckCommands(false, static function (string $command) use (&$commands): array {
-            $commands[] = $command;
-            return ['rc' => 0, 'stdout' => "user quota on /home (/dev/md1) is off\n", 'stderr' => ''];
-        }, $this->pmssMakeArrayLogger($logs), $dir.'/missing/fstab', $dir));
+        $this->assertSame([], \pmssQuotaFixCheckCommands(false,
+            self::pmssMakeCallbacks(['command' => ['rc' => 0, 'stdout' => "user quota on /home (/dev/md1) is off\n", 'stderr' => '']], $commands)['command'],
+            $this->pmssMakeArrayLogger($logs), $dir.'/missing/fstab', $dir));
         $this->assertSame([], $commands);
         $this->assertSame(1, count($logs));
     }

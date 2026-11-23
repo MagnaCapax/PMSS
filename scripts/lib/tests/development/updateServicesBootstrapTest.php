@@ -174,12 +174,10 @@ class UpdateServicesBootstrapTest extends TestCase
             $this->assertSame(["quotaon -p '/home/test mount'"], $commands);
         }
 
-        $called = false;
-        $this->assertFalse(\pmssJournaledQuotaRemountBlocked($mount, 'noatime', static function () use (&$called): array {
-            $called = true;
-            return ['rc' => 2, 'stdout' => '', 'stderr' => ''];
-        }));
-        $this->assertFalse($called);
+        $called = [];
+        $this->assertFalse(\pmssJournaledQuotaRemountBlocked($mount, 'noatime',
+            self::pmssMakeCallbacks(['command' => ['rc' => 2, 'stdout' => '', 'stderr' => '']], $called)['command']));
+        $this->assertSame([], $called);
     }
 
     /** Exercise scripts/lib/quota/mount.php's caller with in-memory fstab and command capture. */

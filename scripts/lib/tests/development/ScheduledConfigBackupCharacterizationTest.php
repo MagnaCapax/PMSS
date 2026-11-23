@@ -48,12 +48,12 @@ PHP;
         }
         foreach ([['bad;user', $this->home, 'create'], ['fixtur01', $this->home, 'unknown'],
             ['fixtur01', $this->homeRoot.'/missing', 'create']] as [$user, $home, $action]) {
-            $called = false;
+            $called = [];
             $result = \pmssScheduledConfigBackupCustomerAction($user, $home, $action, 7,
-                static function () use (&$called): array { $called = true; return []; });
+                self::pmssMakeCallbacks(['runner' => []], $called)['runner']);
             $this->assertSame(['ok' => false, 'message' => 'scheduled backup helper command could not be built',
                 'bytes' => 0, 'path' => ''], $result);
-            $this->assertFalse($called);
+            $this->assertSame([], $called);
         }
     }
 
@@ -188,7 +188,7 @@ PHP;
         foreach (['bad;user' => 'invalid username', 'fixtur02' => 'home missing'] as $user => $message) {
             $this->assertSame(['status' => 'skipped', 'message' => $message, 'enabled' => true],
                 \pmssScheduledConfigBackupRunUser($user, ['scheduledConfigBackup' => true], [
-                    'homeRoot' => $this->homeRoot, 'userLogger' => static function (): void {},
+                    'homeRoot' => $this->homeRoot, 'userLogger' => self::pmssMakeCallbacks(['log' => null])['log'],
                     'runner' => static function (): void { throw new \LogicException('unexpected runner'); },
                 ]));
         }

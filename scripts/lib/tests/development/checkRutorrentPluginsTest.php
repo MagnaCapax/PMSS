@@ -11,10 +11,8 @@ class CheckRutorrentPluginsTest extends TestCase
     public function testSyncUserRejectsInvalidUsername(): void
     {
         $commands = array();
-        $ok = \pmssCheckRutorrentPluginsSyncUser('bad;user', 'allow=1', $this->pmssPaths(), function ($command) use (&$commands): int {
-            $commands[] = $command;
-            return 0;
-        });
+        $ok = \pmssCheckRutorrentPluginsSyncUser('bad;user', 'allow=1', $this->pmssPaths(),
+            self::pmssMakeCallbacks(['run' => 0], $commands)['run']);
 
         $this->assertTrue($ok === false);
         $this->assertEquals(array(), $commands);
@@ -47,10 +45,8 @@ class CheckRutorrentPluginsTest extends TestCase
         $this->pmssCreateUserTree('fixtur01', false, true);
 
         $commands = array();
-        $ok = \pmssCheckRutorrentPluginsSyncUser('fixtur01', "allow=1\n", $paths, function ($command) use (&$commands): int {
-            $commands[] = $command;
-            return 0;
-        });
+        $ok = \pmssCheckRutorrentPluginsSyncUser('fixtur01', "allow=1\n", $paths,
+            self::pmssMakeCallbacks(['run' => 0], $commands)['run']);
 
         $this->assertTrue($ok === true);
         $this->assertEquals(array(), $commands);

@@ -13,17 +13,14 @@ final class CliWrapperCharacterizationTest extends TestCase
         require_once $runtime;
         $original = $_SERVER['SCRIPT_FILENAME'] ?? null;
         $present = array_key_exists('SCRIPT_FILENAME', $_SERVER);
-        $called = false;
+        $called = [];
         try {
             foreach ([null, false, [], "bad\0path", "\0", ''] as $invalid) {
                 $_SERVER['SCRIPT_FILENAME'] = $invalid;
                 $this->pmssAssertNoPhpWarnings(function () use (&$called): void {
-                    \pmssRunCliEntrypoint(__FILE__, static function () use (&$called): int {
-                        $called = true;
-                        return 0;
-                    });
+                    \pmssRunCliEntrypoint(__FILE__, self::pmssMakeCallbacks(['entrypoint' => 0], $called)['entrypoint']);
                 });
-                $this->assertFalse($called);
+                $this->assertSame([], $called);
             }
         } finally {
             if ($present) $_SERVER['SCRIPT_FILENAME'] = $original;
