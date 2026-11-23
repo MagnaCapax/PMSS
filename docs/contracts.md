@@ -1819,8 +1819,8 @@ Automation often invokes these utilities; below are expected inputs and effects.
     See ADRs 0177 and 0229 for defaults, missing inputs and measurement scope.
 
 - scripts/lib/resources/metrics.php
-  - Optional UID-built hybrid `unified/user.slice/user-N.slice/io.pressure`
-    supplies some/full avg300 and total fields through shared numeric PSI
+  - Optional UID-built hybrid `unified/user.slice/user-N.slice/{io,cpu,memory}.pressure`
+    supply some/full avg300 and total fields (`<resource>_pressure_<row>_<field>`) through shared numeric PSI
     validation. Missing/malformed fields are omitted independently. Root
     injection for tests and billing's existing schema remain unchanged.
 

@@ -48,7 +48,9 @@ reaches a writer. New records carry integer `schema_version=2`; absence means 1.
 Per-account metrics optionally read a UID-built hybrid path:
 `/sys/fs/cgroup/unified/user.slice/user-N.slice/io.pressure`. Shared numeric PSI
 validation supplies `io_pressure_some_avg300`, `io_pressure_full_avg300`,
-`io_pressure_some_total` and `io_pressure_full_total`. Averages are percentages,
+`io_pressure_some_total` and `io_pressure_full_total`. The same read applies to
+the sibling `cpu.pressure` and `memory.pressure` files (`cpu_pressure_*`,
+`memory_pressure_*`), each optional, and a kernel that reports no full row for CPU leaves those fields out. Averages are percentages,
 totals are cumulative microseconds represented by the shared parser's floats.
 Absent/unreadable/malformed fields are omitted independently. The injectable
 cgroup root is retained. This is a read-only hybrid observation on production

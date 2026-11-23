@@ -125,6 +125,34 @@ class UserMetricsCollectTest extends TestCase
         }
     }
 
+    /** Per-account CPU and memory stalls persist beside I/O, each file optional (#617). */
+    public function testHybridCpuAndMemoryPressureArePersistedPerAccount(): void
+    {
+        $dir = 'unified/user.slice/user-1000.slice/';
+        $root = $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-metrics-', 0700), [
+            $dir.'io.pressure' => "some avg10=0.00 avg60=0.00 avg300=1.25 total=123\nfull avg10=0.00 avg60=0.00 avg300=0.50 total=456\n",
+            // Some kernels report no full row for CPU.
+            $dir.'cpu.pressure' => "some avg10=2.00 avg60=1.00 avg300=7.50 total=789\n",
+            $dir.'memory.pressure' => "some avg10=0.00 avg60=0.00 avg300=3.00 total=10\nfull avg10=0.00 avg60=0.00 avg300=2.00 total=20\n",
+        ]);
+        $this->assertSame([
+            'io_pressure_some_avg300' => 1.25, 'io_pressure_full_avg300' => 0.5,
+            'io_pressure_some_total' => 123.0, 'io_pressure_full_total' => 456.0,
+            'cpu_pressure_some_avg300' => 7.5, 'cpu_pressure_some_total' => 789.0,
+            'memory_pressure_some_avg300' => 3.0, 'memory_pressure_full_avg300' => 2.0,
+            'memory_pressure_some_total' => 10.0, 'memory_pressure_full_total' => 20.0,
+        ], \pmssUserMetricsCollect(1000, $root));
+        // Another account's slice never lends its files to this UID.
+        $this->assertSame([], \pmssUserMetricsCollect(1001, $root));
+
+        // One missing or malformed file drops only its own fields.
+        $root = $this->pmssWriteFiles($this->pmssMakeTempDir('pmss-metrics-', 0700), [
+            $dir.'cpu.pressure' => "some avg300=101 total=-1\n",
+            $dir.'memory.pressure' => "some avg300=4 total=9\n",
+        ]);
+        $this->assertSame(['memory_pressure_some_avg300' => 4.0, 'memory_pressure_some_total' => 9.0], \pmssUserMetricsCollect(1000, $root));
+    }
+
     public function testCollectsFullV1MetricSet(): void
     {
         $slice = 'user.slice/user-1000.slice';

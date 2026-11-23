@@ -9,7 +9,7 @@
  * readers ignore unknown keys, missing keys are simply absent (graceful absence).
  *
  * The fleet runs cgroup v1 legacy (systemd.unified_cgroup_hierarchy=0). This
- * collector reads the v1 per-controller trees and optional io.pressure from the
+ * collector reads the v1 per-controller trees and optional io/cpu/memory.pressure from the
  * hybrid unified mount. That observation does not enable v2 enforcement; hosts
  * without the unified pressure interface simply omit these metrics.
  *
@@ -36,12 +36,15 @@ function pmssUserMetricsCollect(int $uid, ?string $cgroupRoot = null): array
     // Telemetry records local memory fields and available IO, without billing's source marker.
     unset($metrics['mem_total_rss'], $metrics['mem_total_cache'], $metrics['io_source'], $metrics['io_scope']);
     $root = rtrim($cgroupRoot ?? '/sys/fs/cgroup', '/');
-    $raw = pmssReadRegularFileContents($root.'/unified/user.slice/user-'.$uid.'.slice/io.pressure');
-    if ($raw !== null) {
+    // PSI is a core cgroup file, present for every hybrid unified cgroup: io, cpu and memory stalls
+    // share one reader so per-account contention can be attributed in the same JSONL line.
+    foreach (['io', 'cpu', 'memory'] as $resource) {
+        $raw = pmssReadRegularFileContents($root.'/unified/user.slice/user-'.$uid.'.slice/'.$resource.'.pressure');
+        if ($raw === null) continue;
         foreach (['avg300', 'total'] as $field) {
             foreach (['some', 'full'] as $row) {
                 $value = pmssSystemStatsPsiMetricFromRaw($raw, $row, $field);
-                if ($value !== null) $metrics['io_pressure_'.$row.'_'.$field] = $value;
+                if ($value !== null) $metrics[$resource.'_pressure_'.$row.'_'.$field] = $value;
             }
         }
     }
