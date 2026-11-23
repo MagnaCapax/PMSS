@@ -100,13 +100,16 @@ final class QbittorrentNativeIsolationTest extends TestCase
         // These entry points have no process-injection seam; check their executable delegation only.
         $sites = [
             'scripts/changePw.php' => "pmssTorrentClientNativeStop(\$username, 'qbittorrent', 9);",
-            'scripts/lib/user/torrentPort.php' => "pmssTorrentClientNativeStop(\$user, 'qbittorrent', 9);",
+            'scripts/lib/user/torrentPort.php' => "pmssTorrentClientNativeStopWithGrace(\$user, 'qbittorrent');",
             'scripts/lib/user/qbittorrentThrottleWatchdog.php' => "pmssTorrentClientNativeStop(\$user, 'qbittorrent', 15);",
             'etc/skel/www/qbittorrent.php' => "pmssCustomerNativeStop(pmssCustomerManagedAppDefinitions()['qBittorrent']['binaries']);",
         ];
         foreach ($sites as $path => $call) {
             $this->assertStringContainsAndOmitsStrings([$call], ['killall', 'pkill'], $this->pmssReadRepoExecutableSource($path), $path);
         }
+        // The port repair's grace stop must still signal through the scoped identity stop, TERM first and KILL last.
+        $this->pmssAssertRepoFileContainsString('scripts/lib/torrentClients/identity.php',
+            'return pmssTorrentClientNativeStop($user, $client, $signal); };');
         $this->pmssAssertRepoFileContainsString('scripts/lib/user/watchdog.php',
             'pmssUserWatchdogTerminateProcesses($username, $processNames, 9);');
         $this->pmssAssertRepoFileContainsString('scripts/lib/user/qbittorrentWatchdog.php',
