@@ -110,12 +110,15 @@ $homeMetricsHtml = pmssWelcomeHomeQuotaMetricHtmlBuild($homeQuotaState, $billing
     .pmssWelcomeHomeTrafficMetricHtmlBuild($homeTrafficState, $billingServiceId)
     .pmssWelcomeHomeMemoryMetricHtmlBuild($homeMemoryState)
     .pmssWelcomeHomeServerMetricHtmlBuild();
+$homePerformanceMetricHtml = pmssWelcomeHomePerformanceMetricHtmlBuild(pmssWelcomeUserConfigNumber('cpuQuotaPercent', true),
+    pmssWelcomeUserConfigNumber('CPUWeight', true), pmssWelcomeUserConfigNumber('IOWeight', true));
+$homeMetricsHtml .= $homePerformanceMetricHtml;
 $homeFleetMetricHtml = pmssWelcomeHomeFleetMetricHtmlBuild(dirname(__DIR__), '/var/lib/pmss/public/fleetCompare.json', null, $billingServiceId);
 $homeMetricsHtml .= $homeFleetMetricHtml;
 $homeCreditsKey = pmssWelcomeHomeCreditsKeyRead(dirname(__DIR__)) !== null;
 if ($homeCreditsKey) $homeMetricsHtml .= pmssWelcomeHomeCreditsMetricHtmlBuild();
-// Card count picks the grid: 4 cards fit the base grid, 5 and 6 get their own column counts.
-$homeMetricCount = 4 + ($homeFleetMetricHtml !== '' ? 1 : 0) + ($homeCreditsKey ? 1 : 0);
+// Card count picks the grid: 4 cards fit the base grid, 5 and 6 get their own column counts, 7 wraps in the base grid.
+$homeMetricCount = 4 + ($homePerformanceMetricHtml !== '' ? 1 : 0) + ($homeFleetMetricHtml !== '' ? 1 : 0) + ($homeCreditsKey ? 1 : 0);
 $homeMetricsClass = $homeMetricCount === 5 ? ' h-m5' : ($homeMetricCount === 6 ? ' h-m6' : '');
 $homeApps = pmssWelcomeHomeAppsBuild($appsStatus, $homeAgentFirst);
 $homeAppsHtml = pmssWelcomeHomeAppsHtmlBuild($homeApps);
@@ -1511,6 +1514,26 @@ function pmssWelcomeHomeServerMetricHtmlBuild($uptimePath = '/proc/uptime')
     $uptime = isset($fields[0]) ? pmssWelcomeServerUptimeTextBuild($fields[0]) : null;
     return pmssWelcomeHomeMetricHtmlBuild('Server', is_string($uptime) && $uptime !== '' ? pmssWelcomeHtmlAttr($uptime) : '—', '', array(),
         is_string($uptime) && $uptime !== '' ? 'uptime · shared server' : 'uptime unavailable');
+}
+
+/**
+ * The account's configured CPU limit and CPU / disk I/O priority, from the values the account tools persist in
+ * ~/.config/pmss-user.json. A missing, zero or non-numeric value (no limit, "infinity", an older account) hides its part;
+ * with no part left there is no card.
+ */
+function pmssWelcomeHomePerformanceMetricHtmlBuild($cpuQuotaPercent, $cpuWeight, $ioWeight)
+{
+    $quota = pmssCustomerNonnegativeFloat($cpuQuotaPercent);
+    $threads = $quota !== null && $quota > 0 ? rtrim(rtrim(number_format($quota / 100, 1, '.', ''), '0'), '.') : '';
+    $priorities = array();
+    foreach (array('CPU priority' => $cpuWeight, 'disk I/O priority' => $ioWeight) as $label => $value) {
+        $value = pmssCustomerNonnegativeFloat($value);
+        if ($value !== null && $value > 0) $priorities[] = $label.' '.(int) $value;
+    }
+    if ($threads === '' && $priorities === array()) return '';
+    return pmssWelcomeHomeMetricHtmlBuild('CPU and disk', $threads !== '' ? $threads : '—', $threads !== '' ? ($threads === '1' ? 'CPU thread' : 'CPU threads') : '', array(),
+        $priorities === array() ? 'CPU limit of this account' : implode(' · ', $priorities).' · counts when the server is busy',
+        'Priority only matters when the server is busy. A higher CPU limit can only use cores the server has.');
 }
 
 /**
