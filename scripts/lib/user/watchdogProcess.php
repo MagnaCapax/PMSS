@@ -130,6 +130,29 @@ function pmssUserWatchdogProcStartTime(string $procRoot, string $pid): ?int
     return is_int($mtime) ? $mtime : null;
 }
 
+/**
+ * SIGTERM each process in order, give them up to about ten seconds to exit, then SIGKILL what is left.
+ * A daemon killed mid-write leaves its data to be re-checked or lost, so the hard kill is the last step.
+ *
+ * @param array<int,string> $processNames
+ * @param array{terminate?:callable,running?:callable,pause?:callable,attempts?:int} $ops
+ */
+function pmssUserWatchdogTerminateProcessesWithGrace(string $username, array $processNames, array $ops = []): void
+{
+    $terminate = $ops['terminate'] ?? 'pmssUserWatchdogTerminateProcesses';
+    $running = $ops['running'] ?? 'pmssUserWatchdogProcessRunning';
+    $pause = $ops['pause'] ?? static function (): void { usleep(250000); };
+    $attempts = $ops['attempts'] ?? 40;
+    $terminate($username, $processNames, 15);
+    $left = $processNames;
+    for ($i = 0; $i <= $attempts; $i++) {
+        $left = array_values(array_filter($left, static function ($name) use ($running, $username): bool { return $running($username, $name); }));
+        if ($left === [] || $i === $attempts) break;
+        $pause();
+    }
+    if ($left !== []) $terminate($username, $left, 9);
+}
+
 /** @param array<int,string> $processNames */
 function pmssUserWatchdogRestartProcessesIf(string $username, bool $running, array $processNames, callable $restartNeeded, string $userLogMessage, int $signal = 9, ?callable $terminator = null): bool
 {

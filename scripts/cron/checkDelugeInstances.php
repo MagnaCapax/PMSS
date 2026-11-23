@@ -32,7 +32,7 @@ pmssUserWatchdogRunService('Deluge', 'delugeEnable', ['deluged', 'deluge-web'], 
     $delugedRunning = pmssUserWatchdogRestartProcessesIf($thisUser, $running, ['deluged', 'deluge-web'], static function () use ($thisUser): bool { return function_exists('pmssDelugeUploadThrottleNeedsUpdate') && pmssDelugeUploadThrottleNeedsUpdate($thisUser); }, 'deluge restarted to apply upload throttle', 9, static function () use ($thisUser): void {
         $daemon = pmssTorrentClientNativeStopPids($thisUser, 'deluge', ['storeOnly' => true]);
         $web = pmssTorrentClientNativeStopPids($thisUser, 'deluge', ['storeOnly' => true, 'processName' => 'deluge-web']);
-        if ($daemon === [] && $web === []) { pmssUserWatchdogTerminateProcesses($thisUser, ['deluged', 'deluge-web'], 9); return; }
+        if ($daemon === [] && $web === []) { pmssUserWatchdogTerminateProcessesWithGrace($thisUser, ['deluged', 'deluge-web']); return; }
         pmssTorrentClientNativeStop($thisUser, 'deluge', 15, ['storeOnly' => true]);
         pmssTorrentClientNativeStop($thisUser, 'deluge', 15, ['storeOnly' => true, 'processName' => 'deluge-web']);
     });
