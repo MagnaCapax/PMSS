@@ -69,6 +69,34 @@ function pmssPanelSessionLoginMain(): int
     return 0;
 }
 
+function pmssPanelSessionRenderLogoutForm(string $username, string $csrf): string
+{
+    $action = '/user-'.$username.'/panelSessionLogout.php';
+
+    return '<!doctype html><html><head><meta charset="utf-8"><title>Sign out</title>'
+        .'<meta name="viewport" content="width=device-width,initial-scale=1">'
+        .'<style>body{font:16px/1.4 system-ui,sans-serif;margin:0;display:grid;place-items:center;min-height:100vh;background:#f6f7f8;color:#111827}'
+        .'form{width:min(24rem,calc(100vw - 2rem));background:#fff;border:1px solid #d1d5db;border-radius:6px;padding:1.25rem}'
+        .'button{display:block;width:100%;margin-top:1rem;padding:.7rem;border:0;border-radius:4px;background:#14532d;color:#fff;font-weight:700}</style>'
+        .'</head><body><form method="post" action="'.pmssPanelSessionHtml($action).'">'
+        .'<h1>'.pmssPanelSessionHtml($username).' panel</h1>'
+        .'<input type="hidden" name="csrf" value="'.pmssPanelSessionHtml($csrf).'">'
+        .'<button type="submit">Sign out</button></form></body></html>';
+}
+
+/** Stop the account's agent web UIs and rotate their sessions; runs only after a verified sign-out. */
+function pmssPanelSessionLogoutStopAgents(array $paths): void
+{
+    $hermes = $paths['home'].'/bin/install-hermes';
+    if (is_file($hermes) && !is_link($hermes) && is_executable($hermes))
+        exec(escapeshellarg($hermes).' rotate-session >/dev/null 2>&1');
+    $pikkumiesHermes = $paths['home'].'/bin/pikkumiesHermesUi.php';
+    if (is_file($pikkumiesHermes) && !is_link($pikkumiesHermes)) {
+        exec('HOME='.escapeshellarg($paths['home']).' /usr/bin/php '.escapeshellarg($pikkumiesHermes).' stop-simplified >/dev/null 2>&1');
+        exec('HOME='.escapeshellarg($paths['home']).' /usr/bin/php '.escapeshellarg($pikkumiesHermes).' rotate-session >/dev/null 2>&1');
+    }
+}
+
 function pmssPanelSessionLogoutMain(): int
 {
     $paths = pmssPanelSessionPaths();
@@ -79,19 +107,18 @@ function pmssPanelSessionLogoutMain(): int
         return 1;
     }
 
-    pmssPanelSessionDelete($paths);
-    $hermes = $paths['home'].'/bin/install-hermes';
-    if (is_file($hermes) && !is_link($hermes) && is_executable($hermes))
-        exec(escapeshellarg($hermes).' rotate-session >/dev/null 2>&1');
-    $pikkumiesHermes = $paths['home'].'/bin/pikkumiesHermesUi.php';
-    if (is_file($pikkumiesHermes) && !is_link($pikkumiesHermes)) {
-        exec('HOME='.escapeshellarg($paths['home']).' /usr/bin/php '.escapeshellarg($pikkumiesHermes).' stop-simplified >/dev/null 2>&1');
-        exec('HOME='.escapeshellarg($paths['home']).' /usr/bin/php '.escapeshellarg($pikkumiesHermes).' rotate-session >/dev/null 2>&1');
+    // Logout acts only for the session owner (live cookie) on a POST that carries the session's CSRF token.
+    $result = pmssPanelSessionLogoutAttempt((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'), $_COOKIE, $_POST, $paths, $username, time());
+    pmssPanelSessionEmitHeaders((array) $result['headers'], (int) $result['status']);
+    if (!empty($result['done'])) {
+        pmssPanelSessionLogoutStopAgents($paths);
+        return 0;
     }
-    pmssPanelSessionLog($paths, 'logout status=ok');
-    pmssPanelSessionEmitHeaders([
-        'Set-Cookie' => pmssPanelSessionCookieDeleteHeader($username),
-        'Location' => '/user-'.$username.'/panelSessionLogin.php',
-    ], 302);
+    if ((int) $result['status'] === 200) {
+        echo pmssPanelSessionRenderLogoutForm($username, (string) $result['csrf']);
+    } elseif ((int) $result['status'] === 403) {
+        echo 'Invalid request token';
+        return 1;
+    }
     return 0;
 }

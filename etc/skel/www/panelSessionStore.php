@@ -137,3 +137,21 @@ function pmssPanelSessionFailedIncrement(array $paths, ?int $now = null): int
 
     return (int) $session['failed'];
 }
+
+/**
+ * True when the stored session is live for this cookie id: same id match and the same absolute
+ * and idle lifetimes as the Lua gate's session_valid().
+ */
+function pmssPanelSessionCookieValid(array $session, string $cookieId, int $now): bool
+{
+    $id = pmssPanelSessionHexOrEmpty($session['id'] ?? '');
+    $created = pmssPanelSessionIntOrZero($session['created'] ?? 0);
+    $seen = pmssPanelSessionIntOrZero($session['seen'] ?? 0);
+    if ($id === '' || $created === 0 || $seen === 0 || !hash_equals($id, $cookieId)) {
+        return false;
+    }
+
+    return $now >= $created && $now >= $seen
+        && $now - $created <= PMSS_PANEL_SESSION_ABSOLUTE_LIFETIME
+        && $now - $seen <= PMSS_PANEL_SESSION_IDLE_TIMEOUT;
+}

@@ -164,3 +164,34 @@ function pmssPanelSessionLoginAttempt(array $request, array $paths, string $user
         'failed' => 0,
     ];
 }
+
+/**
+ * Decide a logout request. The login page is public, so its CSRF token is no proof of a session:
+ * only a live session cookie makes the request the owner's. Without one nothing changes (and no
+ * cookie is cleared, so a cross-site request cannot end the owner's browser session); a GET only
+ * shows the sign-out form; a POST also needs the session's CSRF token.
+ *
+ * @return array{status:int,headers:array,done:bool,csrf:string}
+ */
+function pmssPanelSessionLogoutAttempt(string $method, array $cookies, array $request, array $paths, string $username, int $now): array
+{
+    $login = '/user-'.$username.'/panelSessionLogin.php';
+    $session = pmssPanelSessionRead($paths);
+    $cookie = isset($cookies[PMSS_PANEL_SESSION_COOKIE]) && is_string($cookies[PMSS_PANEL_SESSION_COOKIE]) ? $cookies[PMSS_PANEL_SESSION_COOKIE] : '';
+    if (!pmssPanelSessionCookieValid($session, $cookie, $now)) {
+        return ['status' => 302, 'headers' => ['Location' => $login], 'done' => false, 'csrf' => ''];
+    }
+    if ($method !== 'POST') {
+        return ['status' => 200, 'headers' => [], 'done' => false, 'csrf' => pmssPanelSessionHexOrEmpty($session['csrf'] ?? '')];
+    }
+    $csrf = isset($request['csrf']) && is_string($request['csrf']) ? $request['csrf'] : '';
+    if (!pmssPanelSessionCsrfValid($session, $csrf)) {
+        pmssPanelSessionLog($paths, 'logout status=fail reason=csrf');
+        return ['status' => 403, 'headers' => [], 'done' => false, 'csrf' => ''];
+    }
+
+    pmssPanelSessionDelete($paths);
+    pmssPanelSessionLog($paths, 'logout status=ok');
+    return ['status' => 302, 'headers' => ['Set-Cookie' => pmssPanelSessionCookieDeleteHeader($username), 'Location' => $login],
+        'done' => true, 'csrf' => ''];
+}

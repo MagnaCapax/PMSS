@@ -183,4 +183,84 @@ class PanelSessionCustomerLoginTest extends TestCase
         $this->assertSame('/user-fixtur01/', \pmssPanelSessionReturnUrl('fixtur01', 'https://example.test/user-fixtur01/'));
         $this->assertSame('/user-fixtur01/', \pmssPanelSessionReturnUrl('fixtur01', "//example.test/user-fixtur01/"));
     }
+
+    /** Write a live logged-in session and return [session id, csrf token]. */
+    private function liveSession(array $paths, int $created, int $seen): array
+    {
+        $session = ['id' => str_repeat('a', 64), 'csrf' => str_repeat('b', 64), 'created' => $created, 'seen' => $seen, 'failed' => 0];
+        $this->assertTrue(\pmssPanelSessionWrite($paths, $session));
+        return [$session['id'], $session['csrf']];
+    }
+
+    public function testLogoutWithoutLiveSessionCookieChangesNothing(): void
+    {
+        // The login page is public and shows the live session's CSRF token, so the token alone proves nothing.
+        $paths = $this->fixturePaths();
+        $now = 1700000000;
+        [$id, $csrf] = $this->liveSession($paths, $now - 600, $now - 60);
+        $before = file_get_contents($paths['session']);
+        $cases = [
+            'no cookie, GET' => ['GET', [], []],
+            'no cookie, POST with the live token' => ['POST', [], ['csrf' => $csrf]],
+            'wrong cookie, POST with the live token' => ['POST', ['pmss_panel_session' => str_repeat('c', 64)], ['csrf' => $csrf]],
+            'malformed cookie' => ['POST', ['pmss_panel_session' => 'deleted'], ['csrf' => $csrf]],
+            'array cookie' => ['POST', ['pmss_panel_session' => [$id]], ['csrf' => $csrf]],
+        ];
+        foreach ($cases as $label => [$method, $cookies, $request]) {
+            $result = \pmssPanelSessionLogoutAttempt($method, $cookies, $request, $paths, 'fixtur01', $now);
+            $this->assertSame(302, $result['status'], $label);
+            $this->assertSame(['Location' => '/user-fixtur01/panelSessionLogin.php'], $result['headers'], $label.' must not clear the owner cookie');
+            $this->assertFalse($result['done'], $label);
+            $this->assertSame($before, file_get_contents($paths['session']), $label.' must leave the session alone');
+        }
+    }
+
+    public function testLogoutIgnoresExpiredSessions(): void
+    {
+        $paths = $this->fixturePaths();
+        $now = 1700000000;
+        foreach ([[$now - 40000, $now - 60], [$now - 4000, $now - 1801]] as [$created, $seen]) {
+            [$id, $csrf] = $this->liveSession($paths, $created, $seen);
+            $result = \pmssPanelSessionLogoutAttempt('POST', ['pmss_panel_session' => $id], ['csrf' => $csrf], $paths, 'fixtur01', $now);
+            $this->assertSame(302, $result['status']);
+            $this->assertFalse($result['done']);
+            $this->assertTrue(is_file($paths['session']));
+        }
+    }
+
+    public function testLogoutGetShowsTheFormAndPostNeedsTheSessionToken(): void
+    {
+        $paths = $this->fixturePaths();
+        $now = 1700000000;
+        [$id, $csrf] = $this->liveSession($paths, $now - 600, $now - 60);
+        $cookies = ['pmss_panel_session' => $id];
+
+        $get = \pmssPanelSessionLogoutAttempt('GET', $cookies, [], $paths, 'fixtur01', $now);
+        $this->assertSame(200, $get['status']);
+        $this->assertSame($csrf, $get['csrf']);
+        $this->assertFalse($get['done']);
+        $this->assertTrue(is_file($paths['session']));
+
+        foreach ([[], ['csrf' => 'wrong'], ['csrf' => [$csrf]]] as $request) {
+            $post = \pmssPanelSessionLogoutAttempt('POST', $cookies, $request, $paths, 'fixtur01', $now);
+            $this->assertSame(403, $post['status']);
+            $this->assertFalse($post['done']);
+            $this->assertTrue(is_file($paths['session']));
+        }
+    }
+
+    public function testOwnerLogoutDeletesTheSessionAndClearsTheCookie(): void
+    {
+        $paths = $this->fixturePaths();
+        $now = 1700000000;
+        [$id, $csrf] = $this->liveSession($paths, $now - 600, $now - 60);
+
+        $result = \pmssPanelSessionLogoutAttempt('POST', ['pmss_panel_session' => $id], ['csrf' => $csrf], $paths, 'fixtur01', $now);
+
+        $this->assertSame(302, $result['status']);
+        $this->assertTrue($result['done']);
+        $this->assertSame('/user-fixtur01/panelSessionLogin.php', $result['headers']['Location']);
+        $this->assertStringContainsString('Max-Age=0', $result['headers']['Set-Cookie']);
+        $this->assertFalse(file_exists($paths['session']));
+    }
 }

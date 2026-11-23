@@ -54,6 +54,14 @@ login, so Configure saves and opt-in session login work before the next password
 change writes a bcrypt entry. Unsuspend continues to copy the shadow
 hash verbatim; its compatibility with every reader requires separate validation.
 
+Logout acts only for the session owner (Amended 2026-11): the logout page stays a
+public handler in the Lua gate so a signed-in owner can reach it, and it checks
+for itself. Without a live session cookie it redirects to the login page and
+changes nothing; a GET with one shows a sign-out form; only a POST with the live
+cookie and the session's CSRF token deletes the session, clears the cookie and
+stops the account's agent web UIs. The login page is public and shows the live
+session's CSRF token, so that token alone is no proof of a session.
+
 ## Invariants
 - **Off by default is byte-identical:** absent/false `panelSessionLogin` must
   render the same per-user lighttpd config bytes as before this ADR.
