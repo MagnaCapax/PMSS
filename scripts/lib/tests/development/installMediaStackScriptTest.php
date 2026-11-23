@@ -1568,9 +1568,9 @@ LIGHTTPD;
         $this->assertSame($withoutJellyfin, (string) file_get_contents($home.'/.lighttpd/custom.d/media-stack-not-installed.conf'));
 
         $this->assertOrderedStrings(array(
-            'Location rewriting belongs here via map-urlpath. Set-Cookie',
-            'Path rewriting stays in nginx proxy_cookie_path rules',
-            'map-urlpath does not rewrite Set-Cookie.',
+            'Location rewriting belongs here via map-urlpath. map-urlpath',
+            'also reverse-maps the Set-Cookie Path to the short /<app> form; nginx',
+            'proxy_cookie_path restores the external prefix, which only nginx knows.',
             '"^/autobrr$" => "/public-fixtur01/autobrr/"',
             '"^/radarr$" => "/public-fixtur01/radarr/"',
             '"^/sonarr$" => "/public-fixtur01/sonarr/"',
