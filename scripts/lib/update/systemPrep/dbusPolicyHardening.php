@@ -109,6 +109,18 @@ function pmssSystemdDbusDisclosureArtifacts(): array
                 ."# Managed by scripts/lib/update/systemPrep/dbusPolicyHardening.php; edits are overwritten.\n"
                 ."d /run/systemd/sessions 0750 root root -\n",
         ],
+        [
+            'kind' => 'logind',
+            'basename' => '10-pmss-run-directory-mode.conf',
+            'label' => 'logind runtime directory mode drop-in',
+            'content' => "# PMSS-managed: systemd 247+ logind resets its /run/systemd directories to 0755 on every start.\n"
+                ."# Keep them 0750 (UID->username map, per-session client IPs). With 0750 and no messagebus ACL on\n"
+                ."# /run/systemd/users logind itself cannot start, so the ACL is re-applied before every start.\n"
+                ."# Managed by scripts/lib/update/systemPrep/dbusPolicyHardening.php; edits are overwritten.\n"
+                ."[Service]\n"
+                ."RuntimeDirectoryMode=0750\n"
+                ."ExecStartPre=-/bin/systemd-tmpfiles --create /etc/tmpfiles.d/pmss-run-systemd-users.conf\n",
+        ],
     ];
 }
 
@@ -121,7 +133,12 @@ function pmssSystemdDbusDisclosureArtifacts(): array
 function pmssEnsureSystemdDbusDisclosureHardening(?callable $logger = null): void
 {
     $log = $logger ?: 'logMessage';
+    $logindArtifacts = [];
     foreach (pmssSystemdDbusDisclosureArtifacts() as $artifact) {
+        if ($artifact['kind'] === 'logind') {
+            $logindArtifacts[] = $artifact;
+            continue;
+        }
         if ($artifact['kind'] === 'dbus') {
             $dir = pmssResolvePathFromEnv('PMSS_DBUS_SYSTEM_POLICY_DIR', '/etc/dbus-1/system.d');
             $directoryFailure = '[WARN] Unable to create D-Bus system policy directory: '.$dir;
@@ -149,6 +166,58 @@ function pmssEnsureSystemdDbusDisclosureHardening(?callable $logger = null): voi
             continue;
         }
 
-        // The tmpfiles file is installed only; it is not applied to the live directory here.
+        // The tmpfiles files are installed here; pmssApplyRunSystemdDirectoryPolicy() applies them to the live directories.
     }
+    $aclProven = pmssApplyRunSystemdDirectoryPolicy($log);
+    foreach ($logindArtifacts as $artifact) {
+        // The drop-in keeps 0750 across logind starts, which only works where the messagebus ACL is proven on this host.
+        if (!$aclProven) {
+            $log('[WARN] Skipping '.$artifact['label'].': the messagebus ACL on /run/systemd/users is not proven on this host');
+            continue;
+        }
+        $dir = pmssResolvePathFromEnv('PMSS_LOGIND_DROPIN_DIR', '/etc/systemd/system/systemd-logind.service.d');
+        $target = $dir.'/'.$artifact['basename'];
+        if (!pmssInstallManagedPathFile($target, $artifact['content'], $artifact['label'], $log, [
+            'directoryFailureMessage' => '[WARN] Unable to create logind drop-in directory: '.$dir,
+        ])) {
+            continue;
+        }
+        if (!pmssSystemdActionSkip(pmssSystemdActionSkipReason(null, true, true), 'Reloading systemd for '.$artifact['label'])) {
+            runStep('Reloading systemd to read '.$artifact['label'], 'systemctl daemon-reload');
+        }
+    }
+}
+
+/**
+ * Apply the installed tmpfiles policies to the live /run/systemd directories.
+ *
+ * logind resets the modes on every start, so the policy is re-asserted on every run. The users directory goes
+ * first, because 0750 without the messagebus ACL stops logind from starting (GH mcxVainamoinen#1606, reproduced
+ * on Debian 11): when the ACL is not there afterwards the mode is put back to 0755 and a warning is logged.
+ * Returns true when the users directory is 0750 with the ACL on this host (or, in test and dry runs where nothing is applied,
+ * when the users policy file is installed), which is the proof the logind drop-in needs.
+ */
+function pmssApplyRunSystemdDirectoryPolicy(callable $log): bool
+{
+    $dir = pmssResolvePathFromEnv('PMSS_TMPFILES_DIR', '/etc/tmpfiles.d');
+    $usersPolicy = $dir.'/pmss-run-systemd-users.conf';
+    if (pmssSystemdActionSkip(pmssSystemdActionSkipReason(null, true, true), 'Applying /run/systemd directory policy')) {
+        return is_file($usersPolicy);
+    }
+    $proven = false;
+    if (is_file($usersPolicy) && is_dir('/run/systemd/users')) {
+        runStep('Applying /run/systemd/users policy', 'systemd-tmpfiles --create '.escapeshellarg($usersPolicy));
+        $listing = (string) @shell_exec('ls -ld /run/systemd/users 2>/dev/null');
+        if (preg_match('/^drwxr-x---(\\+)\\s/', $listing) === 1) {
+            $proven = true;
+        } else {
+            @chmod('/run/systemd/users', 0755);
+            $log('[WARN] /run/systemd/users is not 0750 with the messagebus ACL after the policy run: mode put back to 0755');
+        }
+    }
+    $sessionsPolicy = $dir.'/pmss-run-systemd-sessions.conf';
+    if (is_file($sessionsPolicy) && is_dir('/run/systemd/sessions')) {
+        runStep('Applying /run/systemd/sessions policy', 'systemd-tmpfiles --create '.escapeshellarg($sessionsPolicy));
+    }
+    return $proven;
 }

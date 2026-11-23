@@ -16,15 +16,17 @@ class DbusPolicyHardeningTest extends TestCase
     {
         $dbusDir = $this->pmssMakeTempDir('pmss-dbus-policy-', 0700);
         $tmpfilesDir = $this->pmssMakeTempDir('pmss-tmpfiles-', 0700);
+        $logindDir = $this->pmssMakeTempDir('pmss-logind-', 0700);
         $this->pmssTrackEnvOverrides([
             'PMSS_DBUS_SYSTEM_POLICY_DIR' => $dbusDir,
             'PMSS_TMPFILES_DIR' => $tmpfilesDir,
+            'PMSS_LOGIND_DROPIN_DIR' => $logindDir,
         ], true);
 
         \pmssEnsureSystemdDbusDisclosureHardening(self::pmssMakeCallbacks(['log' => null])['log']);
 
         $bodies = [];
-        foreach ([$dbusDir, $tmpfilesDir] as $dir) {
+        foreach ([$dbusDir, $tmpfilesDir, $logindDir] as $dir) {
             foreach (array_diff(scandir($dir) ?: [], ['.', '..']) as $basename) {
                 $body = @file_get_contents($dir.'/'.$basename);
                 $this->assertTrue(is_string($body), 'artifact installed: '.$basename);
@@ -42,6 +44,7 @@ class DbusPolicyHardeningTest extends TestCase
             '10-pmss-login1-restrict.conf' => [1102, 'bcda38506feaf4553b1afe7bdc7a65fa070f8bc376f8524284af07f7649adc4d'],
             'pmss-run-systemd-users.conf' => [442, 'd1e62264790cbb59e074c1345f20cf2ae967bd31c48e761e452fa00cdfb3a16e'],
             'pmss-run-systemd-sessions.conf' => [238, 'b672da9aafb26c4391db5e57d63f4b6038a22c00817f5cb5374173d8c5c74e30'],
+            '10-pmss-run-directory-mode.conf' => [503, '6272c84f31873df764c527f00fa05e1527ecb23d69b6ee9c54af147aa840d7c7'],
         ];
 
         $expectedNames = array_keys($snapshots);
@@ -128,8 +131,47 @@ class DbusPolicyHardeningTest extends TestCase
 
         $secondRun = [];
         \pmssEnsureSystemdDbusDisclosureHardening($this->pmssMakeArrayLogger($secondRun));
-        foreach (['systemd1 D-Bus enumeration policy', 'logind D-Bus enumeration policy', '/run/systemd/users tmpfiles policy', '/run/systemd/sessions tmpfiles policy'] as $label) {
+        foreach (['systemd1 D-Bus enumeration policy', 'logind D-Bus enumeration policy', '/run/systemd/users tmpfiles policy', '/run/systemd/sessions tmpfiles policy', 'logind runtime directory mode drop-in'] as $label) {
             $this->pmssAssertMessagesContain($secondRun, $label.' already present and up to date', 'idempotent skip: '.$label);
         }
+    }
+
+    public function testLogindDropinKeepsModeAndRepairsTheAclBeforeEveryStart(): void
+    {
+        $body = $this->installDisclosureArtifacts()['10-pmss-run-directory-mode.conf'];
+        $lines = array_values(array_filter(explode("\n", $body), static function (string $line): bool {
+            return $line !== '' && $line[0] !== '#';
+        }));
+        $this->assertSame([
+            '[Service]',
+            'RuntimeDirectoryMode=0750',
+            'ExecStartPre=-/bin/systemd-tmpfiles --create /etc/tmpfiles.d/pmss-run-systemd-users.conf',
+        ], $lines);
+    }
+
+    public function testLogindDropinComesAfterThePolicyThatCarriesTheAcl(): void
+    {
+        $order = array_column(\pmssSystemdDbusDisclosureArtifacts(), 'basename');
+        $this->assertTrue(array_search('10-pmss-run-directory-mode.conf', $order, true) > array_search('pmss-run-systemd-users.conf', $order, true), 'drop-in is registered after the users tmpfiles policy');
+    }
+
+    public function testLogindDropinIsNotInstalledWithoutTheUsersPolicy(): void
+    {
+        // Negative control: 0750 without the messagebus ACL stops logind from starting, so the drop-in needs the users policy.
+        $root = $this->pmssMakeTempDir('pmss-nopolicy-', 0700);
+        file_put_contents($root.'/blocker', 'a file where the tmpfiles directory would be created');
+        $logindDir = $root.'/logind.service.d';
+        mkdir($logindDir, 0700);
+        $this->pmssTrackEnvOverrides([
+            'PMSS_DBUS_SYSTEM_POLICY_DIR' => $this->pmssMakeTempDir('pmss-dbus-policy-', 0700),
+            'PMSS_TMPFILES_DIR' => $root.'/blocker/tmpfiles.d',
+            'PMSS_LOGIND_DROPIN_DIR' => $logindDir,
+        ], true);
+
+        $messages = [];
+        \pmssEnsureSystemdDbusDisclosureHardening($this->pmssMakeArrayLogger($messages));
+
+        $this->assertSame([], array_values(array_diff(scandir($logindDir) ?: [], ['.', '..'])), 'no drop-in without the users policy');
+        $this->pmssAssertMessagesContain($messages, 'Skipping logind runtime directory mode drop-in', 'skip is logged');
     }
 }
