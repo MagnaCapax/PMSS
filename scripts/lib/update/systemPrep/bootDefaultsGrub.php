@@ -35,20 +35,26 @@ function pmssBootDefaultsEnsureGrubSettings(array &$lines, array $requiredGrubSe
     return $changed;
 }
 
-/** Add BPF to the built-in LSM defaults without losing explicit boot selections. */
+/** Add BPF to running or target kernel defaults without losing explicit boot selections. */
 function pmssBootDefaultsEnsureBpfLsm(
     array &$lines,
     string $grubPath,
     callable $log,
     ?string $kernelConfigPath = null,
-    ?string $lsmPath = null
+    ?string $lsmPath = null,
+    bool $targetKernel = false
 ): bool {
-    $lsmPath = $lsmPath ?? pmssResolvePathFromEnv('PMSS_SECURITY_LSM_PATH', '/sys/kernel/security/lsm');
-    if ($lsmPath === '' || strpos($lsmPath, "\0") !== false) return false;
-    $active = @file_get_contents($lsmPath);
-    if (!is_string($active) || strpos($active, "\0") !== false
-        || preg_match('/^[a-z0-9_]+(?:,[a-z0-9_]+)*$/D', trim($active)) !== 1
-        || in_array('bpf', explode(',', trim($active)), true)) return false;
+    // A newly installed kernel needs preparation even if the running one has BPF active.
+    if (!$targetKernel) {
+        $lsmPath = $lsmPath ?? pmssResolvePathFromEnv('PMSS_SECURITY_LSM_PATH', '/sys/kernel/security/lsm');
+        if ($lsmPath === '' || strpos($lsmPath, "\0") !== false) return false;
+        $active = @file_get_contents($lsmPath);
+        if (!is_string($active) || strpos($active, "\0") !== false
+            || preg_match('/^[a-z0-9_]+(?:,[a-z0-9_]+)*$/D', trim($active)) !== 1
+            || in_array('bpf', explode(',', trim($active)), true)) return false;
+    } elseif ($kernelConfigPath === null) {
+        return false;
+    }
 
     $kernelConfigPath = $kernelConfigPath ?? '/boot/config-'.php_uname('r');
     if ($kernelConfigPath === '' || strpos($kernelConfigPath, "\0") !== false) return false;

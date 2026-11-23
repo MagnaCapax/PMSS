@@ -103,4 +103,44 @@ PHP
             $this->assertSame(['/sys/kernel/security/lsm', '/boot/config-fixture-release'], $result[2]);
         }
     }
+
+    public function testTargetConfigIgnoresRunningLsmButRetainsSelectionRules(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-boot-bpf-target-', 0700);
+        $this->pmssWriteFiles($dir, [
+            'lsm' => "capability,bpf\n",
+            'config' => 'CONFIG_BPF_LSM=y'."\nCONFIG_LSM=\"".self::DEFAULTS."\"\n",
+        ]);
+        foreach ([
+            ['quiet', self::DEFAULTS.',bpf'],
+            ['quiet lsm=selinux,apparmor', 'selinux,apparmor,landlock,lockdown,yama,integrity,bpf'],
+            ['quiet lsm=apparmor,bpf', 'apparmor,bpf,landlock,lockdown,yama,integrity'],
+            ['security=selinux', 'selinux,'.self::DEFAULTS.',bpf'],
+            ['quiet lsm=$other', null],
+            ['quiet lsm=', null],
+        ] as [$options, $expected]) {
+            $input = ['GRUB_CMDLINE_LINUX_DEFAULT="'.$options.'"'];
+            $lines = $input;
+            $messages = [];
+            $log = $this->pmssMakeArrayLogger($messages);
+            // The existing caller must still no-op on an already active BPF LSM.
+            $this->assertFalse(\pmssBootDefaultsEnsureBpfLsm($lines, '/fixture/grub', $log, $dir.'/config', $dir.'/lsm'));
+            $this->assertSame($input, $lines);
+            $this->assertSame([], $messages);
+            $this->assertSame($expected !== null,
+                \pmssBootDefaultsEnsureBpfLsm($lines, '/fixture/grub', $log, $dir.'/config', $dir.'/absent', true));
+            if ($expected === null) $this->assertSame($input, $lines);
+            else {
+                $this->assertStringContainsString('lsm='.$expected, implode("\n", $lines));
+                $this->assertFalse(\pmssBootDefaultsEnsureBpfLsm($lines, '/fixture/grub', $log, $dir.'/config', null, true));
+            }
+        }
+        foreach ([null, '', $dir.'/missing', $dir."/config\0", $dir.'/unsupported'] as $path) {
+            $this->pmssWriteFile($dir.'/unsupported', 'CONFIG_BPF_LSM=n');
+            $lines = ['GRUB_CMDLINE_LINUX_DEFAULT="quiet"'];
+            $input = $lines;
+            $this->assertFalse(\pmssBootDefaultsEnsureBpfLsm($lines, '/fixture/grub', static function ($message) {}, $path, null, true));
+            $this->assertSame($input, $lines);
+        }
+    }
 }

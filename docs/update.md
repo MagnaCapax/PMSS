@@ -270,6 +270,24 @@ write and `update-grub` safeguards apply; activation requires the next boot.
 Missing or malformed observations leave the LSM boot options unchanged. See
 [ADR 0323](adr/0323-bpf-lsm-boot-defaults.md) for validation and rollback.
 
+Immediately before boot defaults, Debian 12 hosts receive the SHA-256-pinned
+7.3.4 kernel package through the verified remote-deb installer (soft-fail,
+[ADR 0324](adr/0324-pinned-kernel-delivery.md)). Existing pinned versions,
+kernel safety holds, non-WireGuard DKMS registrations and insufficient space
+skip delivery with one reason. The step refuses installation without the #1303
+BPF-LSM planner. It prepares first-boot `lsm=` from the installed kernel's
+config through the same managed-write gate, then checks image/initrd/menu
+artifacts. `GRUB_DEFAULT` pins are logged and retained. It neither reboots nor
+removes kernels; activation is a separate operator operation. A stopped trial's
+manual rollback first writes `/etc/seedbox/config/kernel-pin-hold` so a later
+update cannot reinstall it.
+
+Hermetic fixtures can override `PMSS_OS_RELEASE_PATH` and
+`PMSS_KERNEL_PIN_BOOT_PATH`, `PMSS_KERNEL_PIN_ROOT_PATH`,
+`PMSS_KERNEL_PIN_HOLD_PATH`, `PMSS_KERNEL_PIN_DKMS_PATH` and
+`PMSS_KERNEL_PIN_GRUB_PATH`; package and free-space probes are intercepted in
+child fixtures. These path overrides are test seams, not cgroup policy knobs.
+
 Environment hints captured by `install.sh` are passed via `PMSS_HOSTNAME`,
 `PMSS_SKIP_HOSTNAME`, `PMSS_QUOTA_MOUNT`, and `PMSS_SKIP_QUOTA`; phase 2 honors
 those flags when reapplying legacy hostname/quota defaults. Optional hardening

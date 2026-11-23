@@ -45,7 +45,9 @@ disk, not a seedbox under real load.
   `/sys/fs/cgroup/blkio/blkio.throttle.read_iops_device` exist. In that case `auto` acts
   as `enforce`; otherwise it acts as `off`, and the existing `off` path clears dynamic caps.
 - `off` and `enforce` keep their meaning.
-- Installing a kernel is a separate host operation, not part of PMSS. The first hosts to
+- Installing a trial kernel is a separate host operation. Fleet installation is
+  specified by [ADR 0324](0324-pinned-kernel-delivery.md); activation remains separate
+  from `update.php`. The first hosts to
   boot a qualifying kernel are the few-host validation ADR 0243 requires. They are
   compared against similar hosts left on 6.1, with a stop rule: a journal stall, or
   per-account read throughput below those hosts for the same demand. Either stop
@@ -77,6 +79,11 @@ A stop condition therefore ends the trial on a host by purging the trial kernel 
 running `update-grub`, checking that the default entry in `/boot/grub/grub.cfg` is the
 6.1 kernel, and then rebooting and checking `uname -r`. The same applies when a trial
 passes on some hosts and they "return to the fleet kernel".
+
+With repository delivery (ADR 0324), the manual stop path first writes the stop
+reason on the first line of `/etc/seedbox/config/kernel-pin-hold`. Keep this
+safety hold until the stop condition is resolved, so the next rolling update
+does not reinstall the purged trial image. It is not a standing per-host policy.
 
 ## References
 - [Caps off after journal stall](0243-read-caps-off-by-default-after-the-linux-6-1-journal-stall.md)

@@ -299,6 +299,7 @@ if ($pmssQuotaRecalculationNeeded) {
     logmsg('[SKIP] Recalculating quota integrity: the last recalculation completed and quota is on for every type /home declares (ADR 0140)');
 }
 pmssRunProfiledCallableBatch([
+    ['Installing pinned kernel', 'pmssEnsurePinnedKernel', ['logmsg'], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL],
     ['Applying boot defaults', 'pmssEnsureBootDefaults', ['logmsg']],
     ['Applying legacy sysctl baseline', 'pmssEnsureLegacySysctlBaseline', ['logmsg']],
     ['Applying kernel module hardening', 'pmssApplyKernelHardening', ['logmsg']],
