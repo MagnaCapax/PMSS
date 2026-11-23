@@ -79,6 +79,10 @@ function pmssSysctlSecuritySettingsBuild(): array
         // no PMSS scripts use ptrace, no customer ptrace activity observed in fleet sample).
         'kernel.yama.ptrace_scope' => '2',
         'kernel.kptr_restrict' => '1',
+        // Kernels built with CONFIG_LEGACY_TIOCSTI=y let any process that holds a terminal inject input into it.
+        // The leading "-" makes systemd-sysctl and procps skip the key on kernels without it (6.1), so the line is
+        // already in place at the first boot of a newer kernel instead of waiting for the next update run.
+        '-dev.tty.legacy_tiocsti' => '0',
         'net.ipv4.conf.all.rp_filter' => '1',
         'net.ipv4.conf.all.accept_source_route' => '0',
         'net.ipv4.conf.all.send_redirects' => '0',

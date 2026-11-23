@@ -14,7 +14,7 @@ function pmssSysctlSettingsValues(array $groupedSettings): \Generator
 function pmssSysctlAssignmentLineParse(string $line, bool $stripInlineComment = false): ?array
 {
     $trimmed = trim($stripInlineComment ? (string) preg_replace('/\s+#.*$/', '', $line) : $line);
-    if ($trimmed === '' || $trimmed[0] === '#' || preg_match('/^([A-Za-z0-9_.]+)\s*=\s*(.*)$/', $trimmed, $matches) !== 1) {
+    if ($trimmed === '' || $trimmed[0] === '#' || preg_match('/^(-?[A-Za-z0-9_.]+)\s*=\s*(.*)$/', $trimmed, $matches) !== 1) {
         return null;
     }
 
@@ -32,7 +32,9 @@ function pmssSysctlOverridesParse(string $path): array
 /** Filter grouped sysctl settings while respecting explicit operator overrides. */
 function pmssSysctlSettingsFilterOverrides(array $groupedSettings, array $overrideKeys): array
 {
-    $overrides = array_flip($overrideKeys);
+    $overrides = [];
+    // A "-key" line (skip when the kernel lacks the key) and a "key" line name the same setting.
+    foreach ($overrideKeys as $key) $overrides[ltrim($key, '-')] = $overrides['-'.ltrim($key, '-')] = true;
     foreach ($groupedSettings as $group => $settings) {
         if (!is_array($settings) || ($settings = array_diff_key($settings, $overrides)) === []) unset($groupedSettings[$group]);
         else $groupedSettings[$group] = array_map('strval', $settings);

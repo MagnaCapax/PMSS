@@ -149,15 +149,15 @@ class SysctlBaselineTest extends TestCase
         $procSysRoot = $this->pmssMakeTempDir('pmss-sysctl-proc-', 0700);
         $this->pmssTrackEnvOverrides(['PMSS_SYSCTL_PROC_SYS_PATH' => $procSysRoot]);
         $cases = [
-            'no_swap' => [['ram_gb' => 64, 'has_swap' => false, 'swap_is_fast' => false, 'is_vm' => false, 'nic_speed_gbps' => 1], '5535536214adc6cc48f00eaec8ba0e691cf6303d41c3ef66be992af7b26f9dfe'],
-            'vm' => [['ram_gb' => 64, 'has_swap' => true, 'swap_is_fast' => true, 'is_vm' => true, 'nic_speed_gbps' => 1], '9ea1b73ea0ef5123279a3e91812a5063d44ee52f9390d02f79cbead5980738cf'],
-            'fast_swap_10g_conntrack' => [['ram_gb' => 256, 'has_swap' => true, 'swap_is_fast' => true, 'is_vm' => false, 'nic_speed_gbps' => 10, 'has_conntrack' => true], 'c3838b52e37d193d2e6740915c29e471d47ca89b4ed7da99ca479f6fad86a051'],
-            'slow_swap' => [['ram_gb' => 64, 'has_swap' => true, 'swap_is_fast' => false, 'is_vm' => false, 'nic_speed_gbps' => 1], '9ea1b73ea0ef5123279a3e91812a5063d44ee52f9390d02f79cbead5980738cf'],
+            'no_swap' => [['ram_gb' => 64, 'has_swap' => false, 'swap_is_fast' => false, 'is_vm' => false, 'nic_speed_gbps' => 1], '91b5e9975ec4a2e66657cfa80320145e6f38a6cde0f88d03f94ea9fa146c4364'],
+            'vm' => [['ram_gb' => 64, 'has_swap' => true, 'swap_is_fast' => true, 'is_vm' => true, 'nic_speed_gbps' => 1], 'b21a5a4f66dae6e852b7fb1258d4ddc191603e5c15362a2802d6503e43e9452f'],
+            'fast_swap_10g_conntrack' => [['ram_gb' => 256, 'has_swap' => true, 'swap_is_fast' => true, 'is_vm' => false, 'nic_speed_gbps' => 10, 'has_conntrack' => true], '27d99caeb70859cbba1a1f49627ad99c3e6b29c839532f18d8234c825cb7ac9d'],
+            'slow_swap' => [['ram_gb' => 64, 'has_swap' => true, 'swap_is_fast' => false, 'is_vm' => false, 'nic_speed_gbps' => 1], 'b21a5a4f66dae6e852b7fb1258d4ddc191603e5c15362a2802d6503e43e9452f'],
         ];
 
         foreach ($cases as $label => [$profile, $expectedHash]) {
             $rendered = \pmssSysctlConfigRender(\pmssSysctlSettingsBuild($profile));
-            $this->assertSame($expectedHash, hash('sha256', $rendered), $label.' rendered sysctl profile changed');
+            $this->assertSame($expectedHash, hash('sha256', $rendered), $label.' rendered sysctl profile changed, got '.hash('sha256', $rendered));
         }
     }
 
