@@ -73,11 +73,19 @@ final class TorrentClientsP6IdentityTest extends TestCase
             'lighttpd/delugeWebConf.php' => ['$user', 15],
             'user/deluge.php' => ['$username', 15],
             'user/delugeManagedConfig.php' => ['$username', 15],
-            'user/torrentPort.php' => ['$user', 9],
         ] as $file => $case) {
             $source = $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/'.$file, [], ['killall']);
             $call = "pmssTorrentClientNativeStop({$case[0]}, 'deluge', {$case[1]}, ['processName' => 'deluge-web']);";
             $this->assertSame(1, substr_count($source, $call));
         }
+    }
+
+    public function testDelugePortRepairStopsDelugeWebWithGraceThroughTheScopedIdentityStop(): void
+    {
+        // The port repair term-waits-kills deluge-web (#479), still through the identity-scoped stop and never killall.
+        $this->assertSame(1, substr_count($this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/user/torrentPort.php', [], ['killall']),
+            'pmssDelugeWebStopWithGrace($user);'));
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/torrentClients/identity.php',
+            ["\$ops['processName'] = 'deluge-web';", "pmssTorrentClientNativeStop(\$user, 'deluge', \$signal, \$ops)"], ['killall']);
     }
 }

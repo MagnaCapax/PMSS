@@ -138,3 +138,17 @@ function pmssTorrentClientNativeStopWithGrace(string $user, string $client, arra
     for ($i = 0; $i < $attempts && $remaining() !== []; $i++) $pause();
     if ($remaining() !== []) $stop(9);
 }
+
+/**
+ * Stop only the account's deluge-web with the SIGTERM grace sequence; deluged is never signalled.
+ *
+ * @param array $ops identity seams plus the optional grace seams of pmssTorrentClientNativeStopWithGrace
+ */
+function pmssDelugeWebStopWithGrace(string $user, array $ops = []): void
+{
+    $ops['processName'] = 'deluge-web';
+    pmssTorrentClientNativeStopWithGrace($user, 'deluge', $ops + [
+        'stop' => static function (int $signal) use ($user, $ops): int { return pmssTorrentClientNativeStop($user, 'deluge', $signal, $ops); },
+        'remaining' => static function () use ($user, $ops): array { return pmssTorrentClientNativeStopPids($user, 'deluge', $ops); },
+    ]);
+}

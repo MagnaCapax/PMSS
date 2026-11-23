@@ -84,7 +84,7 @@ function pmssDelugePortEnsure(string $user, string $home): bool
         return true;
     }
 
-    pmssTorrentClientNativeStop($user, 'deluge', 9, ['processName' => 'deluge-web']);
+    pmssDelugeWebStopWithGrace($user);
     $parsed['config']['port'] = $expectedPort;
     pmssDelugeNormalizeEmptySessionsObject($parsed['config']);
     return pmssDelugeWriteWebConf($home.'/.config/deluge/web.conf', $parsed['meta'], $parsed['config'], $user);
