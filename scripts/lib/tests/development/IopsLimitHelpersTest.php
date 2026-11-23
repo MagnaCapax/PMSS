@@ -120,6 +120,33 @@ class IopsLimitHelpersTest extends TestCase
         );
     }
 
+    public function testClampAppliesOnlyOnUnifiedHierarchy(): void
+    {
+        $this->assertTrue(\pmssIopsLimitClampApplies('v2'));
+        foreach (['v1', 'unknown', ''] as $mode) {
+            $this->assertFalse(\pmssIopsLimitClampApplies($mode));
+        }
+    }
+
+    public function testLogLineClaimsAThrottleOnlyWhenOneWasApplied(): void
+    {
+        $this->assertSame('monthly IOPS throttle enabled (limit=10 usage=12 cap=100)', \pmssIopsLimitLogLine('enforce', true, 10, 12, 100));
+        $this->assertSame('monthly IOPS throttle removed (limit=10 usage=8)', \pmssIopsLimitLogLine('restore', true, 10, 8, 0));
+        foreach ([['enforce', 12], ['restore', 8]] as $case) {
+            $line = \pmssIopsLimitLogLine($case[0], false, 10, $case[1], 100);
+            $this->assertFalse(strpos($line, 'throttle enabled') !== false || strpos($line, 'throttle removed') !== false);
+            $this->assertTrue(strpos($line, 'limit=10 usage='.$case[1]) !== false);
+        }
+    }
+
+    public function testEnforcerRequestsTheClampOnlyWhenItApplies(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/iopsLimitEnforcer.php', [
+            "\$clamp = pmssIopsLimitClampApplies(pmssCgroupModeWithDefault('v1'));",
+            '$rc = !$clamp ? 0 : runStep(',
+        ]);
+    }
+
     public function testBuildsThrottleCommandAgainstHomeDevice(): void
     {
         $command = \pmssIopsLimitBuildThrottleCommand('alice', 100);

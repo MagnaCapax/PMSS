@@ -33,6 +33,28 @@ function pmssIopsLimitBuildRestoreCommand(string $username, array $payload): ?st
         .$applyCommand;
 }
 
+/**
+ * systemd applies IOReadIOPSMax/IOWriteIOPSMax only on the unified hierarchy, and on cgroup v1 the
+ * account read cap belongs to cgroupIopsLimitApply.php, which rewrites it every run (#1307).
+ */
+function pmssIopsLimitClampApplies(string $cgroupMode): bool
+{
+    return $cgroupMode === 'v2';
+}
+
+/** The user-log line states only what was applied. */
+function pmssIopsLimitLogLine(string $action, bool $clamp, int $limit, int $usage, int $cap): string
+{
+    if ($action === 'enforce') {
+        return $clamp
+            ? sprintf('monthly IOPS throttle enabled (limit=%d usage=%d cap=%d)', $limit, $usage, $cap)
+            : sprintf('monthly IOPS budget exceeded (limit=%d usage=%d); no IOPS throttle on cgroup v1', $limit, $usage);
+    }
+    return $clamp
+        ? sprintf('monthly IOPS throttle removed (limit=%d usage=%d)', $limit, $usage)
+        : sprintf('monthly IOPS usage back within budget (limit=%d usage=%d)', $limit, $usage);
+}
+
 /** @return array{action:string,limit:int,usage:int} */
 function pmssIopsLimitEnforcementPlan(int $limit, int $usage, bool $markerExists): array
 {
@@ -52,6 +74,7 @@ function pmssIopsLimitsRun(): int
         return 1;
     }
     $store = new UserConfigStore();
+    $clamp = pmssIopsLimitClampApplies(pmssCgroupModeWithDefault('v1'));
 
     foreach ($users as $user) {
         $limit = pmssIntegerSettingFileRead(pmssIopsLimitRuntimePath($user), 'pmssIopsLimitParseMonthlyOperations');
@@ -62,7 +85,7 @@ function pmssIopsLimitsRun(): int
 
         if ($plan['action'] === 'enforce') {
             $throttleIops = 100;
-            $rc = runStep(
+            $rc = !$clamp ? 0 : runStep(
                 'Applying monthly IOPS throttle for '.$user,
                 pmssIopsLimitBuildThrottleCommand($user, $throttleIops)
             );
@@ -71,7 +94,7 @@ function pmssIopsLimitsRun(): int
                     && function_exists('pmssAtomicWriteFile')
                     && pmssAtomicWriteFile($markerPath, (string) time(), 0600)
                     && pmssIntegerSettingPathModeConverge($markerPath, 0600);
-                pmssUserLog($user, sprintf('monthly IOPS throttle enabled (limit=%d usage=%d cap=%d)', $limit, $usage, $throttleIops));
+                pmssUserLog($user, pmssIopsLimitLogLine('enforce', $clamp, $limit, $usage, $throttleIops));
             }
             continue;
         }
@@ -87,7 +110,7 @@ function pmssIopsLimitsRun(): int
             $rc = runStep('Restoring baseline cgroup IOPS for '.$user, $command);
             if ($rc === 0) {
                 pmssIntegerSettingFileRemove($markerPath);
-                pmssUserLog($user, sprintf('monthly IOPS throttle removed (limit=%d usage=%d)', $limit, $usage));
+                pmssUserLog($user, pmssIopsLimitLogLine('restore', $clamp, $limit, $usage, 0));
             }
         }
     }

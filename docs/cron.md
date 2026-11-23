@@ -135,7 +135,7 @@ append logs to `/var/log/pmss/<script>.log`. Highlights include:
   remain unchanged.
 - `resourceSnapshot.php` – Append a daily root-only snapshot of resource usage for long-term review.
 - `trafficLimits.php` – Refresh per-user traffic throttling configuration (supports staged overage caps via `overageStages` and progressive post-cap reduction via `progressiveThrottleEnabled`, `progressiveThrottleFloorPercent`, and `progressiveThrottleGracePercent` in `/etc/seedbox/config/network`).
-- `iopsLimits.php` – Refresh per-user monthly IOPS throttling by comparing `resourceStats` month totals against `/etc/seedbox/runtime/iopsLimits/<user>` and temporarily capping `/home` read/write IOPS via `userConfigCgroup.php`.
+- `iopsLimits.php` – Refresh per-user monthly IOPS throttling by comparing `resourceStats` month totals against the runtime `iopsLimits/<user>` file. On cgroup v2 an account over budget gets its `/home` read/write IOPS capped via `userConfigCgroup.php`; on cgroup v1 systemd does not apply IOPS limits, so the job records the over-budget marker and logs the overage without a cap (#1307).
 - `mdadmCheckarray.php` – Runs the quarterly mdadm redundancy check for
   non-degraded md arrays only, logging degraded or unknown arrays that are
   deferred until redundancy is restored. Optionally set
