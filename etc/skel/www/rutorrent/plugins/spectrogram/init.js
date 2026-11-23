@@ -149,6 +149,9 @@ plugin.onLangLoaded = function()
 			$("#soximgcmd").val("soxgetimage");
 			$('#soxgetimg').submit();
 		});
+		// Hide the button until a spectrogram task finishes: _task only notifies the requesting plugin, and
+		// the theme's input.Button rule outranks the plugin stylesheet, so it showed in every task console.
+		$('.soxplay').hide();
 		plugin.markLoaded();
 	}
 }

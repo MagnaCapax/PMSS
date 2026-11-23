@@ -122,7 +122,7 @@ PHP;
         ['plugins/throttle/throttle.php', 'new rXMLRPCCommand( "set_download_rate", MAX_SPEED )', 'new rXMLRPCCommand( "set_download_rate", 327625*1024 )'],
         ['plugins/throttle/throttle.php', 'new rXMLRPCCommand( "set_upload_rate", 0 )', 'new rXMLRPCCommand( "set_upload_rate", 327625*1024 )'],
         ['plugins/throttle/throttle.php', 'new rXMLRPCCommand( "set_download_rate", 0 )', 'new rXMLRPCCommand( "set_download_rate", 327625*1024 )'],
-    ], pmssUserRutorrentRpcCompatibilityPatches(), pmssUserRutorrentCreatePluginPatches(), pmssUserRutorrentSnoopyGzipPatches()) as [$path, $legacy, $patched]) {
+    ], pmssUserRutorrentRpcCompatibilityPatches(), pmssUserRutorrentCreatePluginPatches(), pmssUserRutorrentSnoopyGzipPatches(), pmssUserRutorrentPluginCompatibilityPatches()) as [$path, $legacy, $patched]) {
         pmssUserPatchWritableStrings($ctx['home'].'/www/rutorrent/'.$path, [['legacy' => $legacy, 'patched' => $patched]]);
     }
 }
@@ -258,4 +258,19 @@ function pmssUserRutorrentSnoopyGzipPatches(): array
         ];
     }
     return $patches;
+}
+
+/**
+ * Compatibility patches for bundled ruTorrent plugin scripts that existing accounts keep their own copy of.
+ *
+ * The spectrogram plugin never hid its Save button, so it showed in every task console; hide it right after
+ * the button is created (the skeleton copy carries the same line, so a patched copy is left as it is).
+ *
+ * @return array<int, array{0:string,1:string,2:string}> Path below www/rutorrent, legacy text, patched text.
+ */
+function pmssUserRutorrentPluginCompatibilityPatches(): array
+{
+    return [
+        ['plugins/spectrogram/init.js', 'plugin.markLoaded();', "$('.soxplay').hide();\n\t\tplugin.markLoaded();"],
+    ];
 }
