@@ -48,16 +48,13 @@ class RtorrentThrottleGetTest extends TestCase
     public function testInvalidUsernameNeverCallsScgi(): void
     {
         foreach ([[], ['script'], ['script', '../root'], ['script', 'FIXTUR01'], ['script', 'fixtur01', 'extra']] as $argv) {
-            $calls = 0;
+            $calls = [];
             [$exitCode, $output] = $this->pmssCaptureStdout(static function () use ($argv, &$calls): int {
-                return \pmssRtorrentThrottleGetCli($argv, static function () use (&$calls) {
-                    $calls++;
-                    return 0;
-                });
+                return \pmssRtorrentThrottleGetCli($argv, self::pmssMakeCallbacks(['rpc' => 0], $calls)['rpc']);
             });
 
             $this->assertSame(1, $exitCode);
-            $this->assertSame(0, $calls);
+            $this->assertSame([], $calls);
             $this->assertSame('', $output);
         }
     }

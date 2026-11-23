@@ -41,7 +41,7 @@ class RealtekNicAspmTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-realtek-aspm-missing-udev-', 0700);
         $messages = [];
         $commands = [];
-        $runner = static function (string $description, string $command) use (&$commands): int { $commands[] = $command; return 0; };
+        $runner = self::pmssMakeCallbacks(['run' => 0], $commands)['run'];
         $path = self::pmssMakeCallbacks(['path' => ''])['path'];
         \pmssEnsureRealtekNicAspmOff($this->pmssMakeArrayLogger($messages), $root.'/rule', $runner, $path);
         $this->assertSame([], $commands);

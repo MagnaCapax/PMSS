@@ -26,7 +26,7 @@ final class TorrentClientsDelugeWebBasePatchTest extends TestCase
                     : "    self.site = Site(self.top_level)\n");
             }
         };
-        return [$entry, $root.'/deluge/2.1.1', ['install' => $install, 'log' => static function (): void {}]];
+        return [$entry, $root.'/deluge/2.1.1', ['install' => $install] + self::pmssMakeCallbacks(['log' => null])];
     }
 
     private function server(string $dir, string $python = '3.11'): string
@@ -63,10 +63,10 @@ final class TorrentClientsDelugeWebBasePatchTest extends TestCase
     public function testRequiredPatchFailureReturnsFalse(): void
     {
         [$entry, $dir, $ops] = $this->fixture();
-        $calls = 0;
-        $ops['patch'] = static function () use (&$calls): bool { $calls++; return false; };
+        $calls = [];
+        $ops['patch'] = self::pmssMakeCallbacks(['patch' => false], $calls)['patch'];
         $this->assertFalse(\pmssTorrentClientsDelugeVenvInstall($entry, $dir, $ops));
-        $this->assertSame(1, $calls);
+        $this->assertSame(['patch'], $calls);
         $this->assertSame("    self.top_level.putChild(self.base.strip('/'), self.top_level)\n",
             file_get_contents($this->server($dir)));
     }
@@ -87,10 +87,10 @@ final class TorrentClientsDelugeWebBasePatchTest extends TestCase
     public function testFailedInstallSkipsPatcher(): void
     {
         [$entry, $dir, $ops] = $this->fixture();
-        $calls = 0;
-        $ops['install'] = static function (): void {};
-        $ops['patch'] = static function () use (&$calls): bool { $calls++; return true; };
+        $calls = [];
+        $ops['install'] = self::pmssMakeCallbacks(['install' => null])['install'];
+        $ops['patch'] = self::pmssMakeCallbacks(['patch' => true], $calls)['patch'];
         $this->assertFalse(\pmssTorrentClientsDelugeVenvInstall($entry, $dir, $ops));
-        $this->assertSame(0, $calls);
+        $this->assertSame([], $calls);
     }
 }

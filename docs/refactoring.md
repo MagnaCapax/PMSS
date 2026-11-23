@@ -1040,6 +1040,9 @@ account, PID, restart and RPC results. Child-process stubs stay self-contained;
 identity mutators and callbacks that validate arguments or record effects stay explicit.
 Network routes, netconsole logging/steps, systemd recovery and refused rewrite
 results use the same factory; partial Deluge writes retain each injected byte count.
+Fixed-result invocation checks use its event log instead of custom counters,
+including refusal gates, Deluge patching and stopped-client restore. Empty or
+single-event assertions retain the expected call counts; stateful callbacks stay explicit.
 
 AI launcher tests share their temporary-directory setup, valid account state,
 passthrough cases, explicit-environment matrix and result assertions through

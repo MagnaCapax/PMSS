@@ -43,12 +43,12 @@ final class QbittorrentPostSetupTest extends TestCase
 
     public function testRunningClientSkipsTheRepairRestoreAndStoppedClientRestores(): void
     {
-        $calls = 0;
+        $calls = [];
+        $restore = self::pmssMakeCallbacks(['restore' => true], $calls);
         foreach ([[101], []] as $pids) {
-            $this->assertTrue(\pmssQbittorrentFrontendRestoreForRepair('/fixture/t', [
-                'restore' => static function () use (&$calls): bool { $calls++; return true; },
-            ] + self::pmssMakeCallbacks(['accountPids' => $pids])));
-            $this->assertSame($pids === [] ? 1 : 0, $calls);
+            $this->assertTrue(\pmssQbittorrentFrontendRestoreForRepair('/fixture/t',
+                $restore + self::pmssMakeCallbacks(['accountPids' => $pids])));
+            $this->assertSame($pids === [] ? ['restore'] : [], $calls);
         }
     }
 

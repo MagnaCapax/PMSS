@@ -44,9 +44,9 @@ final class TorrentClientsP6LaunchTest extends TestCase
     {
         $home = $this->pmssMakeTempDir('pmss-p6-no-selection-').'/t@localhost';
         $this->pmssEnsureDir($home.'/bin/deluge');
-        $calls = 0;
-        $run = static function () use (&$calls): int { $calls++; return 0; };
+        $calls = [];
+        $run = self::pmssMakeCallbacks(['run' => 0], $calls)['run'];
         $this->assertFalse(\pmssTorrentClientDelugeLaunch($home, '/missing', '/missing', $run));
-        $this->assertSame(0, $calls);
+        $this->assertSame([], $calls);
     }
 }

@@ -34,13 +34,10 @@ class RuntimeTempPrefixSafetyTest extends TestCase
         // A matching on-disk name must not bypass prefix validation.
         $prefix = "pmss-prefix-newline-\n";
         $directory = $this->pmssMakeTempDir($prefix);
-        $calls = 0;
-        $runner = static function () use (&$calls): int {
-            $calls++;
-            return 0;
-        };
+        $calls = [];
+        $runner = self::pmssMakeCallbacks(['run' => 0], $calls)['run'];
         $this->assertSame(1, \pmssRemovePrivateTempDir($directory, $prefix, 'Cleanup fixture', self::pmssMakeCallbacks(['log' => null])['log'], $runner));
-        $this->assertSame(0, $calls);
+        $this->assertSame([], $calls);
         $this->assertTrue(is_dir($directory));
     }
 
@@ -49,14 +46,14 @@ class RuntimeTempPrefixSafetyTest extends TestCase
         $parent = $this->pmssMakeTempDir('pmss-prefix-parent-');
         $nested = $parent.'/pmss-prefix-nested';
         $this->assertTrue(mkdir($nested, 0700));
-        $calls = 0;
+        $calls = [];
         $messages = [];
         $logger = $this->pmssMakeArrayLogger($messages);
-        $runner = static function () use (&$calls): int { $calls++; return 0; };
+        $runner = self::pmssMakeCallbacks(['run' => 0], $calls)['run'];
 
         $this->assertSame(null, \pmssPrivateTempDirRealpath($nested, 'pmss-prefix-', $logger));
         $this->assertSame(1, \pmssRemovePrivateTempDir($nested, 'pmss-prefix-', 'Cleanup fixture', $logger, $runner));
-        $this->assertSame(0, $calls);
+        $this->assertSame([], $calls);
         $this->assertSame(array_fill(0, 2, '[WARN] Refusing temporary directory cleanup outside PMSS temp scope: '.realpath($nested)), $messages);
         $this->assertTrue(is_dir($nested));
     }
