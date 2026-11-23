@@ -137,6 +137,14 @@ Keep the canonical installer/update details under `docs/install.md` and
   and restart verification; `watchdogSocketState.php` owns consecutive-failure
   markers. Both probe consumers use `watchdogSocketRetry.php` for timing, and
   `watchdogSocketHealth.php` supplies the cron's socket restart decision (ADR 0209).
+- **etc/skel/www/console.php** distinguishes shell completion from connection loss
+  with the account-private `~/.lighttpd/console.ended` marker (GH #1232).
+  The shell wrapper writes it when the shell returns; the next launcher request
+  consumes it and shows **Session ended** with a **Start a new session** link.
+  Without the marker, the reconnect overlay still reloads the launcher as in
+  ADR 0031's GH #1001 update. Persistent links retain `mode=persist` so the next
+  launch reattaches to tmux. `BrowserConsoleArtifactsTest` covers wrapper exit,
+  hangup, marker consumption and both page states; execution stays on testing machines.
 - **etc/skel/www/welcome.php** keeps customer app presentation in one local catalog
   and tile projection. **userMediaStackPanel.php** projects installed-state
   observations after its existing reads. Both keep their delivery boundaries,
