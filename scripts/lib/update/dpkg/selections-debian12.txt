@@ -1206,6 +1206,7 @@ php-cli	install
 php-common	install
 php-curl	install
 php-gd	install
+php-intl	install
 php-mbstring	install
 php-sqlite3	install
 php-xml	install
