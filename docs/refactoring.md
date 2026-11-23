@@ -883,6 +883,10 @@ callers retain file guards, schema checks, and missing/malformed-data fallbacks.
 
 ## Helper Extraction Rules
 
+Udev rule appliers share `pmssUdevRulesApply()` in the existing updater command
+library: reload failure stops activation; later action failures still allow settle.
+Callers retain selectors, warnings, managed-file gates and render-deny ACL read-back.
+
 Systemd slice text fixtures call `pmssSystemdSliceRender()` directly and reuse
 `pmssSystemdSliceTasksTemplate()` for the common TasksMax template. Keep fixture
 records explicit when a scenario mutates prepared files or reruns convergence.

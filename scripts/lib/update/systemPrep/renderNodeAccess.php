@@ -12,26 +12,15 @@ function pmssEnsureIntelRenderNodeAccess(?callable $logger = null, ?string $targ
 {
     $log = $logger ?: 'logMessage';
     $target = $target ?? '/etc/udev/rules.d/70-pmss-render-node.rules';
-    $commandRunner = $commandRunner ?: 'runStep';
-    $commandPath = $commandPath ?: 'pmssCommandPath';
     $content = "# PMSS-managed: allow all local accounts to use Intel and AMD iGPU render nodes.\n"
         ."SUBSYSTEM==\"drm\", KERNEL==\"renderD*\", DRIVERS==\"".implode('|', pmssRenderNodeDrivers())."\", MODE=\"0666\"\n";
     if (!pmssInstallManagedPathFile($target, $content, 'Intel render-node access rule', $log, ['mode' => 0644])) {
         return;
     }
 
-    $udevadm = $commandPath('udevadm');
-    if ($udevadm === '') {
-        $log('[WARN] udevadm unavailable; Intel render-node rule will apply on the next device event');
-        return;
-    }
-    if ($commandRunner('Reloading udev rules for Intel render nodes', escapeshellarg($udevadm).' control --reload') !== 0) {
-        $log('[WARN] Unable to reload udev rules for Intel render nodes');
-        return;
-    }
-    if ($commandRunner('Applying Intel render-node access', escapeshellarg($udevadm).' trigger --subsystem-match=drm --action=change') !== 0) {
-        $log('[WARN] Unable to trigger DRM devices for Intel render-node access');
-    }
+    pmssUdevRulesApply('Intel render nodes', '[WARN] udevadm unavailable; Intel render-node rule will apply on the next device event', [
+        ['Applying Intel render-node access', 'trigger --subsystem-match=drm --action=change', '[WARN] Unable to trigger DRM devices for Intel render-node access'],
+    ], $log, $commandRunner, $commandPath);
 }
 
 /** Add one validated account to render when Intel or AMD iGPU hardware and the group exist. */

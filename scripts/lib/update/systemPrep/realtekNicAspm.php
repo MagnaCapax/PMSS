@@ -9,8 +9,6 @@ function pmssEnsureRealtekNicAspmOff(?callable $logger = null, ?string $target =
 {
     $log = $logger ?: 'logMessage';
     $target = $target ?? '/etc/udev/rules.d/71-pmss-realtek-nic-aspm.rules';
-    $commandRunner = $commandRunner ?: 'runStep';
-    $commandPath = $commandPath ?: 'pmssCommandPath';
     // bind runs after the driver probe, so a driver that enables ASPM at probe is overridden.
     $match = 'ACTION=="add|bind|change", SUBSYSTEM=="pci", ATTR{vendor}=="0x10ec", ATTR{class}=="0x020000"';
     $content = "# PMSS-managed: keep PCIe ASPM off on Realtek Ethernet controllers (RTL8111/8168 transmit queue stalls).\n"
@@ -20,16 +18,7 @@ function pmssEnsureRealtekNicAspmOff(?callable $logger = null, ?string $target =
         return;
     }
 
-    $udevadm = $commandPath('udevadm');
-    if ($udevadm === '') {
-        $log('[WARN] udevadm unavailable; Realtek NIC ASPM rule will apply on the next device event');
-        return;
-    }
-    if ($commandRunner('Reloading udev rules for Realtek NIC ASPM', escapeshellarg($udevadm).' control --reload') !== 0) {
-        $log('[WARN] Unable to reload udev rules for Realtek NIC ASPM');
-        return;
-    }
-    if ($commandRunner('Applying Realtek NIC ASPM rule', escapeshellarg($udevadm).' trigger --subsystem-match=pci --attr-match=vendor=0x10ec --attr-match=class=0x020000 --action=change') !== 0) {
-        $log('[WARN] Unable to trigger Realtek Ethernet devices for the ASPM rule');
-    }
+    pmssUdevRulesApply('Realtek NIC ASPM', '[WARN] udevadm unavailable; Realtek NIC ASPM rule will apply on the next device event', [
+        ['Applying Realtek NIC ASPM rule', 'trigger --subsystem-match=pci --attr-match=vendor=0x10ec --attr-match=class=0x020000 --action=change', '[WARN] Unable to trigger Realtek Ethernet devices for the ASPM rule'],
+    ], $log, $commandRunner, $commandPath);
 }

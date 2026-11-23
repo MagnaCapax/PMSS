@@ -79,6 +79,23 @@ if (!function_exists('runUserStep')) {
     }
 }
 
+/** Reload udev before ordered rule actions; a failed action still permits later settle/read-back. */
+function pmssUdevRulesApply(string $context, string $unavailableWarning, array $actions, callable $log, ?callable $commandRunner = null, ?callable $commandPath = null): void
+{
+    $commandRunner = $commandRunner ?: 'runStep';
+    $udevadm = ($commandPath ?: 'pmssCommandPath')('udevadm');
+    if ($udevadm === '') { $log($unavailableWarning); return; }
+    $command = escapeshellarg($udevadm);
+    if ($commandRunner('Reloading udev rules for '.$context, $command.' control --reload') !== 0) {
+        $log('[WARN] Unable to reload udev rules for '.$context);
+        return;
+    }
+    // Callers retain device selectors, diagnostics and whether settling is required.
+    foreach ($actions as [$description, $arguments, $warning]) {
+        if ($commandRunner($description, $command.' '.$arguments) !== 0) $log($warning);
+    }
+}
+
 /** Select real account entries before changing mode, skipping multiply linked files. */
 function pmssUserEntryChmodCommand(string $path, int $mode, bool $recursive = false): string
 {

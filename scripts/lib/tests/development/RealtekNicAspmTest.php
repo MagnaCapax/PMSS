@@ -38,12 +38,21 @@ class RealtekNicAspmTest extends TestCase
 
     public function testMissingUdevadmWarnsWithoutRunningCommands(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-realtek-aspm-missing-udev-', 0700);
-        $messages = [];
-        $commands = [];
-        \pmssEnsureRealtekNicAspmOff($this->pmssMakeArrayLogger($messages), $root.'/rule',
-            self::pmssMakeCallbacks(['run' => 0], $commands)['run'], self::pmssMakeCallbacks(['path' => ''])['path']);
-        $this->assertSame([], $commands);
-        $this->assertTrue(in_array('[WARN] udevadm unavailable; Realtek NIC ASPM rule will apply on the next device event', $messages, true));
+        foreach ([
+            'missing' => '[WARN] udevadm unavailable; Realtek NIC ASPM rule will apply on the next device event',
+            'control --reload' => '[WARN] Unable to reload udev rules for Realtek NIC ASPM',
+            'trigger ' => '[WARN] Unable to trigger Realtek Ethernet devices for the ASPM rule',
+        ] as $failure => $warning) {
+            $root = $this->pmssMakeTempDir('pmss-realtek-aspm-failure-', 0700);
+            $messages = $commands = [];
+            $runner = static function ($label, $command) use (&$commands, $failure): int {
+                $commands[] = $command;
+                return strpos($command, $failure) !== false ? 1 : 0;
+            };
+            \pmssEnsureRealtekNicAspmOff($this->pmssMakeArrayLogger($messages), $root.'/rule', $runner,
+                self::pmssMakeCallbacks(['path' => $failure === 'missing' ? '' : '/usr/bin/udevadm'])['path']);
+            $this->assertSame(['missing' => 0, 'control --reload' => 1, 'trigger ' => 2][$failure], count($commands));
+            $this->assertTrue(in_array($warning, $messages, true));
+        }
     }
 }

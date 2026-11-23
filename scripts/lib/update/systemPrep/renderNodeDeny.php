@@ -54,20 +54,11 @@ function pmssEnsureIntelRenderNodeDenies(
 
     // Even unchanged rules must repair ACLs that a console seat change flushed.
     if ($lines !== [] || $removed) {
-        $udevadm = $commandPath('udevadm');
-        if ($udevadm === '') {
-            $log('[WARN] udevadm unavailable; Intel render-node denies await the next device event');
-        } elseif ($commandRunner('Reloading udev rules for Intel render denies', escapeshellarg($udevadm).' control --reload') !== 0) {
-            $log('[WARN] Unable to reload udev rules for Intel render denies');
-        } else {
-            if ($commandRunner('Applying Intel render-node denies', escapeshellarg($udevadm).' trigger --subsystem-match=drm --action=change') !== 0) {
-                $log('[WARN] Unable to trigger DRM devices for Intel render denies');
-            }
+        pmssUdevRulesApply('Intel render denies', '[WARN] udevadm unavailable; Intel render-node denies await the next device event', [
+            ['Applying Intel render-node denies', 'trigger --subsystem-match=drm --action=change', '[WARN] Unable to trigger DRM devices for Intel render denies'],
             // trigger is asynchronous; read-back must follow completion of the RUN list.
-            if ($commandRunner('Waiting for Intel render-node denies', escapeshellarg($udevadm).' settle') !== 0) {
-                $log('[WARN] Unable to wait for Intel render-node denies');
-            }
-        }
+            ['Waiting for Intel render-node denies', 'settle', '[WARN] Unable to wait for Intel render-node denies'],
+        ], $log, $commandRunner, $commandPath);
     }
     $nodeLister = $nodeLister ?: function (): array {
         $nodes = [];
