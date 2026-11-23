@@ -115,6 +115,21 @@ If a `docker run` command fails with a “bind: address already in use” error,
 either you already have a container using that port or another process is
 listening on it. Pick a different host port or stop the conflicting container.
 
+Your seedbox is shared with other accounts, so the well-known default ports
+used throughout this guide (Jellyfin 8096, Radarr 7878, Sonarr 8989, Prowlarr
+9696, qBittorrent 8080, Deluge 8112, and so on) may already be bound by someone
+else. Check before you publish one:
+
+```bash
+ss -tln | grep ':8096 '
+```
+
+If the command prints a line, that host port is taken. Choose another free
+host port for the left side of `-p HOST_PORT:CONTAINER_PORT` (the container
+side keeps its default) and use that host port in the URL or SSH tunnel you open
+afterwards. Without this check, a taken port makes `docker run -d` fail with
+an error that is easy to miss, and the address from the guide then never loads.
+
 From your browser you normally reach services via:
 
 ```text
@@ -142,6 +157,10 @@ This section walks through a simple Jellyfin media server deployment.
    ```
 
 3. **Run Jellyfin**
+
+   First check that host port 8096 is free: `ss -tln | grep ':8096 '` must print
+   nothing. If it prints a line, another account is using it; pick a different host
+   port and use it in the `-p` line below.
 
    ```bash
    docker run -d \
