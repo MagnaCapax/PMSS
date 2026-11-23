@@ -23,8 +23,8 @@ if (!function_exists('pmssCheckRtorrentOptOutRepair')) {
      * The trigger is state, not an event: a route request that failed is retried in the next window
      * because the route file is still absent. A healthy account costs two stat calls and no state.
      *
-     * @param callable $recoverConfig fn(string $user, string $home): bool restores the missing rc
-     * @param callable $requestRoute  fn(string $user): bool regenerates and reloads that account's route
+     * @param callable $recoverConfig callable(string $user, string $home): bool restores the missing rc
+     * @param callable $requestRoute  callable(string $user): bool regenerates and reloads that account's route
      * @return string healthy|throttled|state-unwritable|config-failed|config-recovered|route-requested|route-failed
      */
     function pmssCheckRtorrentOptOutRepair(
