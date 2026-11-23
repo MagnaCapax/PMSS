@@ -121,7 +121,7 @@ class QuotaFixGuardTest extends TestCase
             ['dir' => $dir, 'fstab' => $fstab] = $this->pmssMountFixtureCreate('pmss-quota-recalc-', "UUID=abc /srv ext4 usrquota 0 0\nUUID=def /home ext4 {$options} 0 0\n");
             $stamp = $dir.'/quota-recalculation.complete';
             if ($stamped) {
-                file_put_contents($stamp, "2026-10-22T00:00:00+00:00\n");
+                $this->pmssWriteFile($stamp, "2026-10-22T00:00:00+00:00\n");
             }
             $commands = [];
             $logs = [];
@@ -141,7 +141,7 @@ class QuotaFixGuardTest extends TestCase
         }
 
         ['dir' => $dir] = $this->pmssMountFixtureCreate('pmss-quota-recalc-', '');
-        file_put_contents($dir.'/stamp', "x\n");
+        $this->pmssWriteFile($dir.'/stamp', "x\n");
         $logs = [];
         $this->assertTrue(\pmssQuotaHomeRecalculationNeeded(self::pmssMakeCallbacks(['command' => ['rc' => 2, 'stdout' => '', 'stderr' => '']])['command'], $this->pmssMakeArrayLogger($logs), $dir.'/missing/fstab', $dir.'/stamp'));
         $this->assertSame(1, count($logs));

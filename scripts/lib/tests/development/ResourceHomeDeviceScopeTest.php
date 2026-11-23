@@ -13,12 +13,10 @@ class ResourceHomeDeviceScopeTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-home-scope-');
         $class = $root.'/class/block';
         $devices = $root.'/devices';
-        $this->pmssEnsureDir($class, 0755);
         $this->pmssWriteFiles($devices, [
             'md1/dev' => "9:1\n", 'md0/dev' => "9:0\n", 'sda/dev' => "8:0\n", 'sdb/dev' => "8:16\n",
             'sda/sda4/partition' => '4', 'sda/sda4/dev' => "8:4\n", 'sdb/sdb4/partition' => '4', 'sdb/sdb4/dev' => "8:20\n",
         ]);
-        $this->pmssEnsureDir($devices.'/md1/slaves', 0755);
         $this->pmssWriteSymlinks($class, ['md1' => $devices.'/md1', 'md0' => $devices.'/md0', 'sda' => $devices.'/sda',
             'sdb' => $devices.'/sdb', 'sda4' => $devices.'/sda/sda4', 'sdb4' => $devices.'/sdb/sdb4']);
         $this->pmssWriteSymlinks($devices, ['md1/slaves/sda4' => $devices.'/sda/sda4', 'md1/slaves/sdb4' => $devices.'/sdb/sdb4']);
@@ -41,7 +39,6 @@ class ResourceHomeDeviceScopeTest extends TestCase
     {
         $root = $this->pmssMakeTempDir('pmss-home-scope-');
         $this->pmssWriteFiles($root.'/devices', ['vdb/dev' => "252:16\n", 'vda/dev' => "252:0\n"]);
-        $this->pmssEnsureDir($root.'/class/block', 0755);
         $this->pmssWriteSymlinks($root.'/class/block', ['vdb' => $root.'/devices/vdb', 'vda' => $root.'/devices/vda']);
         $this->assertSame(['252:16' => true], $this->keys('/dev/vdb', $root.'/class/block'));
     }
