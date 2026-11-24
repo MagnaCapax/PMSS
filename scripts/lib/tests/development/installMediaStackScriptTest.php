@@ -1855,7 +1855,7 @@ BASHRC
 for arg in "$@"; do
     case "$arg" in --config=*) config=${arg#*=} ;; esac
 done
-printf '{}\n' > "$config"
+printf '{"core":{},"remotes":{"google":{}}}\n' > "$config"
 printf 'config\n' >> "$HOME/actions"
 BASH
         );
@@ -1873,7 +1873,7 @@ BASH
         ));
         $output = $this->pmssRunShellHarness($harness);
         $this->assertSame("config\nsession:cloudplow", $output);
-        $this->assertSame("{}\n", file_get_contents($home.'/.config/cloudplow/config.json'));
+        $this->assertSame([], json_decode(file_get_contents($home.'/.config/cloudplow/config.json'), true)['uploader']);
         $this->assertStringContainsString('media_stack_cloudplow_config_ensure',
             $this->pmssExtractShellFunction($this->script, 'media_stack_start_stopped'));
         $this->assertStringContainsString('sleep 3',
@@ -1889,7 +1889,7 @@ BASH
         $this->pmssWriteExecutableFile($home.'/.bin/cloudplow/bin/python3', <<<'BASH'
 #!/usr/bin/env bash
 for arg in "$@"; do
-    case "$arg" in --config=*) printf '{}\n' > "${arg#*=}" ;; esac
+    case "$arg" in --config=*) printf '{"core":{},"remotes":{"google":{}}}\n' > "${arg#*=}" ;; esac
 done
 BASH
         );

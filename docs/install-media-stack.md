@@ -217,6 +217,49 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
 10) Logging
 - All output is colored for terminals and appended to `~/.install-media-stack.log`.
 
+### Cloudplow first-run defaults
+
+Fresh installs adapt the [pinned upstream defaults](https://github.com/l3uddz/cloudplow/blob/4a4e9cf7579ce4ba91761c12ad1bc88ae2707f8c/utils/config.py)
+before publishing `~/.config/cloudplow/config.json` with mode `600`:
+
+- `core.rclone_config_path` is the absolute account path to `~/.config/rclone/rclone.conf`.
+- `core.rclone_binary_path` is `rclone`, resolved through the account's `PATH`.
+- `remotes.google.upload_folder` is the absolute account path to `~/data`.
+- The sample remote's `upload_remote`, `hidden_remote`, and `sync_remote` are empty.
+- `uploader`, `hidden`, and `syncer` are empty objects. The upstream hidden-folder
+  path is removed; no upload, cleanup, or sync job is enabled.
+
+The Cloudplow tmux session starts idle: with these empty sections, its
+[scheduler](https://github.com/l3uddz/cloudplow/blob/4a4e9cf7579ce4ba91761c12ad1bc88ae2707f8c/cloudplow.py)
+has no transfer jobs to run, even if rclone already has remotes. Logs and cache
+stay in `~/.config/cloudplow/`. Existing configs are preserved byte for byte on
+reruns, including configs created before these defaults.
+
+To enable uploads, run `rclone config --config "$HOME/.config/rclone/rclone.conf"`
+and create your own remote. Edit Cloudplow's `config.json`: set
+`remotes.google.upload_remote` to your destination (for example,
+`archive:Media` for an rclone remote named `archive`), confirm the source folder,
+and add this entry under `uploader`, using the same Cloudplow key `google`:
+
+```json
+"google": {
+    "can_be_throttled": false,
+    "check_interval": 30,
+    "max_size_gb": 200,
+    "size_excludes": ["downloads/*"],
+    "opened_excludes": [],
+    "exclude_open_files": true,
+    "schedule": {"enabled": false, "allowed_from": "04:00", "allowed_until": "08:00"}
+}
+```
+
+`google` is only Cloudplow's example key; the destination chooses the rclone
+remote. The inherited `rclone_command` is `move`: uploaded files leave the local
+source. Review the source and destination before enabling the uploader. Set
+`core.dry_run` to `true` for the first check. Restart through
+`bash ~/install-media-stack.sh --stop-app=cloudplow`, then
+`bash ~/install-media-stack.sh --start-app=cloudplow` to load changes.
+
 ## Dry‑Run and Verify‑Only
 - `--dry-run` checks each URL (`curl -I` or `wget --spider`), prints the actions that would be taken, and skips any filesystem or process changes.
 - `--verify-only` is an alias that implies `--dry-run`. The script remains side‑effect‑free in both modes.

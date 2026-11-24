@@ -372,6 +372,7 @@ media_stack_session_kill_owned() {
 # before either the installer or recovery path creates a lasting session.
 media_stack_cloudplow_config_ensure() {
 	local config_dir="$HOME/.config/cloudplow" config_file="$HOME/.config/cloudplow/config.json"
+	local config_tmp
 	[[ -f "$config_file" ]] && return 0
 	if [[ ! -f "$HOME/.bin/cloudplow/cloudplow/cloudplow.py" ]]; then
 		log_warn "Cloudplow config is missing and Cloudplow is not installed"
@@ -381,13 +382,35 @@ media_stack_cloudplow_config_ensure() {
 		log_warn "Could not create Cloudplow config directory: $config_dir"
 		return 1
 	}
+	# Generate privately: an interrupted bootstrap must not leave active upstream defaults.
+	config_tmp=$(mktemp -d "$config_dir/.config.XXXXXX") || return 1
 	timeout 30 "$HOME/.bin/cloudplow/bin/python3" "$HOME/.bin/cloudplow/cloudplow/cloudplow.py" run \
-		--config="$config_file" --loglevel=DEBUG --cachefile="$config_dir/cache.db" \
+		--config="$config_tmp/config.json" --loglevel=DEBUG --cachefile="$config_dir/cache.db" \
 		--logfile="$config_dir/cloudplow.log" >/dev/null 2>&1 || true
-	if [[ ! -f "$config_file" ]]; then
-		log_warn "Cloudplow did not create $config_file; skipping its session"
+	if ! php -r '
+    $config = json_decode(@file_get_contents($argv[1]));
+    if (!is_object($config->core ?? null) || !is_object($config->remotes->google ?? null)) { exit(1); }
+    $config->core->rclone_binary_path = "rclone";
+    $config->core->rclone_config_path = $argv[2]."/.config/rclone/rclone.conf";
+    $config->remotes->google->upload_folder = $argv[2]."/data";
+    foreach (["upload_remote", "hidden_remote", "sync_remote"] as $key) {
+        $config->remotes->google->$key = "";
+    }
+    // Empty objects schedule no uploads, hidden-file cleanup or sync work.
+    foreach (["uploader", "hidden", "syncer"] as $key) { $config->$key = (object) []; }
+    $json = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    if ($json === false) { exit(1); }
+    echo $json, "\n";
+' "$config_tmp/config.json" "$HOME" >"$config_tmp/pmss.json" ||
+		! chmod 600 "$config_tmp/pmss.json" || ! ln -T "$config_tmp/pmss.json" "$config_file"; then
+		rm -f "$config_tmp/config.json" "$config_tmp/pmss.json"
+		rmdir "$config_tmp"
+		log_warn "Could not prepare Cloudplow defaults; skipping its session"
 		return 1
 	fi
+	rm -f "$config_tmp/config.json" "$config_tmp/pmss.json"
+	rmdir "$config_tmp"
+	log_warn "Cloudplow is idle: run rclone config, then add a destination and uploader to $config_file (see docs/install-media-stack.md)."
 }
 
 media_stack_start_stopped() {
