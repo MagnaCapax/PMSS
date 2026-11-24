@@ -4,6 +4,7 @@
 require_once __DIR__.'/../torrentClients/projection.php';
 require_once __DIR__.'/../runtime/filesystem.php';
 require_once __DIR__.'/../user/identity.php';
+require_once __DIR__.'/../user/watchdogTimeout.php';
 
 /** Match an account link to one published static socket build. */
 function pmssLighttpdTransmissionSelected(
@@ -49,11 +50,15 @@ function pmssLighttpdTransmissionRouteStale(string $user, bool $selected, string
 function pmssLighttpdTransmissionRouteConverge(string $user, string $home): void
 {
     if (!pmssValidateUsername($user) || basename($home) !== $user) return;
+    // A preceding route repair may have timed out in this same watchdog pass.
+    if (pmssUserWatchdogBackoffActive($user, 'lighttpd')) return;
     $path = $home.'/.lighttpd.conf';
     // The file sits in the account-writable home: read only the root-owned single-link regular inode, non-blocking,
     // so a swapped link, hard link or FIFO can neither redirect nor stall this root watchdog.
     $config = (string) pmssReadRegularFileContentsVerified($path, 0, 1048576);
     if ($config === '' || !pmssLighttpdTransmissionRouteStale($user, pmssLighttpdTransmissionSelected($user, $home), $config)) return;
-    runStep('Reconcile Transmission lighttpd route for '.$user,
-        pmssBuildCommand('/scripts/util/userConfigLighttpd.php', [$user]));
+    $result = pmssUserWatchdogCommandRun(
+        pmssBuildCommand('/scripts/util/userConfigLighttpd.php', [$user]), 60, $user, 'lighttpd'
+    );
+    if ($result['timed_out'] || $result['rc'] !== 0) return;
 }

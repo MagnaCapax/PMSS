@@ -1590,6 +1590,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Directory preparation seeds `.lighttpd/custom` at `0640` and reapplies that mode to existing regular files without rewriting their contents or modification time; symlinks and non-file targets remain rejected.
 
 - scripts/cron/checkLighttpdInstances.php [<user>]
+  - Hermes and Transmission route reconciliation check the shared account lighttpd backoff before work. Their lighttpd config regeneration uses the same 60-second watchdog deadline as missing-config and Docker-proxy refreshes; a timeout records the 15-minute backoff and stops that repair, including Hermes' subsequent nginx work (ADR 0035, Refs #1309).
   - Socket-health boundary: the existing `lighttpd/watchdogSocketProbe.php`
     include retains every public helper and overrideable constant. Connection
     probes and post-restart listener verification share the same retry cadence;
