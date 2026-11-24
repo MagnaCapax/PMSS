@@ -36,6 +36,11 @@ Responsibilities:
 - Invoke phase 2 unless explicitly skipped.
 - Keep `/etc/cron.d/pmss` active through phase-1 staging; disable it only for
   the immediate phase-2 handoff and restore it from a shutdown/signal guard.
+  The handoff writes `/run/pmss-root-cron-disabled` before removing the cron file.
+  Both `rc.local` and cron's `ExecStartPre` respect that marker, keeping root cron
+  off through account maintenance, the idle storage benchmark and BFQ restoration
+  until phase 2 explicitly restores it. `/run` is cleared at boot, allowing
+  recovery after an interrupted update (Refs #1185).
 - Self-heal `cron.service` when systemd reports it as masked, because PMSS
   watchdogs, quotas, and traffic jobs depend on root cron.
 - If phase 2 exits non-zero after staging, make a best-effort
