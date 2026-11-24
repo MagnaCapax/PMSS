@@ -39,9 +39,9 @@ function pmssTerminateUserClearIopsBudgetState(string $username, bool $dryRun, ?
     if (pmssUserAccountLookup($username) !== null) return false;
     $root = rtrim(pmssDirPathResolve($runtimeRoot, 'PMSS_RUNTIME_DIR', '/etc/seedbox/runtime'), '/');
     $ok = true;
-    // Same buckets as the failed-provision cleanup, plus the cap writer's held-cap record.
-    foreach (array('iopsLimits', 'iopsLimitEnforced', 'iopsBudgetCap') as $bucket) {
-        $ok = pmssTerminateUserUnlinkPath($username, 'remove_iops_budget_state', $root.'/'.$bucket.'/'.$username, $dryRun) && $ok;
+    // Inventory additions receive the same unassigned-name guard and audited removal.
+    foreach (pmssUserNameStatePaths($username, 'iops', array('iops' => $root)) as $path) {
+        $ok = pmssTerminateUserUnlinkPath($username, 'remove_iops_budget_state', $path, $dryRun) && $ok;
     }
     return $ok;
 }
@@ -60,8 +60,7 @@ function pmssTerminateUserArchiveUsageHistory(string $username, bool $dryRun, ?s
     $root = rtrim($logRoot ?? '/var/log/pmss', '/');
     $stamp = gmdate('YmdHis', $now ?? time());
     $ok = true;
-    foreach (array('resources/'.$username, 'traffic/'.$username, 'traffic/'.$username.'-localnet', 'traffic-ingress/'.$username) as $rel) {
-        $path = $root.'/'.$rel;
+    foreach (pmssUserNameStatePaths($username, 'usage', array('usage' => $root)) as $path) {
         if (!is_file($path) || is_link($path)) continue;
         // A subdirectory, so the stats crons that list every file in the log directory do not pick it up.
         $archiveDir = dirname($path).'/terminated';
@@ -77,8 +76,7 @@ function pmssTerminateUserArchiveUsageHistory(string $username, bool $dryRun, ?s
     }
     // The stats caches are rebuilt from these logs; with the logs moved, a stale cache would stay as the new account's usage.
     $cacheRoot = rtrim(pmssDirPathResolve($cacheRoot, 'PMSS_RUNTIME_DIR', '/var/run/pmss'), '/');
-    foreach (array('resourceStats', 'trafficStats') as $bucket) {
-        $cache = $cacheRoot.'/'.$bucket.'/'.$username;
+    foreach (pmssUserNameStatePaths($username, 'cache', array('cache' => $cacheRoot)) as $cache) {
         if (!is_file($cache) || is_link($cache)) continue;
         if ($dryRun) {
             pmssUserLifecycleContextLogStatusMessage('terminate', 'remove_usage_cache', $username, 'SKIP', 'Dry run; usage cache not removed', array('path' => $cache));
@@ -100,7 +98,7 @@ function pmssTerminateUserClearLinger(string $username, bool $dryRun): bool
     }
     if (pmssUserAccountLookup($username) !== null) return false;
     // The systemd directory is root-controlled; unlink only this exact entry, never its target.
-    return pmssTerminateUserUnlinkPath($username, 'remove_stale_linger', '/var/lib/systemd/linger/'.$username, $dryRun);
+    return pmssTerminateUserUnlinkPath($username, 'remove_stale_linger', pmssUserNameStatePaths($username, 'linger')[0], $dryRun);
 }
 
 /** Return the final line, exit code, and audit status after every purge has run. */

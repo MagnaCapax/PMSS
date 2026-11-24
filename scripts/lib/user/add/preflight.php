@@ -8,6 +8,7 @@
 
 require_once __DIR__.'/orphanCleanup.php';
 require_once dirname(__DIR__).'/cronSpool.php';
+require_once dirname(__DIR__).'/nameState.php';
 
 /**
  * Remove only a regular cron spool whose owning UID has no current account.
@@ -19,7 +20,7 @@ function pmssAddUserCronSpoolPreflight(string $userName, string $spoolDir = '/va
         return 'unsafe';
     }
 
-    return pmssUserCronSpoolRemoveOrphan($spoolDir.'/'.$userName, $uidLookup)['status'];
+    return pmssUserCronSpoolRemoveOrphan(pmssUserNameStatePaths($userName, 'cron', array('cron' => $spoolDir))[0], $uidLookup)['status'];
 }
 
 /**
@@ -57,5 +58,14 @@ function pmssAddUserEnsurePreflightState(users $userDb, array $user, string $hom
         logProvisionMessage('Removed orphaned cron spool before account creation');
     } elseif ($cronSpoolState !== 'absent') {
         pmssAddUserFatalExit('ERROR', 'Cron spool entry requires inspection before account creation', 'cron_spool_'.$cronSpoolState);
+    }
+
+    // Do not let a reused name inherit limits, history, or account-owned socket residue.
+    $residue = pmssUserNameStateResidue($user['name']);
+    foreach ($residue as $entry) {
+        logProvisionMessage('Username state requires '.$entry['action'].' before reuse: '.$entry['path']);
+    }
+    if ($residue !== array()) {
+        pmssAddUserFatalExit('ERROR', 'Username state requires inspection before account creation', 'username_state_residue');
     }
 }

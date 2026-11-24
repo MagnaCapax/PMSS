@@ -21,9 +21,9 @@ function pmssTerminateUserInitialRemovalSteps(string $username, int $uid): array
     }
     return array(
         array('crontab_remove', 'crontab -r -u '.escapeshellarg($username).' || true'),
-        array('crontab_spool_remove', 'rm -f -- '.escapeshellarg('/var/spool/cron/crontabs/'.$username).' '.escapeshellarg('/var/spool/cron/'.$username).' || true'),
+        array('crontab_spool_remove', 'rm -f -- '.escapeshellarg(pmssUserNameStatePaths($username, 'cron')[0]).' '.escapeshellarg(pmssUserNameStatePaths($username, 'cron_legacy')[0]).' || true'),
         array('remove_tmux_socket', pmssTerminateUserAccountSocketRemoveCommand($username, '/tmp/tmux-'.$uid)),
-        array('remove_screen_socket', pmssTerminateUserAccountSocketRemoveCommand($username, '/var/run/screen/S-'.$username)),
+        array('remove_screen_socket', pmssTerminateUserAccountSocketRemoveCommand($username, pmssUserNameStatePaths($username, 'screen')[0])),
         array('userdel_initial', 'userdel '.escapeshellarg($username)),
     );
 }

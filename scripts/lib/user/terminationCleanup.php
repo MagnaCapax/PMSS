@@ -10,6 +10,7 @@ require_once dirname(__DIR__).'/userLifecycle.php';
 require_once dirname(__DIR__).'/pathSafety.php';
 require_once __DIR__.'/userConfigStore.php';
 require_once __DIR__.'/pikkumiesPreinstallState.php';
+require_once __DIR__.'/nameState.php';
 
 pmssRequireRelativeFiles(__DIR__.'/termination', ['commands.php', 'filesystem.php', 'ports.php', 'completion.php']);
 
