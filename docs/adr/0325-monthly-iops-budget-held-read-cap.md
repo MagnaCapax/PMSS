@@ -72,6 +72,13 @@ through `pmssDynamicIopsKernelReady()`.
   `-localnet` file) into a root-only `terminated/` subdirectory, named with the
   termination time. The history is kept (ADR 0044), but the budget no longer
   judges a later account with the same name on the old account's operations.
+  It also removes the derived `resourceStats/<user>` and `trafficStats/<user>`
+  caches under the runtime directory: with the logs moved, the stats crons no
+  longer rewrite them, and a stale cache would stand as the new account's usage.
+- After a release where no other cap is written, the panel's budget notice is not
+  rewritten; it disappears once the status file is older than the panel's 900 s
+  freshness bound. Clearing it at once would mean another root write into the
+  account's home for a notice that is at most 15 minutes late.
 
 ## Consequences
 - The cap bites only an account reading faster than its cap; an account slightly

@@ -51,7 +51,7 @@ function pmssTerminateUserClearIopsBudgetState(string $username, bool $dryRun, ?
  * kept (ADR 0044 retention), but a later account with the same name no longer reads it as its own usage.
  * The log directories are root-owned; the archive directory is root-only.
  */
-function pmssTerminateUserArchiveUsageHistory(string $username, bool $dryRun, ?string $logRoot = null, ?int $now = null): bool
+function pmssTerminateUserArchiveUsageHistory(string $username, bool $dryRun, ?string $logRoot = null, ?int $now = null, ?string $cacheRoot = null): bool
 {
     if (!pmssUsernameIsValid($username)) {
         throw new \InvalidArgumentException('Refusing unsafe usage history archive');
@@ -74,6 +74,20 @@ function pmssTerminateUserArchiveUsageHistory(string $username, bool $dryRun, ?s
         pmssUserLifecycleContextLogStatusMessage('terminate', 'archive_usage_history', $username, $moved ? 'OK' : 'ERR',
             $moved ? 'Moved usage history aside' : 'Failed to move usage history aside', array('path' => $path, 'target' => $target));
         $ok = $moved && $ok;
+    }
+    // The stats caches are rebuilt from these logs; with the logs moved, a stale cache would stay as the new account's usage.
+    $cacheRoot = rtrim(pmssDirPathResolve($cacheRoot, 'PMSS_RUNTIME_DIR', '/var/run/pmss'), '/');
+    foreach (array('resourceStats', 'trafficStats') as $bucket) {
+        $cache = $cacheRoot.'/'.$bucket.'/'.$username;
+        if (!is_file($cache) || is_link($cache)) continue;
+        if ($dryRun) {
+            pmssUserLifecycleContextLogStatusMessage('terminate', 'remove_usage_cache', $username, 'SKIP', 'Dry run; usage cache not removed', array('path' => $cache));
+            continue;
+        }
+        $gone = @unlink($cache);
+        pmssUserLifecycleContextLogStatusMessage('terminate', 'remove_usage_cache', $username, $gone ? 'OK' : 'ERR',
+            $gone ? 'Removed usage cache' : 'Failed to remove usage cache', array('path' => $cache));
+        $ok = $gone && $ok;
     }
     return $ok;
 }
