@@ -129,4 +129,30 @@ PHP;
         }
         $this->assertSame($expected, $this->pmssRunInlinePhpJson($script));
     }
+
+    public function testIopsBudgetStateIsRemovedOnlyOnceTheNameIsUnassigned(): void
+    {
+        // A later account with the same name must not start with the old budget, marker or held cap (#1307 UC12).
+        $root = $this->pmssMakeTempDir('pmss-iops-budget-term-', 0700);
+        $script = 'namespace TerminationBudgetFixture; require_once '.var_export($this->pmssRepoPath('scripts/lib/user/terminationCleanup.php'), true).';';
+        $script .= 'function pmssUserAccountLookup($username) { return $GLOBALS[\'live\'] ? [\'uid\' => 1000] : null; }';
+        $script .= 'function pmssTerminateUserUnlinkPath($u, $phase, $path, $dry) { $GLOBALS[\'calls\'][] = [$phase, $path, $dry]; return true; }';
+        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/user/termination/completion.php', 'TerminationBudgetFixture');
+        $script .= '$out = []; foreach ([[true, false], [false, false], [false, true]] as [$live, $dry]) { $calls = [];'
+            .' $out[] = [pmssTerminateUserClearIopsBudgetState(\'user1234\', $dry, '.var_export($root, true).'), $calls]; }'
+            .' try { pmssTerminateUserClearIopsBudgetState(\'../user1234\', false); } catch (\InvalidArgumentException $e) { $out[] = $e->getMessage(); }'
+            .' echo json_encode($out);';
+        $paths = static function (bool $dry) use ($root): array {
+            return array_map(static function (string $bucket) use ($root, $dry): array {
+                return ['remove_iops_budget_state', $root.'/'.$bucket.'/user1234', $dry];
+            }, ['iopsLimits', 'iopsLimitEnforced', 'iopsBudgetCap']);
+        };
+        $this->assertSame([[false, []], [true, $paths(false)], [true, $paths(true)], 'Refusing unsafe IOPS budget cleanup'],
+            $this->pmssRunInlinePhpJson($script));
+        $this->pmssAssertRepoFileContainsOrderedStrings('scripts/terminateUser.php', [
+            'pmssTerminateUserFinalRemovalSteps($username, $uid, $killUserCommand)',
+            'pmssTerminateUserClearIopsBudgetState($username, $dryRun);',
+            'pmssTerminateUserCompletion($username, $purgePaths, $purgeResults, $dryRun)',
+        ]);
+    }
 }

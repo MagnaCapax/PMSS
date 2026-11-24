@@ -354,6 +354,8 @@ $sliceCleanupOk = pmssUserCgroupSliceDropinsCleanup(
 
 // This root-owned marker must not be inherited by a later account with the same name.
 pmssTerminateUserClearPreinstallState($username, $dryRun, pmssUserAccountLookup($username) !== null);
+// The budget file, enforcement marker and held-cap record would otherwise hold a later account with this name (#1307).
+pmssTerminateUserClearIopsBudgetState($username, $dryRun);
 
 // Retire both possible certbot names after the account is gone. The root-owned
 // billing ID was captured before the user record was removed.

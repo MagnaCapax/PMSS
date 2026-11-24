@@ -103,4 +103,34 @@ class IopsBudgetHoldTest extends TestCase
         $this->assertTrue($cap !== false && $clear !== false && $cap < $clear, 'budget cap must be set before the clear branch');
         $this->assertTrue(strpos($source, "'monthly-iops-budget'") !== false, 'budget cap writes carry their own audit reason');
     }
+
+    public function testHeldCapRecordRoundTripsAndRejectsJunk(): void
+    {
+        $runtime = $this->pmssMakeTempDir('iops-budget-record-');
+        $this->assertSame(null, \pmssIopsBudgetCapRecordRead('acct1', $runtime));
+        $this->assertTrue(\pmssIopsBudgetCapRecordWrite('acct1', 30, $runtime));
+        $this->assertSame(30, \pmssIopsBudgetCapRecordRead('acct1', $runtime));
+        $this->assertSame(0600, fileperms($runtime.'/iopsBudgetCap/acct1') & 0777);
+        $this->assertTrue(\pmssIopsBudgetCapRecordWrite('acct1', 300, $runtime));
+        $this->assertSame(300, \pmssIopsBudgetCapRecordRead('acct1', $runtime));
+        foreach (['', '0', '-30', 'thirty', '30 IOPS'] as $junk) {
+            file_put_contents($runtime.'/iopsBudgetCap/acct1', $junk);
+            $this->assertSame(null, \pmssIopsBudgetCapRecordRead('acct1', $runtime), $junk);
+        }
+    }
+
+    public function testReleaseClearsOnlyTheRecordedCapAndKeepsTheRecordUntilItIsGone(): void
+    {
+        // UC05: with no other cap to write, a released account keeps the held cap unless the writer takes it back.
+        $source = (string) file_get_contents(dirname(__DIR__, 3).'/cron/cgroupIopsLimitApply.php');
+        $this->assertStringContainsAllStrings([
+            'pmssIopsBudgetCapRecordWrite((string) $user, $budgetCap)',
+            '$held === $recordedCap ? pmssIopsClearThrottle($releasePath, $majMin, $DRY_RUN)',
+            "'monthly-iops-budget-release'",
+            'if ($recordedCap !== null && $released && !$DRY_RUN) pmssIntegerSettingFileRemove(',
+        ], $source);
+        $record = strpos($source, 'pmssIopsBudgetCapRecordRead(');
+        $this->assertTrue($record > strpos($source, 'pmssIopsBudgetHeldReadCap(')
+            && $record < strpos($source, 'Off leaves no dynamic read cap behind'), 'release runs after the hold is read, before the clear branch');
+    }
 }

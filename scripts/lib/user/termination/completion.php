@@ -30,6 +30,22 @@ function pmssTerminateUserClearPreinstallState(string $username, bool $dryRun, b
     return $status;
 }
 
+/** Retire the monthly IOPS budget state once the name is unassigned, so a later account with the name starts unheld. */
+function pmssTerminateUserClearIopsBudgetState(string $username, bool $dryRun, ?string $runtimeRoot = null): bool
+{
+    if (!pmssUsernameIsValid($username)) {
+        throw new \InvalidArgumentException('Refusing unsafe IOPS budget cleanup');
+    }
+    if (pmssUserAccountLookup($username) !== null) return false;
+    $root = rtrim(pmssDirPathResolve($runtimeRoot, 'PMSS_RUNTIME_DIR', '/etc/seedbox/runtime'), '/');
+    $ok = true;
+    // Same buckets as the failed-provision cleanup, plus the cap writer's held-cap record.
+    foreach (array('iopsLimits', 'iopsLimitEnforced', 'iopsBudgetCap') as $bucket) {
+        $ok = pmssTerminateUserUnlinkPath($username, 'remove_iops_budget_state', $root.'/'.$bucket.'/'.$username, $dryRun) && $ok;
+    }
+    return $ok;
+}
+
 /** Retire a raced linger flag only after the account name is no longer assigned. */
 function pmssTerminateUserClearLinger(string $username, bool $dryRun): bool
 {

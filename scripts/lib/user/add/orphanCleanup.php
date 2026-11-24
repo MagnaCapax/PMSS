@@ -136,7 +136,7 @@ function pmssAddUserCleanupFailedProvision(users $userDb, string $userName, stri
         array('Release lighttpd port', '/scripts/util/portManager.php release '.escapeshellarg($userName).' lighttpd'),
         array('Remove nginx user config', 'rm -f -- '.escapeshellarg('/etc/nginx/users/'.$userName)),
         array('Remove runtime traffic limit', 'rm -f -- '.escapeshellarg('/etc/seedbox/runtime/trafficLimits/'.$userName)),
-        array('Remove runtime IOPS limit', 'rm -f -- '.escapeshellarg('/etc/seedbox/runtime/iopsLimits/'.$userName).' '.escapeshellarg('/etc/seedbox/runtime/iopsLimitEnforced/'.$userName)),
+        array('Remove runtime IOPS limit', 'rm -f -- '.escapeshellarg('/etc/seedbox/runtime/iopsLimits/'.$userName).' '.escapeshellarg('/etc/seedbox/runtime/iopsLimitEnforced/'.$userName).' '.escapeshellarg('/etc/seedbox/runtime/iopsBudgetCap/'.$userName)),
         array('Disable systemd linger', 'if [ -e '.escapeshellarg('/var/lib/systemd/linger/'.$userName).' ]; then timeout --kill-after=5s 45s loginctl disable-linger '.escapeshellarg($userName).'; fi'),
         array('Delete user account and home', 'userdel -r '.escapeshellarg($userName).' || true'),
         array('Delete leftover home directory', 'rm -rf -- '.escapeshellarg($homePath)),

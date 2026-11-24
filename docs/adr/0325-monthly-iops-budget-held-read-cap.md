@@ -54,6 +54,19 @@ through `pmssDynamicIopsKernelReady()`.
 - The floor is a whole ten: blk-throttle delivers whole tens per 100 ms slice
   (`pmssReadLimitDelivered`, ADR 0232), so a floor of 30 is the rate delivered.
 - Writes stay as they are: v1 throttles do not bind buffered writes.
+- The cap writer records the held cap it applied in the root-only
+  `/etc/seedbox/runtime/iopsBudgetCap/<user>`. This record is not a second hold
+  state. The marker says the account is held; the record says which kernel value
+  the hold wrote. After release, when no other cap replaces it (for example a
+  dynamic cycle in its keep-kernel fallback, or an account the dynamic cycle gives
+  no cap), the writer clears the `/home` read cap only if the kernel still holds
+  the recorded value. It audits this as `monthly-iops-budget-release` and removes
+  the record once the cap is gone. Without the record, a released account kept
+  its held cap for as long as the fallback lasted (#1307 acceptance UC05).
+- `terminateUser` removes `iopsLimits/<user>`, `iopsLimitEnforced/<user>` and
+  `iopsBudgetCap/<user>` once the name is unassigned, so a later account with
+  the same name does not start held (UC12). The failed-provision cleanup removes
+  the same three. `recreateUser` does not terminate, so a rebuild keeps the hold.
 
 ## Consequences
 - The cap bites only an account reading faster than its cap; an account slightly
@@ -64,5 +77,11 @@ through `pmssDynamicIopsKernelReady()`.
   read-limit status after the dynamic cycle, with `reason: monthly-budget`, and the
   panel names the budget instead of disk contention.
 - The v2 branch keeps its 100 IOPS clamp; no PMSS host runs v2.
+- The cap covers every read the account makes from `/home`, including the
+  account's own panel PHP. If a held account keeps reading at its cap, its own
+  load competes with its panel: a page whose files are not in the page cache can
+  take more than 10 s (measured at a cap of 30 with a random-read load running, UC09).
+  That is the hold working, not a fault. The notice the account gets before the
+  hold is the primary channel, and the warm panel still shows the budget text.
 
 Tests: `scripts/lib/tests/development/IopsBudgetHoldTest.php`.

@@ -131,6 +131,25 @@ foreach ($userConfigs as $user => $json) {
     $budgetCap = pmssIopsBudgetHeldReadCap((string) $user, $budgetKernelReady);
     if ($budgetCap !== null) $readIops = $readIops === null ? $budgetCap : min($readIops, $budgetCap);
     if ($budgetCap !== null && $readIops === $budgetCap) $budgetBound[$user] = $budgetCap;
+    if (isset($budgetBound[$user]) && !$DRY_RUN && !$CENSUS) pmssIopsBudgetCapRecordWrite((string) $user, $budgetCap);
+    // A released hold takes back its cap even when no other cap replaces it; a cap the kernel no longer holds is left alone.
+    $recordedCap = $budgetCap === null && !$CENSUS ? pmssIopsBudgetCapRecordRead((string) $user) : null;
+    $released = true;
+    if ($recordedCap !== null && $readIops === null) {
+        $released = false;
+        if (($releaseUid = pmssCgroupDirectUserUidOrError($user, $errors)) !== null) {
+            $releasePath = pmssCgroupDirectUserBlkioFilePath($releaseUid, 'blkio.throttle.read_iops_device');
+            $held = is_file($releasePath) ? pmssCgroupDirectDeviceValueParse(trim((string) @file_get_contents($releasePath)), $majMin) : null;
+            $res = $held === $recordedCap ? pmssIopsClearThrottle($releasePath, $majMin, $DRY_RUN) : ['ok' => true, 'reason' => 'not-held'];
+            $released = $res['ok'];
+            if (!$res['ok']) { $errors++; syslog(LOG_WARNING, "read-iops budget release $user uid=$releaseUid: ".$res['reason']); }
+            elseif ($res['reason'] === 'written') {
+                $written++;
+                pmssCgroupDirectAudit($user, $releaseUid, 'read_iops', $recordedCap, 0, 'monthly-iops-budget-release');
+            }
+        }
+    }
+    if ($recordedCap !== null && $released && !$DRY_RUN) pmssIntegerSettingFileRemove(pmssIopsBudgetCapRecordPath((string) $user));
     // Off leaves no dynamic read cap behind: a slice without a configured or derived cap is cleared.
     if (!$dynamicEnforce && $readIops === null && !$CENSUS && $dynamicSettings !== null) {
         $clearUid = pmssCgroupDirectUserUidOrError($user, $errors);

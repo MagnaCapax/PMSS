@@ -123,3 +123,28 @@ function pmssIopsBudgetHeldReadCap(string $username, bool $kernelReady, ?string 
     $limit = pmssIntegerSettingFileRead(pmssIopsLimitRuntimePath($username, $runtimeDir), 'pmssIopsLimitParseMonthlyOperations');
     return $limit > 0 ? pmssIopsBudgetReadCap($limit) : null;
 }
+
+/** Root-owned record of the held cap the cap writer put in the kernel, so a release takes back exactly that cap. */
+function pmssIopsBudgetCapRecordPath(string $username, ?string $runtimeDir = null): string
+{
+    return pmssIntegerSettingRuntimeUserPath('iopsBudgetCap', $username, $runtimeDir);
+}
+
+function pmssIopsBudgetCapRecordParse(string $raw): ?int
+{
+    return ctype_digit($raw) && (int) $raw > 0 ? (int) $raw : null;
+}
+
+/** The recorded held cap; null when there is none or it cannot be read. */
+function pmssIopsBudgetCapRecordRead(string $username, ?string $runtimeDir = null): ?int
+{
+    return pmssIntegerSettingFileParse(pmssIopsBudgetCapRecordPath($username, $runtimeDir), 'pmssIopsBudgetCapRecordParse');
+}
+
+/** A failed write only means a later release leaves the cap to the other cap sources, as before the record existed. */
+function pmssIopsBudgetCapRecordWrite(string $username, int $cap, ?string $runtimeDir = null): bool
+{
+    if (pmssIopsBudgetCapRecordRead($username, $runtimeDir) === $cap) return true;
+    $path = pmssIopsBudgetCapRecordPath($username, $runtimeDir);
+    return pmssIntegerSettingStorageDirEnsure(dirname($path), 0700) && pmssAtomicWriteFile($path, (string) $cap, 0600);
+}
