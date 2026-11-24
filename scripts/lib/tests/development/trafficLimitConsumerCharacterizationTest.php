@@ -84,7 +84,7 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
             "'trafficLimit.php'",
             "pmssTrafficLimitReadGiBFile(pmssIntegerSettingRuntimeUserPath('trafficLimits', \$user))",
             'pmssReadUserTrafficMonth(pmssTrafficStatsPath($user))',
-            'max($diskQuotaGiB * 500, 15000)',
+            'pmssQuotaFilesLimit($diskQuotaGiB)',
         ], ['unserialize(', '/.trafficLimit', '/.trafficData']);
     }
 

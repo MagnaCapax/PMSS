@@ -48,6 +48,9 @@ function pmssAgentDiagnosticsSectionSpecs(string $user = ''): array
             'mdstat' => ['type' => 'file', 'env' => 'PMSS_AGENT_DIAGNOSTICS_MDSTAT_PATH', 'path' => '/proc/mdstat'],
             'md_write_path' => ['type' => 'command', 'command' => pmssAgentDiagnosticsMdWritePathCommand(), 'format' => 'json'],
             'fstab' => ['type' => 'file', 'env' => 'PMSS_AGENT_DIAGNOSTICS_FSTAB_PATH', 'path' => '/etc/fstab'],
+            // Per-host file quota ratio (ADR 0342): the effective value and whether the host file exists, so it never drifts unseen.
+            'quota_files_per_gib' => ['type' => 'command', 'command' => 'php -r \'require "/scripts/lib/user/quotaFilesPerGiB.php"; echo pmssQuotaFilesPerGiB();\' 2>/dev/null', 'format' => 'text', 'fallback' => 'unknown'],
+            'quota_files_per_gib_file_present' => ['type' => 'command', 'command' => 'if [ -e /etc/seedbox/config/quotaFilesPerGiB ]; then echo yes; else echo no; fi', 'format' => 'text', 'fallback' => 'unknown'],
         ],
         'services' => [
             'nginx' => ['type' => 'command', 'command' => 'systemctl is-active nginx 2>/dev/null', 'format' => 'text', 'fallback' => 'unknown'],

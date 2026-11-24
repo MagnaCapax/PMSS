@@ -144,10 +144,13 @@ on 2026-10-21 measured peaks of 49,505 and 50,139 extra files over about
 Going over the soft file limit only starts the quota grace period, so when
 quota data is available the installer checks that current usage is within
 the soft limit and that current usage plus 60,000 fits the hard limit before
-stopping the gateway. PMSS sets 500 files per GiB of disk quota and a hard
-limit 1.25 times that, so an account holding little besides OpenClaw
-(about 55,000 files) can update on a plan of about 184 GiB or more; a smaller
-plan can run OpenClaw but `update` refuses until files are freed.
+stopping the gateway. PMSS sets 500 files per GiB of disk quota by default
+(a host can set another ratio in `/etc/seedbox/config/quotaFilesPerGiB`, ADR
+0342) and a hard limit 1.25 times that, so on the default ratio an account
+holding little besides OpenClaw (about 55,000 files) can update on a plan of
+about 184 GiB or more; a smaller plan can run OpenClaw but `update` refuses
+until files are freed. The installer reads the account's actual limits, so a
+higher host ratio lowers that plan size.
 
 The update holds the watchdog lock, stops the gateway, replaces the private
 Node runtime when it is not the pinned version (download and SHA256 check

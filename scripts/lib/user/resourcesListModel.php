@@ -3,7 +3,7 @@
  * @license GPL-3.0-only
  */
 require_once dirname(__DIR__).'/runtime.php';
-pmssRequireRelativeFiles(__DIR__, ['../systemdSliceProperties.php', 'selection.php', 'traffic.php', 'trafficLimit.php', 'userConfigStore.php']);
+pmssRequireRelativeFiles(__DIR__, ['../systemdSliceProperties.php', 'quotaFilesPerGiB.php', 'selection.php', 'traffic.php', 'trafficLimit.php', 'userConfigStore.php']);
 
 /**
  * Compute quota- and suspension-derived fields from stored user config.
@@ -13,14 +13,15 @@ pmssRequireRelativeFiles(__DIR__, ['../systemdSliceProperties.php', 'selection.p
 function pmssUserResourcesListQuotaState(?array $userConfig, bool $suspended): array
 {
     $diskQuotaGiB = is_numeric($userConfig['quota'] ?? null) ? (int) $userConfig['quota'] : null;
-    $inodeQuota = $diskQuotaGiB !== null && $diskQuotaGiB > 0 ? max($diskQuotaGiB * 500, 15000) : null;
+    // The enforced limits (ADR 0342): the same helper userApplyDiskQuota() uses.
+    $inodeLimits = $diskQuotaGiB !== null && $diskQuotaGiB > 0 ? pmssQuotaFilesLimit($diskQuotaGiB) : null;
     return [
         'disk_quota_gib' => $diskQuotaGiB,
         // Explicit zero bursts survive; only missing/invalid values derive from the quota.
         'disk_burst_gib' => is_numeric($userConfig['quotaBurst'] ?? null) ? (int) $userConfig['quotaBurst']
             : ($diskQuotaGiB === null ? null : (int) round($diskQuotaGiB * 1.25)),
-        'inode_quota' => $inodeQuota,
-        'inode_burst' => $inodeQuota === null ? null : (int) floor($inodeQuota * 1.25),
+        'inode_quota' => $inodeLimits['soft'] ?? null,
+        'inode_burst' => $inodeLimits['hard'] ?? null,
         'suspended' => $suspended || (bool) ($userConfig['suspended'] ?? false),
     ];
 }

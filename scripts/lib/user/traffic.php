@@ -14,7 +14,7 @@
  */
 
 require_once __DIR__.'/../update/runtime/commands.php';
-pmssRequireRelativeFiles(__DIR__, ['../lighttpd/userFileWrite.php', '../traffic/storage.php', 'integerSetting.php', 'userConfigStore.php']);
+pmssRequireRelativeFiles(__DIR__, ['../lighttpd/userFileWrite.php', '../traffic/storage.php', 'integerSetting.php', 'quotaFilesPerGiB.php', 'userConfigStore.php']);
 require_once __DIR__.'/../quotaSnapshot.php';
 
 /**
@@ -40,18 +40,22 @@ function userApplyTrafficLimit(array $user): void
 
 /**
  * Configure disk quota limits for the user.
+ *
+ * The file limits come from the host's per-GiB ratio (quotaFilesPerGiB.php, ADR 0342).
+ *
+ * @return bool True when the limits were applied; the quota status file refresh does not count.
  */
-function userApplyDiskQuota(array $user): void
+function userApplyDiskQuota(array $user): bool
 {
     if (!isset($user['name']) || !is_string($user['name']) || !pmssUsernameIsValid($user['name'])) {
-        return;
+        return false;
     }
 
-    $filesLimitPerGb = 500;
     $quota = $user['quota'] * 1024 * 1024;
-    $filesLimit = max($user['quota'] * $filesLimitPerGb, 15000);
+    $filesLimits = pmssQuotaFilesLimit((int) $user['quota']);
+    $filesLimit = $filesLimits['soft'];
     $quotaBurst = (int) floor($quota * 1.25);
-    $filesBurst = (int) floor($filesLimit * 1.25);
+    $filesBurst = $filesLimits['hard'];
 
     $cmd = sprintf(
         'setquota %s %d %d %d %d -a',
@@ -61,12 +65,12 @@ function userApplyDiskQuota(array $user): void
         $filesLimit,
         $filesBurst
     );
-    runStep('Applying disk quota', $cmd);
+    $applied = runStep('Applying disk quota', $cmd) === 0;
 
     $quotaPath = pmssUserQuotaStatusPath($user['name']);
     if ($quotaPath === null) {
         pmssLogStatus('skip', 'Refreshing quota status file: unsafe or missing user home');
-        return;
+        return $applied;
     }
 
     $report = pmssQuotaSnapshotAggregateReport($user['name'],
@@ -75,6 +79,8 @@ function userApplyDiskQuota(array $user): void
         || !pmssQuotaSnapshotWrite($quotaPath, implode("\n", $report['lines'])."\n")) {
         pmssLogStatus('error', "Refreshing quota status file failed for {$user['name']}: {$quotaPath}");
     }
+
+    return $applied;
 }
 
 /**

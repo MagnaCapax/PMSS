@@ -46,6 +46,7 @@ pmssRequireRelativeFiles(__DIR__.'/../lib', [
     'update/systemPrep.php', 'update/services/systemd.php', 'update/services/logging.php',
     'update/services/logrotate.php', 'update/services/mountHardening.php', 'update/userMaintenance.php',
     'update/networking.php', 'update/sessionHistoryPermissions.php', 'update/services/bootstrap.php', 'motd/Generator.php', 'certbotSetup.php',
+    'user/quotaFilesReapply.php',
 ]);
 
 requireRoot();
@@ -426,6 +427,8 @@ $rutorrentIndexSha = sha1((string) @file_get_contents('/etc/skel/www/rutorrent/i
 $userMaintenanceSummary = pmssRunProfiledCallable('Updating all user environments', 'pmssUpdateAllUsers', [$rutorrentIndexSha]);
 // User maintenance can reload systemd or set slice properties, overwriting direct BFQ weights.
 runStep('Restoring direct BFQ weights after user maintenance', '/scripts/cron/cgroupBfqWeightApply.php');
+// A changed per-host file quota ratio (ADR 0342) reaches existing accounts only here; unchanged is a no-op.
+pmssRunProfiledCallable('Re-applying the file quota ratio to existing accounts', 'pmssQuotaFilesReapplyRun', [], PMSS_UPDATE_STEP_CLASS_SOFT_FAIL);
 pmssUpdateStep2HandleUserMaintenanceSummary($userMaintenanceSummary);
 // Root cron stays disabled through phase 2; retry account services now rather
 // than leaving a transient per-user start failure until cron resumes.
