@@ -628,9 +628,10 @@ Failed CLI link publication emits a warning; a later update can retry the link.
    created by this pass. A file that disappears before flags are restored still
    produces a diagnostic.
    Then `pmssQuotaFilesReapplyRun()` re-applies the file quota ratio to every
-   account's stored quota when `/etc/seedbox/config/quotaFilesPerGiB` differs from
-   the ratio last applied under `/var/lib/pmss` (ADR 0342); an unchanged ratio
-   does nothing.
+   account's file limits when `/etc/seedbox/config/quotaFilesPerGiB` differs from
+   the ratio last applied under `/var/lib/pmss` (ADR 0342); block limits are read
+   live and written back unchanged, an unreadable account is left alone and
+   retried next update, and an unchanged ratio does nothing.
 10. Reapply network templates, apply security hardening, summarise profiling, and
    log completion markers. Tenant-empty fresh installs also run the existing
    storage benchmark once with `--require-idle --devices` before root cron is

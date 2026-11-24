@@ -6,6 +6,9 @@
  *   - `name` (string) – Unix account.
  *   - `trafficLimit` (int|null) – Monthly quota in GiB; <=1 disables throttling.
  *   - `quota` (int) – Disk quota in GiB; converted to blocks/inodes below.
+ *   - `blockSoftKiB` / `blockHardKiB` (optional ints) – Block limits to keep as they are: when
+ *     both are set, `setquota` receives them instead of the limits derived from `quota`, and
+ *     `quota` then only sizes the file limits (ADR 0342 re-apply, which reads them live).
  *   - `CPUWeight` / `IOWeight` (optional ints) – Set elsewhere but carried with
  *     the user array for holistic resource adjustments.
  *
@@ -55,6 +58,11 @@ function userApplyDiskQuota(array $user): bool
     $filesLimits = pmssQuotaFilesLimit((int) $user['quota']);
     $filesLimit = $filesLimits['soft'];
     $quotaBurst = (int) floor($quota * 1.25);
+    // Block limits the caller read from the kernel are passed back unchanged (ADR 0342 re-apply).
+    if (isset($user['blockSoftKiB'], $user['blockHardKiB'])) {
+        $quota = (int) $user['blockSoftKiB'];
+        $quotaBurst = (int) $user['blockHardKiB'];
+    }
     $filesBurst = $filesLimits['hard'];
 
     $cmd = sprintf(

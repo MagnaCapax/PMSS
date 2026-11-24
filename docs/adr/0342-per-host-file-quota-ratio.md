@@ -43,10 +43,16 @@ host runs the same code and the file holds one integer that depends on the stora
 - A changed ratio reaches existing accounts through the update. `pmssQuotaFilesReapplyRun`
   (`scripts/lib/user/quotaFilesReapply.php`, one step of `update-step2.php`) compares the effective
   ratio with the last applied one in `/var/lib/pmss/quotaFilesPerGiBApplied` (no record means 500).
-  When they differ it runs `userApplyDiskQuota` for every account from its stored `quota`, then
-  records the ratio. Accounts with no stored `quota` are skipped and logged. When the ratio went
-  down, accounts above their new soft limit are logged. A failed apply leaves the record unchanged
-  so the next update retries. Equal ratios do nothing, and so does a host with no file and no record.
+  When they differ it reads every account's live block soft and hard limits and file count from one
+  fresh `repquota -u -n /home` report, then runs `userApplyDiskQuota` per account with the live block
+  limits passed back unchanged and the file limits sized from the live block soft limit, and records the
+  ratio. Only the file limits change; the stored json `quota` is never used, because it is older than
+  the kernel quota whenever something raised the kernel quota with a raw `setquota` (it does not
+  rewrite the json) and writing it back would lower the account's disk quota. An account whose live
+  limits cannot be read is left untouched, logged and counted as failed; an account with no live block
+  soft limit (unlimited) is skipped and logged. When the ratio went down, accounts above their new soft
+  limit are logged. A failed apply or unreadable account leaves the record unchanged so the next update
+  retries. Equal ratios do nothing, and so does a host with no file and no record.
 - Diagnostics report `storage.quota_files_per_gib` (the effective ratio) and
   `storage.quota_files_per_gib_file_present` (`yes` or `no`), answering ADR 0233's concern that
   per-host values stay visible to the repository's tooling.
@@ -56,8 +62,11 @@ host runs the same code and the file holds one integer that depends on the stora
   HDD hosts. Enforced and displayed limits cannot drift. Old accounts get a changed ratio on
   the next update.
 - Negative: the file is a host setting that a reader of the repository does not see; diagnostics
-  and this ADR are the visibility. Re-applying rebuilds block limits from the stored `quota`,
-  which equals what `userApplyDiskQuota` set; a block limit set by hand outside PMSS would be reset.
+  and this ADR are the visibility. Re-applying leaves block limits as the kernel holds them, so a
+  block limit raised or set outside the json survives. `setquota` takes all four limits at once, so a
+  block limit changed by another writer between the one live read and that account's `setquota` can
+  still be overwritten; the window is the length of the step. File limits follow the live block soft
+  limit rounded down to whole GiB, not the stored `quota`.
 - Follow-ups: writing the file on a host is a provisioning step outside PMSS. Accounts that hold
   more files than a lowered limit enter the kernel grace period; the log names them.
 
