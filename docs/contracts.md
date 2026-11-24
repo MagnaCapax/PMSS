@@ -1783,6 +1783,11 @@ Automation often invokes these utilities; below are expected inputs and effects.
     Refusals return 1; execution returns the repair command's status. Re-running
     on a healthy tree makes no ownership changes.
 
+- scripts/util/userQuotaApply.php <user> <quotaGiB>
+  - Behavior: Sets one account's disk quota when it changes after provisioning (ADR 0342). Validates the account as `userConfig.php` does (normalized valid name, passwd entry, uid at least 1000, home `/home/<user>`), calls `userApplyDiskQuota()` for the block limits and the file limits at the host ratio, then persists `quota` and `quotaBurst = round(quota * 1.25)` through `UserConfigStore::persist()`, keeping every other stored key. `<quotaGiB>` is a positive whole number of at most seven digits. Starts no process and never touches rTorrent.
+  - Exit codes: 0 applied and stored; 1 the kernel apply failed and nothing was stored; 2 bad arguments or no such account; 3 the kernel limits were applied but the store write failed (an account with no complete stored record cannot be written; rerun a full `userConfig.php`). Diagnostics go to stderr.
+  - Code: `scripts/lib/user/quotaApplyCli.php`; test: `QuotaApplyCliTest`.
+
 - scripts/util/userConfig.php <user> <ramMiB> <quotaGiB>
   - Behavior: Applies quota settings and rTorrent/ruTorrent configs; seeds dotfiles; safe to re-run.
   - rTorrent ports: a reconfigure keeps the stored `rtorrentPort` when its scgi reservation marker under `/var/lib/pmss/ports/scgi/<port>` still exists (`pmssRtorrentPortReservationReusable()`); only a missing, invalid or unreserved scgi port is reserved anew. Existing `rtorrentDhtPort` and `rtorrentListenPort` payload keys and markers are left untouched; the reconciler covers only scgi.

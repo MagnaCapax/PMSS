@@ -53,6 +53,12 @@ host runs the same code and the file holds one integer that depends on the stora
   soft limit (unlimited) is skipped and logged. When the ratio went down, accounts above their new soft
   limit are logged. A failed apply or unreadable account leaves the record unchanged so the next update
   retries. Equal ratios do nothing, and so does a host with no file and no record.
+- A quota that changes after provisioning (for example a reward that grows) is set through
+  `scripts/util/userQuotaApply.php <user> <quotaGiB>`, not by a raw `setquota`: it applies the block
+  limits and the file limits at the host ratio through `userApplyDiskQuota`, then stores `quota` and
+  `quotaBurst` through `UserConfigStore`, so the stored value follows the kernel's and the re-apply above
+  never meets a stale one. Exit 0 applied and stored; 1 apply failed, nothing stored; 2 bad arguments or
+  account; 3 applied but the store write failed. It starts no process and never touches rTorrent.
 - Diagnostics report `storage.quota_files_per_gib` (the effective ratio) and
   `storage.quota_files_per_gib_file_present` (`yes` or `no`), answering ADR 0233's concern that
   per-host values stay visible to the repository's tooling.
