@@ -46,6 +46,38 @@ function pmssTerminateUserClearIopsBudgetState(string $username, bool $dryRun, ?
     return $ok;
 }
 
+/**
+ * Move the account's per-user resource and traffic history aside once the name is unassigned. The history is
+ * kept (ADR 0044 retention), but a later account with the same name no longer reads it as its own usage.
+ * The log directories are root-owned; the archive directory is root-only.
+ */
+function pmssTerminateUserArchiveUsageHistory(string $username, bool $dryRun, ?string $logRoot = null, ?int $now = null): bool
+{
+    if (!pmssUsernameIsValid($username)) {
+        throw new \InvalidArgumentException('Refusing unsafe usage history archive');
+    }
+    if (pmssUserAccountLookup($username) !== null) return false;
+    $root = rtrim($logRoot ?? '/var/log/pmss', '/');
+    $stamp = gmdate('YmdHis', $now ?? time());
+    $ok = true;
+    foreach (array('resources/'.$username, 'traffic/'.$username, 'traffic/'.$username.'-localnet', 'traffic-ingress/'.$username) as $rel) {
+        $path = $root.'/'.$rel;
+        if (!is_file($path) || is_link($path)) continue;
+        // A subdirectory, so the stats crons that list every file in the log directory do not pick it up.
+        $archiveDir = dirname($path).'/terminated';
+        $target = $archiveDir.'/'.basename($path).'.'.$stamp;
+        if ($dryRun) {
+            pmssUserLifecycleContextLogStatusMessage('terminate', 'archive_usage_history', $username, 'SKIP', 'Dry run; usage history not moved', array('path' => $path));
+            continue;
+        }
+        $moved = (is_dir($archiveDir) || @mkdir($archiveDir, 0700)) && !is_link($archiveDir) && @rename($path, $target);
+        pmssUserLifecycleContextLogStatusMessage('terminate', 'archive_usage_history', $username, $moved ? 'OK' : 'ERR',
+            $moved ? 'Moved usage history aside' : 'Failed to move usage history aside', array('path' => $path, 'target' => $target));
+        $ok = $moved && $ok;
+    }
+    return $ok;
+}
+
 /** Retire a raced linger flag only after the account name is no longer assigned. */
 function pmssTerminateUserClearLinger(string $username, bool $dryRun): bool
 {

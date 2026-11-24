@@ -356,6 +356,8 @@ $sliceCleanupOk = pmssUserCgroupSliceDropinsCleanup(
 pmssTerminateUserClearPreinstallState($username, $dryRun, pmssUserAccountLookup($username) !== null);
 // The budget file, enforcement marker and held-cap record would otherwise hold a later account with this name (#1307).
 pmssTerminateUserClearIopsBudgetState($username, $dryRun);
+// Keep the usage history, but out of the name-keyed path a later account with this name would read as its own.
+pmssTerminateUserArchiveUsageHistory($username, $dryRun);
 
 // Retire both possible certbot names after the account is gone. The root-owned
 // billing ID was captured before the user record was removed.

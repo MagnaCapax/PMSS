@@ -67,6 +67,11 @@ through `pmssDynamicIopsKernelReady()`.
   `iopsBudgetCap/<user>` once the name is unassigned, so a later account with
   the same name does not start held (UC12). The failed-provision cleanup removes
   the same three. `recreateUser` does not terminate, so a rebuild keeps the hold.
+- `terminateUser` also moves the account's per-user resource and traffic logs
+  (`/var/log/pmss/{resources,traffic,traffic-ingress}/<user>`, and the traffic
+  `-localnet` file) into a root-only `terminated/` subdirectory, named with the
+  termination time. The history is kept (ADR 0044), but the budget no longer
+  judges a later account with the same name on the old account's operations.
 
 ## Consequences
 - The cap bites only an account reading faster than its cap; an account slightly
