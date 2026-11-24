@@ -45,6 +45,7 @@ PHP;
         '.rtorrentThrottleInit.php',
         '.bashrc',
         'install-media-stack.sh',
+        'bin/mediaStackProwlarr.sh',
         'install-ai-tools.sh',
         'bin/docker-install-lsio',
         'bin/dockerInstallLsio.php',

@@ -26,10 +26,13 @@ class UserSkeletonDeliveryCharacterizationTest extends TestCase
     public function testUpdaterPreservesCompleteManifestAndMaintenanceOrder(): void
     {
         $result = $this->trace('pmssUserApplySkeletonFiles', 'pmssUserApplySkeletonFiles(["user" => "fixtur01", "home" => "/fixture/home/fixtur01"]);');
-        // Digest of the 145 manifest entries (143, www/pikkumiesBar.html and www/jquery.min.js), each followed by LF.
-        $this->assertSame(145, count($result['files']));
+        // Pin the new helper separately while retaining the complete legacy manifest digest.
+        $this->assertSame(146, count($result['files']));
+        $this->assertSame('bin/mediaStackProwlarr.sh', $result['files'][5]);
+        $legacyFiles = $result['files'];
+        array_splice($legacyFiles, 5, 1);
         $this->assertSame('0f13cc9680e88b2a2afc24e8d1fc2a54a1d7b7eb7c3ed3c589f0aea29772a624',
-            hash('sha256', implode("\n", $result['files'])."\n"));
+            hash('sha256', implode("\n", $legacyFiles)."\n"));
         $this->assertSame(['traffic', 'panel', 'links', 'migration', 'cleanup', 'delete', 'delete', 'delete',
             'delete', 'patch', 'glob', 'counts', 'log'], array_column($result['events'], 0));
         $this->assertSame(['/fixture/home/fixtur01/www/filemanager.php', 6], array_slice($result['events'][9], 1));

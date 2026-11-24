@@ -3102,8 +3102,16 @@ if [[ $DRY_RUN -eq 0 ]]; then
 	media_stack_credentials_file_write
 	media_stack_start_apps
 	media_stack_verify_sessions
+	if [[ -r "$HOME/bin/mediaStackProwlarr.sh" ]]; then
+		# shellcheck source=etc/skel/bin/mediaStackProwlarr.sh
+		source "$HOME/bin/mediaStackProwlarr.sh"
+		media_stack_prowlarr_seed || log_warn "Prowlarr application links could not be seeded; configure Settings > Apps manually"
+	else
+		log_warn "Prowlarr application links helper missing; update PMSS or configure Settings > Apps manually"
+	fi
 else
 	log_info "[dry-run] would start tmux sessions: $(media_stack_sessions_label)"
+	log_info "[dry-run] would add missing Prowlarr Radarr/Sonarr applications with full sync"
 fi
 
 echo ""
@@ -3173,6 +3181,7 @@ echo ""
 echo "=== IMPORTANT WARNINGS ==="
 echo "This script installs EXTRA FEATURES AS-IS. NO GUARANTEES OR SUPPORT FROM PULSED MEDIA."
 echo "You MUST configure apps (e.g., add media libraries, indexers) and maintain updates."
+echo "Add your own indexers in Prowlarr; compatible categories sync to its linked Radarr/Sonarr apps."
 echo "All services bind to localhost. Other accounts on this server can reach localhost too, so keep every app's own login enabled."
 echo "For security: Use VPN/HTTPS only; do not forward ports publicly. Monitor for conflicts with /opt installs."
 echo "Report issues to support, but expect no hand-holding—DIY maintenance required."
