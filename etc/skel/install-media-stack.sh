@@ -2870,14 +2870,20 @@ fi
 echo "Configuring ${app^^}"
 if [[ $DRY_RUN -eq 0 ]]; then
 	if [ ! -f "$datadir/${app}.ini" ]; then
+		# Seed customer defaults only once; reruns retain folders, language and categories.
+		mkdir -p "$HOME/data/usenet/complete" "$HOME/data/usenet/incomplete"
 		cat <<EOF >"$datadir/${app}.ini"
 [misc]
+complete_dir = "${HOME}/data/usenet/complete"
+download_dir = "${HOME}/data/usenet/incomplete"
+language = en
 port = 8080
 host = 127.0.0.1
 url_base = /sabnzbd
 host_whitelist = ${HOSTNAME}
 inet_exposure = 4
 EOF
+		log_info "SABnzbd first run: English and local host settings are prefilled; add your own Usenet news server in the wizard."
 	fi
 	sabnzbd_misc_value_set "$datadir/${app}.ini" url_base "/public-${USERNAME}/${app}"
 	sabnzbd_misc_value_set "$datadir/${app}.ini" port "$SABNZBD_PORT"
