@@ -1235,6 +1235,50 @@ EOF
 	fi
 }
 
+# On failed reruns, repair only existing routes from saved app configs, never reservations.
+lighttpd_media_stack_ports_reconcile() {
+	local target="$HOME/.lighttpd/custom.d/media-stack.conf" temp_target app port
+	[[ $DRY_RUN -eq 0 && -f "$target" && ! -L "$target" ]] || return 0
+	temp_target=$(mktemp "$HOME/.lighttpd/.media-stack-ports.XXXXXX") || return 1
+	if ! cp -p -- "$target" "$temp_target"; then
+		rm -f "$temp_target"
+		return 1
+	fi
+	for app in sabnzbd radarr prowlarr sonarr autobrr jellyfin; do
+		case "$app" in
+		sabnzbd) port=$(existing_port_from_ini "$HOME/.config/sabnzbd/sabnzbd.ini" port) ;;
+		radarr|prowlarr|sonarr) port=$(existing_port_from_xml_tag "$HOME/.config/$app/config.xml" Port) ;;
+		autobrr) port=$(existing_port_from_ini "$HOME/.config/autobrr/config.toml" port) ;;
+		jellyfin)
+			port=$(existing_port_from_xml_tag "$JELLYFIN_CONFIG_DIR/network.xml" InternalHttpPort)
+			port="${port:-$(existing_port_from_xml_tag "$JELLYFIN_CONFIG_DIR/network.xml" PublicHttpPort)}"
+			;;
+		esac
+		# Unconfigured or malformed apps cannot supply a replacement proxy port.
+		media_stack_port_is_valid "$port" || continue
+		if ! sed -i -E '/^\$HTTP\["url"\] =~ "\^\/'"$app"'\(/,/^[[:space:]]*}/ s/("port"[[:space:]]*=>[[:space:]]*)[0-9]+/\1'"$port"'/' "$temp_target"; then
+			rm -f "$temp_target"
+			return 1
+		fi
+	done
+	if cmp -s "$target" "$temp_target"; then
+		rm -f "$temp_target"
+	elif ! mv -- "$temp_target" "$target"; then
+		rm -f "$temp_target"
+		return 1
+	fi
+}
+
+media_stack_install_exit() {
+	local rc="$1"
+	trap - ERR
+	if [[ $rc -ne 0 ]] && ! lighttpd_media_stack_ports_reconcile; then
+		log_warn "Failed to reconcile media-stack proxy ports; rerun the installer to repair routes."
+	fi
+	checksum_summary
+	exit "$rc"
+}
+
 # Helper to append to .bashrc.custom only if marker not present
 append_to_bashrc_custom_if_missing() {
 	local content="$1"
@@ -2749,6 +2793,8 @@ JELLYFIN_PORT="$(pick_existing_or_reserved_port "$JELLYFIN_PORT" jellyfin)"
 USERNAME=$(whoami)
 HOSTNAME=$(hostname)
 MEDIA_STACK_AUTH_USERNAME="$USERNAME"
+# EXIT also covers explicit download failures and prompt EOF, preserving their status.
+trap 'media_stack_install_exit "$?"' EXIT
 media_stack_require_auth_seed_tools
 SABNZBD_AUTH_USERNAME=$(existing_value_from_ini "$HOME/.config/sabnzbd/sabnzbd.ini" "username")
 SABNZBD_AUTH_USERNAME="${SABNZBD_AUTH_USERNAME:-$MEDIA_STACK_AUTH_USERNAME}"

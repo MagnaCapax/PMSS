@@ -207,6 +207,7 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
 
 8) Reverse proxy
 - Writes the PMSS-managed media-stack proxy fragment to `~/.lighttpd/custom.d/media-stack.conf` with URL rewriting from `/app` to `/public-<user>/<app>`; Autobrr uses that same non-empty map and an exact bare-path trailing-slash redirect.
+- Failed full reruns reconcile existing fragment routes with valid ports saved in app configs, including on explicit download failure or prompt EOF. Untouched apps retain their configured ports; reservation markers do not drive this recovery. Replacement is atomic and preserves fragment permissions; the lighttpd watchdog activates changed routes. The original failure status and checksum summary remain intact. This does not restore removed app binaries or handle an uncatchable process termination. Dry runs leave routes untouched.
 - Publishes Jellyfin whenever its installed DLL or `~/.config/jellyfin` directory exists, matching the watchdog's install markers. Skipping Jellyfin installation (for example, when FFmpeg is too old) preserves its proxy route and panel tab; an account without either marker gets no Jellyfin route.
 - On first rerun after older installer versions, legacy PMSS-managed `~/.lighttpd/custom` content is migrated out of the user-controlled include so custom rules are preserved.
 
