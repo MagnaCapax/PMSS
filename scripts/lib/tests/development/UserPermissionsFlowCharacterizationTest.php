@@ -216,7 +216,7 @@ PHP;
             'ingress' => '/fixture/ingress', 'ingressLocal' => '/fixture/ingress-local'];
         [$modes, $owners] = \pmssUserPermissionsPolicy('fixtur01', $traffic);
         $expectedModes = [
-            ['', 0770], ['/.bin', 0750, true], ['/bin', 0750, true], ['/.viminfo', 0640], ['/.quota', 0640],
+            ['', 01770], ['/.bin', 0750, true], ['/bin', 0750, true], ['/.viminfo', 0640], ['/.quota', 0640],
             ['/.billingServiceId', 0640], ['/.billingId', 0640], ['/.billingClientId', 0640], ['/.notifyEmail', 0640],
             ['/.profile', 0644], ['/.bash_history', 0640], ['/.bashrc', 0644], ['/.bashrc.user', 0640],
             ['/radarr-sonarr.txt', 0644], ['/.tmp', 0770], ['/.config', 0770, true, true],

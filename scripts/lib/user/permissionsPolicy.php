@@ -5,7 +5,8 @@
 function pmssUserPermissionsPolicy(string $thisUser, array $trafficPaths): array
 {
     return [[
-        ["/home/{$thisUser}", 0770],
+        // OpenClaw requires sticky protection on group-writable temp ancestors (#1322).
+        ["/home/{$thisUser}", 01770],
         ["/home/{$thisUser}/.bin", 0750, true],
         ["/home/{$thisUser}/bin", 0750, true],
         ["/home/{$thisUser}/.viminfo", 0640],

@@ -1753,6 +1753,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/util/userPermissions.php <user>
   - Behavior: Fixes ownership/permissions under `/home/<user>` according to policy (chmod/chown); safe to re-run.
+  - Home mode: converges to `1770`, retaining owner/group access and adding sticky protection required by OpenClaw's temp-ancestor guard (#1322; ADR 0344). The home owner retains rename/delete rights; other group members cannot replace entries they do not own. This mode applies only to the home itself.
   - Recursive walks use `-xdev -ignore_readdir_race`: they stop descent at filesystem boundaries and tolerate entries removed between enumeration and stat. Ordinary nested `~/data` directories still receive mode `0750`; the owner walk still prunes that tree. Each explicit mode target is a separate starting root, so a target that is itself mounted is not excluded by `-xdev`. This is a partial fix for #1268: root's stat of a FUSE mount without `allow_other` can still fail, and a real FUSE acceptance run remains required (ADR 0282).
   - Web executables: After stripping executable bits from web files, restores mode `0750` on the exact shell helpers launched directly by ruTorrent's create, erasedata and unpack plugins (#1011). Ordinary web data stays non-executable; symlink and hard-link guards remain in force.
   - Billing identity: `.billingServiceId`, legacy `.billingId`, and `.billingClientId`
