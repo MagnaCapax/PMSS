@@ -68,7 +68,9 @@ final class UserShowLimitsTest extends TestCase
     {
         $o = $this->fixture();
         $data = \pmssUserShowLimitsCollect($o);
-        $this->pmssAssertArraySubsetSame(['value' => 1610612736.0, 'limit' => 4294967296.0], $this->metric($data, 'memory', 'memory'));
+        $this->pmssAssertArraySubsetSame(['value' => 1610612736.0, 'limit' => 4294967296.0, 'percent' => 37.5], $this->metric($data, 'memory', 'memory'));
+        $this->pmssAssertArraySubsetSame(['value' => 1073741824.0, 'limit' => 4294967296.0, 'percent' => 25.0], $this->metric($data, 'memory', 'process memory'));
+        $this->pmssAssertArraySubsetSame(['value' => 536870912.0, 'limit' => null, 'percent' => null], $this->metric($data, 'memory', 'page cache'));
         $this->assertSame(25.0, $this->metric($data, 'memory', 'memory pressure')['value']);
         $this->assertSame(null, $this->metric($data, 'processes', 'processes')['limit']);
         $this->assertSame(null, $this->metric($data, 'cpu', 'CPU quota enforced')['value']);
@@ -79,6 +81,7 @@ final class UserShowLimitsTest extends TestCase
         $this->assertSame('iops', $this->metric($data, 'disk I/O', 'read IOPS enforced')['unit']);
         $this->pmssWriteFile($o['cgroups']['memory'].'/memory.limit_in_bytes', "9223372036854771712\n");
         $this->assertSame(null, $this->metric(\pmssUserShowLimitsCollect($o), 'memory', 'memory')['limit']);
+        $this->assertSame(null, $this->metric(\pmssUserShowLimitsCollect($o), 'memory', 'process memory')['limit']);
         $this->pmssWriteFile($o['home'].'/.trafficLimit', "0\n");
         $this->assertSame(null, $this->metric(\pmssUserShowLimitsCollect($o), 'traffic', 'upload past 30 days')['limit']);
     }
@@ -94,11 +97,33 @@ final class UserShowLimitsTest extends TestCase
         $this->assertSame(true, $data['sections']['traffic']['available']);
     }
 
+    public function testMemoryBreakdownDoesNotSubstituteCacheForMissingProcessMemory(): void
+    {
+        $o = $this->fixture();
+        // Missing or rejected counters stay unavailable; zero is a valid process reading.
+        foreach (array(
+            array("total_rss 0\ntotal_cache 536870912\n", 0.0, 536870912.0),
+            array("total_cache 536870912\n", null, 536870912.0),
+            array("total_rss invalid\ntotal_cache 536870912\n", null, 536870912.0),
+            array("total_rss 1073741824\n", 1073741824.0, null),
+            array("total_rss 1073741824\ntotal_cache invalid\n", 1073741824.0, null),
+        ) as list($raw, $process, $cache)) {
+            $this->pmssWriteFile($o['cgroups']['memory'].'/memory.stat', $raw);
+            $data = \pmssUserShowLimitsCollect($o);
+            $this->assertSame($process, $this->metric($data, 'memory', 'process memory')['value']);
+            $this->assertSame($cache, $this->metric($data, 'memory', 'page cache')['value']);
+            $this->assertSame(1610612736.0, $this->metric($data, 'memory', 'memory')['value']);
+        }
+    }
+
     public function testJsonModesAndControlCharacters(): void
     {
         $o = $this->fixture();
         list(, $json) = $this->pmssCaptureStdout(function () use ($o) { \pmssUserShowLimitsMain(array('userShowLimits', '--json'), $o); });
         $data = $this->pmssDecodeJsonArray($json);
+        $this->assertSame(1610612736, $this->metric($data, 'memory', 'memory')['value']);
+        $this->assertSame(1073741824, $this->metric($data, 'memory', 'process memory')['value']);
+        $this->assertSame(536870912, $this->metric($data, 'memory', 'page cache')['value']);
         $this->assertSame('11.10', $this->metric($data, 'account', 'Debian version')['value']);
         $this->assertSame('12.15', $this->metric($data, 'account', 'PMSS version')['value']);
         $this->assertStringNotContainsString('\\u001b', $json);
@@ -107,6 +132,7 @@ final class UserShowLimitsTest extends TestCase
             $metric = $this->pmssDecodeJsonArray($line);
             $this->assertSame(array('section', 'metric', 'value', 'limit', 'unit', 'percent', 'source'), array_keys($metric));
             if ($metric['metric'] === 'Debian version') $this->assertSame('11.10', $metric['value']);
+            if ($metric['section'] === 'memory' && $metric['metric'] === 'memory') $this->assertSame(1610612736, $metric['value']);
         }
     }
 
@@ -125,7 +151,10 @@ final class UserShowLimitsTest extends TestCase
                 '0.09 GiB-hours [resource-data]', '<0.01 hours [resource-data]', '25% [', '1d 1h 1m [proc]',
                 '1m [quota-snapshot]', '71 / 16384 enforced', 'n/a [cgroup]'],
             'forbidden' => ["\033", '/ 100 percent enforced', 'count /'],
-            'matches' => ['/CPU quota enforced\s+unlimited \[cgroup\]/'],
+            'matches' => ['/CPU quota enforced\s+unlimited \[cgroup\]/',
+                '/\n  memory\s+1.0 GiB \/ 4.0 GiB enforced \(4.0 GiB configured\) \[[#-]+\] 25% \[cgroup\]/',
+                '/\n  page cache\s+512.0 MiB \[cgroup\]\n/',
+                '/\n  memory including cache\s+1.5 GiB \[cgroup\]\n/'],
         ]);
         touch($o['home'].'/.quota', $o['now'] - 5);
         clearstatcache(true, $o['home'].'/.quota');

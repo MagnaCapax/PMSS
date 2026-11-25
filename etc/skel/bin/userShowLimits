@@ -170,13 +170,19 @@ function pmssUserShowLimitsCollect(array $overrides = array(), $human = false)
             pmssUserShowLimitsMetric($m, 'held by deleted files', pmssUserShowLimitsDeletedHeld($proc, $uid), null, 'bytes', 'proc');
         },
         'memory' => function (&$m) use ($home, $uid, $cgroups, $overrides, $now) {
-            pmssUserShowLimitsHelper('scriptsInc.php', array('pmssCustomerCgroupMemoryRead', 'pmssCustomerSerializedArrayFileRead', 'pmssFormatBytes'), $overrides);
-            pmssUserShowLimitsHelper('webCgroupMemoryStatus.php', array('pmssWebCgroupMemoryStatusRead'), $overrides);
+            pmssUserShowLimitsHelper('scriptsInc.php', array('pmssCustomerCgroupMemoryRead', 'pmssCustomerCgroupCounterPaths', 'pmssCustomerSerializedArrayFileRead', 'pmssFormatBytes'), $overrides);
+            pmssUserShowLimitsHelper('webCgroupMemoryStatus.php', array('pmssWebCgroupMemoryStatusRead', 'pmssWebCgroupMemoryStatusMemoryStatBreakdownRead'), $overrides);
             $config = pmssUserShowLimitsConfig($home, $overrides);
             pmssUserShowLimitsConfigured($m, $config, 'ramMiB', 'bytes', 1048576);
             $state = pmssWebCgroupMemoryStatusRead(array('uid' => $uid, 'cgroup_dir' => $cgroups['memory'] ?? '', 'oom_status_path' => $home.'/.oomKillStatus', 'now' => $now));
             if (empty($state['available'])) throw new RuntimeException('Memory unavailable');
+            $breakdown = pmssWebCgroupMemoryStatusMemoryStatBreakdownRead(
+                pmssCustomerCgroupCounterPaths($uid, rtrim($state['cgroup_dir'], '/'), 'memory.stat', 'memory', 'memory.stat'), array('anon')
+            );
+            // Keep the cache-inclusive memory metric unchanged for JSON consumers.
             pmssUserShowLimitsMetric($m, 'memory', $state['memory_current'] ?? null, $state['limit_bytes'] ?? null, 'bytes', 'cgroup');
+            pmssUserShowLimitsMetric($m, 'process memory', $breakdown['anon'] ?? null, $state['limit_bytes'] ?? null, 'bytes', 'cgroup');
+            pmssUserShowLimitsMetric($m, 'page cache', $breakdown['file'] ?? null, null, 'bytes', 'cgroup');
             pmssUserShowLimitsMetric($m, 'memory pressure', $state['pressure_usage_percent'] ?? null, 100, 'percent', 'cgroup');
             pmssUserShowLimitsMetric($m, 'memory status', $state['status'] ?? null, null, '', 'cgroup');
             pmssUserShowLimitsMetric($m, 'OOM kills', $state['oom_kill_events'] ?? null, null, 'count', 'cgroup');
@@ -305,6 +311,11 @@ function pmssUserShowLimitsHuman(array $data)
             if ($entry['source'] === 'account-config') $configured[$entry['metric']] = $entry;
         }
         foreach ($state['metrics'] as $metric) {
+            // Only process memory gets a usage bar; cache-inclusive usage is informational.
+            if ($section === 'memory' && $metric['metric'] === 'memory') {
+                $metric['metric'] = 'memory including cache';
+                $metric['limit'] = $metric['percent'] = null;
+            } elseif ($section === 'memory' && $metric['metric'] === 'process memory') $metric['metric'] = 'memory';
             $value = $metric['value'];
             $format = function ($number) { return function_exists('pmssFormatBytes') ? pmssFormatBytes($number) : number_format((float) $number, 0, '.', '').' B'; };
             $unit = $metric['unit'];

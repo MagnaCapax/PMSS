@@ -1236,6 +1236,12 @@ iptables helpers:
   `scriptsInc.php` (ADRs 0059 and 0099). Page-specific
   directory precedence and missing-data behavior stay unchanged; live pressure
   thresholds remain separate from the OOM recency signal.
+- `etc/skel/bin/userShowLimits` shows process memory (`total_rss` on v1)
+  against the enforced limit in the human `memory` row. Page cache (`total_cache`)
+  and memory including cache are separate values without usage bars or percentages.
+  Missing process counters stay unavailable rather than counting cache as process
+  memory. JSON/JSONL retain the cache-inclusive `memory` metric and add
+  `process memory` and `page cache` metrics; the latter has no limit or percentage.
 - The five-minute metrics collector projects the sum of local cgroup-v1
   `oom_kill` counters in the account slice and all descendants, including SSH
   session and run scopes. The telemetry `mem_oom_kill` field retains its local
