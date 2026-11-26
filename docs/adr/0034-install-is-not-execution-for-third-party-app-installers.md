@@ -30,7 +30,7 @@ remedy was to bound the probe with a timeout. A timeout bounds how long the PARE
 does not bound the CHILD. Bounding therefore converted a loud, visible hang into a silent,
 permanent root daemon — a strictly worse failure mode, and the direct cause of the compromise.
 
-Measured fleet state (2026-07-29, 172 reachable hosts): 104 hosts had `/root/.config/<App>/`,
+Measured fleet state (2026-07-29, reachable hosts): most hosts had `/root/.config/<App>/`,
 i.e. root had run a Servarr application on them; 281 root-owned configs carried
 `AuthenticationMethod=None` and 285 carried `BindAddress=*`. Three long-uptime hosts still
 had live root daemons; the rest died at reboot because the orphan has no unit.

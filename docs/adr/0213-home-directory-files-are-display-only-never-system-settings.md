@@ -96,7 +96,7 @@ records billing identity there before it writes the home copy (ADR 0152).
    the last `bonus traffic set to N GiB` line of the root-only per-user log,
    only while the home copy still holds the same N, so the home file could stop
    an import but never create or raise one. A read-only count across the fleet
-   on 2026-10-30 (173 of 174 nodes) found no such upload cap and no such log
+   on 2026-10-30 (all but one node) found no such upload cap and no such log
    line, so no import ships. A value set by hand on a node is set again with
    the same CLI after the update. Until a node has the store values, its
    accounts have their plan defaults (no priority bonus); disk bonus is
