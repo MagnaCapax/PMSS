@@ -147,9 +147,9 @@ final class WelcomeHomeTest extends TestCase
             $this->assertStringContainsAndOmitsStrings(['how it works' => $name], ['0%' => $name], $html[$name]);
         }
         foreach ($states as $name => $unused) {
-            $this->pmssAssertStringNotContainsString('>Upgrade</a>', $html[$name], $name);
+            $this->pmssAssertStringNotContainsString('>Manage plan</a>', $html[$name], $name);
         }
-        $this->assertStringContainsAllStrings(['Bonus disk <b>+50 GiB</b>', '>Upgrade</a>', 'type=configoptions&amp;id=42'], $html['billed']);
+        $this->assertStringContainsAndOmitsStrings(['Bonus disk <b>+50 GiB</b>', 'href="https://pulsedmedia.com/clients/clientarea.php?action=productdetails&amp;id=42" target="_blank" rel="noopener">Manage plan</a>'], ['>Upgrade</a>', 'type=configoptions'], $html['billed']);
     }
 
     public function testAgentFirstOnlyWhenOpenClawRunsWithoutTorrentClients(): void

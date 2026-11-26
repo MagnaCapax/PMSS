@@ -1650,7 +1650,7 @@ function pmssWelcomeHomeAlertsHtmlBuild(array $quota, array $traffic, array $mem
     return $alerts;
 }
 
-/** The loyalty bonus sits with the other figures; "0%" is shown only when the server records a zero. */
+/** Show the recorded loyalty bonus and service details; the node does not know which products offer add-ons. */
 function pmssWelcomeHomeStatusChipsHtmlBuild($bonusDisplayState, $billingServiceId)
 {
     $policy = 'https://wiki.pulsedmedia.com/index.php/Pulsed_Media_Free_Bonus_Disk_Policy';
@@ -1667,7 +1667,7 @@ function pmssWelcomeHomeStatusChipsHtmlBuild($bonusDisplayState, $billingService
     }
     $note = function_exists('pmssCustomerBonusDisplayNoteBuild') ? pmssCustomerBonusDisplayNoteBuild($state) : '';
     $html = '<a class="h-chip h-chip-bonus" href="'.$policy.'" target="_blank" rel="noopener" title="'.pmssWelcomeHtmlAttr($note !== '' ? $note.' How the bonus works' : 'How the bonus works').'">'.$chip.'</a>';
-    if ((int) $billingServiceId > 0) $html .= '<a class="h-chip" href="'.pmssCustomerHtmlAttr(pmssWelcomeTrafficUpgradeUrlBuild($billingServiceId)).'" target="_blank" rel="noopener">Upgrade</a>';
+    if ((int) $billingServiceId > 0) $html .= '<a class="h-chip" href="https://pulsedmedia.com/clients/clientarea.php?action=productdetails&amp;id='.(int) $billingServiceId.'" target="_blank" rel="noopener">Manage plan</a>';
     return $html;
 }
 
