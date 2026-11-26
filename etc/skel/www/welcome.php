@@ -638,7 +638,7 @@ function pmssWelcomePageStateBuild() {
 
     $trafficLimitState = function_exists('pmssTrafficLimitStateRead')
         ? pmssTrafficLimitStateRead('../.trafficLimit', '../.bonusTraffic')
-        : array('limitGiB' => 0, 'bonusGiB' => 0, 'effectiveLimitGiB' => 0);
+        : array('limitGiB' => 0, 'bonusGiB' => 0, 'effectiveLimitGiB' => 0, 'limitKnown' => false);
     $billingServiceId = pmssWelcomeBillingServiceIdRead('../.billingServiceId', '../.billingId');
     $trafficBandwidthState = pmssWelcomeTrafficBandwidthStateBuild('../.throttle');
 
@@ -1405,7 +1405,7 @@ function pmssWelcomeHomeQuotaStateBuild($quotaInfo)
         'hard' => $fields['hardLimit'], 'percent' => $percent, 'graceUntil' => $graceUntil === null ? null : (int) $graceUntil);
 }
 
-/** Traffic over the rolling 30 days, using the same limit and bonus readers as before. */
+/** Traffic over the rolling 30 days; unknown limits must never be presented as unlimited. */
 function pmssWelcomeHomeTrafficStateBuild($trafficData, $trafficIngress, $trafficLimitState, $bandwidthState)
 {
     $usedMiB = is_array($trafficData) ? pmssWelcomeTrafficMonthValueRead($trafficData) : null;
@@ -1413,7 +1413,7 @@ function pmssWelcomeHomeTrafficStateBuild($trafficData, $trafficIngress, $traffi
     $bonus = max(0, (int) ($trafficLimitState['bonusGiB'] ?? 0));
     $state = array('available' => $usedMiB !== null, 'usedGiB' => $usedMiB === null ? 0.0 : $usedMiB / 1024,
         'limitGiB' => $limit > 0 ? $limit + $bonus : 0, 'bonusGiB' => $bonus, 'percent' => 0.0, 'overCap' => false,
-        'inboundGiB' => null, 'ratio' => null, 'reduced' => !empty($bandwidthState['isReduced']));
+        'inboundGiB' => null, 'ratio' => null, 'reduced' => !empty($bandwidthState['isReduced']), 'limitKnown' => !empty($trafficLimitState['limitKnown']));
     $inbound = is_array($trafficIngress) ? pmssWelcomeTrafficMonthValueRead($trafficIngress) : null;
     if ($inbound !== null) $state['inboundGiB'] = $inbound / 1024;
     if ($usedMiB !== null && function_exists('pmssTrafficRatioStateBuild')) {
@@ -1480,9 +1480,9 @@ function pmssWelcomeHomeTrafficMetricHtmlBuild(array $traffic, $billingServiceId
     if ($traffic['inboundGiB'] !== null) $details[] = 'in '.number_format(round($traffic['inboundGiB'])).' GiB';
     if (is_array($traffic['ratio']) && $traffic['usedGiB'] >= 1) $details[] = 'ratio <span style="color:'.pmssCustomerHtmlAttr($traffic['ratio']['color']).'">'.pmssCustomerHtmlAttr($traffic['ratio']['display']).'</span>';
     $details[] = $traffic['reduced'] ? '<b>speed reduced</b>' : 'full port speed';
-    if ($traffic['limitGiB'] <= 0) {
-        return pmssWelcomeHomeMetricHtmlBuild('Traffic · 30 days', number_format(round($traffic['usedGiB'])).' GiB', 'out · unlimited', array(),
-            implode(' · ', $details));
+    if (!$traffic['limitKnown'] || $traffic['limitGiB'] <= 0) {
+        return pmssWelcomeHomeMetricHtmlBuild('Traffic · 30 days', number_format(round($traffic['usedGiB'])).' GiB', $traffic['limitKnown'] ? 'out · unlimited' : '', array(),
+            ($traffic['limitKnown'] ? '' : 'limit unavailable · ').implode(' · ', $details));
     }
     $meta = number_format($traffic['percent'], 1).'% · '.implode(' · ', $details);
     if ($traffic['bonusGiB'] > 0) $meta .= ' · bonus '.number_format($traffic['bonusGiB']).' GiB';

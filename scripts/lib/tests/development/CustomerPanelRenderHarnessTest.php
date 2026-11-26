@@ -261,14 +261,22 @@ class CustomerPanelRenderHarnessTest extends TestCase
     public function testWelcomeTrafficUsageRendersWhenLimitFileIsMissing(): void
     {
         $this->pmssWithCustomerPanelRender(function (string $home, callable $render): void {
-            @unlink($home.'/.trafficLimit');
+            foreach ([null, '', " \t\n", 'invalid', "0\n", "20GiB\n"] as $payload) {
+                @unlink($home.'/.trafficLimit');
+                if ($payload !== null) $this->pmssWriteFile($home.'/.trafficLimit', $payload);
+                $unknown = $payload === null || trim($payload) === '' || $payload === 'invalid';
+                $result = $render('welcome.php', ['minBytes' => 1024, 'markers' => ['Traffic · 30 days']]);
 
-            $result = $render('welcome.php',
-                ['minBytes' => 1024, 'markers' => ['Traffic · 30 days']]
-            );
-
-            $this->assertStringContainsAndOmitsStrings(['<div class="h-metric-v">15 GiB<span>out · unlimited</span></div>'],
-                ['Over your monthly traffic limit'], $result['stdout']);
+                // The fixture's 25 GiB bonus is clamped to the 20 GiB base, as before.
+                $suffix = $unknown ? '' : ($payload === "0\n" ? '<span>out · unlimited</span>' : '<span>of 40 GiB</span>');
+                $this->assertStringContainsAndOmitsStrings(['<div class="h-metric-v">15 GiB'.$suffix.'</div>'],
+                    ['Over your monthly traffic limit'], $result['stdout']);
+                if ($unknown) {
+                    $this->assertStringContainsAndOmitsStrings(['limit unavailable'], ['out · unlimited', 'of 0 GiB'], $result['stdout']);
+                } else {
+                    $this->assertStringNotContainsString('limit unavailable', $result['stdout']);
+                }
+            }
         });
     }
 

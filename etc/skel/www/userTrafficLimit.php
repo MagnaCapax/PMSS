@@ -81,11 +81,12 @@ if (!function_exists('pmssTrafficLimitStateRead')) {
     /**
      * Build the traffic-limit state array used by welcome.php / stats.php.
      *
-     * @return array{limitGiB:int,bonusGiB:int,effectiveLimitGiB:int}
+     * @return array{limitGiB:int,bonusGiB:int,effectiveLimitGiB:int,limitKnown:bool}
      */
     function pmssTrafficLimitStateRead(string $limitPath, string $bonusPath = ''): array
     {
-        $limitGiB = pmssTrafficLimitReadGiBFile($limitPath);
+        $limitRead = pmssTrafficLimitParseGiB(pmssCustomerTrimmedFileRead($limitPath));
+        $limitGiB = $limitRead ?? 0; // Preserve numeric fallbacks while distinguishing unknown from unlimited.
         $bonusGiB = ($bonusPath !== '') ? pmssTrafficLimitReadGiBFile($bonusPath) : 0;
         // #945 fairness clamp: keep the customer-facing display in lockstep with the
         // enforcement copy (scripts/lib/user/trafficLimit.php). ~/.bonusTraffic is
@@ -100,6 +101,7 @@ if (!function_exists('pmssTrafficLimitStateRead')) {
             'limitGiB'          => $limitGiB,
             'bonusGiB'          => $bonusGiB,
             'effectiveLimitGiB' => ($limitGiB > 0) ? ($limitGiB + $bonusGiB) : 0,
+            'limitKnown'        => $limitRead !== null,
         ];
     }
 }

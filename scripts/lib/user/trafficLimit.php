@@ -48,13 +48,14 @@ if (!function_exists('pmssTrafficLimitStateRead')) {
     /**
      * Display state from two GiB files (the account's panel and own tools).
      *
-     * @return array{limitGiB:int,bonusGiB:int,effectiveLimitGiB:int}
+     * @return array{limitGiB:int,bonusGiB:int,effectiveLimitGiB:int,limitKnown:bool}
      */
     function pmssTrafficLimitStateRead(string $limitPath, string $bonusPath = ''): array
     {
-        $limitGiB = pmssTrafficLimitReadGiBFile($limitPath);
+        $limitRead = pmssIntegerSettingFileParse($limitPath, 'pmssTrafficLimitParseGiB');
+        $limitGiB = $limitRead ?? 0; // Display availability is separate from the legacy numeric fallback.
         $bonusGiB = ($bonusPath !== '') ? pmssTrafficLimitReadGiBFile($bonusPath) : 0;
-        return ['limitGiB' => $limitGiB, 'bonusGiB' => $bonusGiB, 'effectiveLimitGiB' => ($limitGiB > 0) ? ($limitGiB + $bonusGiB) : 0];
+        return ['limitGiB' => $limitGiB, 'bonusGiB' => $bonusGiB, 'effectiveLimitGiB' => ($limitGiB > 0) ? ($limitGiB + $bonusGiB) : 0, 'limitKnown' => $limitRead !== null];
     }
 }
 

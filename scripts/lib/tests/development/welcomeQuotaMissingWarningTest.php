@@ -228,7 +228,7 @@ final class welcomeQuotaMissingWarningTest extends TestCase
     {
         $traffic = $trafficMonthMiB === null ? array('raw' => array()) : array('raw' => array('month' => $trafficMonthMiB));
         $bandwidthState += array('effectiveCapMbit' => 100, 'isReduced' => false);
-        $limitState = array('limitGiB' => $limitGiB, 'bonusGiB' => 0, 'effectiveLimitGiB' => $limitGiB);
+        $limitState = array('limitGiB' => $limitGiB, 'bonusGiB' => 0, 'effectiveLimitGiB' => $limitGiB, 'limitKnown' => true);
         $output = $this->pmssRunInlinePhpRequire($this->makeWelcomeUsageFixture(),
             '$bandwidth = '.var_export($bandwidthState, true).';'
             .'$quota = pmssWelcomeHomeQuotaStateBuild('.var_export($quotaInfo, true).');'

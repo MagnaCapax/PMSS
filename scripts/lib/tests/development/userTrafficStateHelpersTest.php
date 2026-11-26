@@ -366,13 +366,13 @@ class UserTrafficStateHelpersTest extends TestCase
     public function testTrafficLimitStateReadHandlesBaseAndBonusCases(): void
     {
         foreach ([
-            ['combined', "5\n", "2GiB\n", ['limitGiB' => 5, 'bonusGiB' => 2, 'effectiveLimitGiB' => 7]],
-            ['bonus-only', null, "9\n", ['limitGiB' => 0, 'bonusGiB' => 9, 'effectiveLimitGiB' => 0]],
+            ['combined', "5\n", "2GiB\n", ['limitGiB' => 5, 'bonusGiB' => 2, 'effectiveLimitGiB' => 7, 'limitKnown' => true]],
+            ['bonus-only', null, "9\n", ['limitGiB' => 0, 'bonusGiB' => 9, 'effectiveLimitGiB' => 0, 'limitKnown' => false]],
             // #945 fairness clamp: tenant-inflated bonus above the root-owned base is
             // bounded to the base (effective cannot exceed 2x sanctioned limit).
-            ['bonus-clamped-to-base', "5\n", "20\n", ['limitGiB' => 5, 'bonusGiB' => 5, 'effectiveLimitGiB' => 10]],
+            ['bonus-clamped-to-base', "5\n", "20\n", ['limitGiB' => 5, 'bonusGiB' => 5, 'effectiveLimitGiB' => 10, 'limitKnown' => true]],
             // At-base bonus is honored unchanged (clamp is > not >=).
-            ['bonus-at-base', "5\n", "5\n", ['limitGiB' => 5, 'bonusGiB' => 5, 'effectiveLimitGiB' => 10]],
+            ['bonus-at-base', "5\n", "5\n", ['limitGiB' => 5, 'bonusGiB' => 5, 'effectiveLimitGiB' => 10, 'limitKnown' => true]],
         ] as [$name, $limitPayload, $bonusPayload, $expected]) {
             $limitPath = $this->tempDir.'/traffic-limit-'.$name;
             $bonusPath = $this->tempDir.'/bonus-traffic-'.$name;
@@ -380,6 +380,26 @@ class UserTrafficStateHelpersTest extends TestCase
             $this->pmssWriteFile($bonusPath, $bonusPayload);
 
             $this->assertEquals($expected, \pmssTrafficLimitStateRead($limitPath, $bonusPath), 'case '.$name);
+        }
+    }
+
+    public function testTrafficLimitKnownMatchesBothReaderCopies(): void
+    {
+        // Separate processes ensure function_exists guards cannot hide either implementation.
+        foreach (['etc/skel/www/userTrafficLimit.php', 'scripts/lib/user/trafficLimit.php'] as $reader) {
+            foreach ([null, '', " \t\n", 'invalid', '-1', "0\n", "500GiB\n"] as $index => $payload) {
+                $path = $this->tempDir.'/known-limit-'.$index;
+                if ($payload !== null) $this->pmssWriteFile($path, $payload);
+                $output = $this->pmssRunInlinePhpRequire($this->pmssRepoPath($reader),
+                    'echo json_encode(pmssTrafficLimitStateRead('.var_export($path, true).'));', [], '2>&1');
+                $state = $this->pmssDecodeJsonArray($output);
+                $this->assertSame($index >= 5, $state['limitKnown'], $reader.' case '.$index);
+                $this->assertSame($index === 6 ? 500 : 0, $state['limitGiB'], $reader.' case '.$index);
+            }
+            $path = $this->pmssEnsureDir($this->tempDir.'/known-limit-directory');
+            $output = $this->pmssRunInlinePhpRequire($this->pmssRepoPath($reader),
+                'echo json_encode(pmssTrafficLimitStateRead('.var_export($path, true).'));', [], '2>&1');
+            $this->assertSame(false, $this->pmssDecodeJsonArray($output)['limitKnown'], $reader.' non-file');
         }
     }
 
