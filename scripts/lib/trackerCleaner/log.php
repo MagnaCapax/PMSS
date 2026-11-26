@@ -42,7 +42,8 @@ function pmssTrackerCleanerWriteUserVerboseLog(string $username, string $payload
     }
     $userHome = "/home/{$username}";
     $userLogsDir = $userHome.'/.logs';
-    $userLogFile = $userLogsDir.'/trackerCleaner.log';
+    // Named for the client it serves: ~/.logs also holds rtorrent.log.* and the old trackerCleaner.log is left in place.
+    $userLogFile = $userLogsDir.'/rTorrent_trackerCleanerJob.log';
     pmssUserLifecycleStep('trackerCleaner', $username, 'ensure_user_logs_dir',
         pmssBuildUserShellCommand($username, 'mkdir -p ~/.logs', '/bin/bash'), false);
     if (!pmssTrackerCleanerAccountLogAppend($username, $userHome, $userLogFile, $payload)) {

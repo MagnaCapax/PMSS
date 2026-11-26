@@ -26,6 +26,8 @@ function pmssTrackerCleanerRunUser(
     // Check in priority order; later path checks must not run for parked users.
     if (pmssUserServicesParked($username)) $skip = ['suspended_or_moved', "User {$username} is suspended or moved; skipping.", ''];
     elseif (file_exists("/home/{$username}/.trackerCleanerDisable")) $skip = ['disabled', '', ''];
+    // rTorrent opt-out marker (GH#470): the session belongs to a client that stays off. Link check first so root never follows a planted link (checkRtorrent.php does the same).
+    elseif (is_link("/home/{$username}/.rtorrentDisable") || is_file("/home/{$username}/.rtorrentDisable")) $skip = ['rtorrent_disabled', '', ''];
     elseif (!pmssPathWithinRootIsSafe($sessionDir, $sessionDir, true)) $skip = ['session_path_unsafe', "SKIP: refusing to operate; session path unsafe for user {$username} ({$sessionDir}).", ' session='.$sessionDir];
     elseif (file_exists($backupsDir) && (!is_dir($backupsDir) || is_link($backupsDir))) $skip = ['backups_path_unsafe', "SKIP: refusing to operate; backups path unsafe for user {$username} ({$backupsDir}).", ' backups='.$backupsDir];
     if (isset($skip)) {

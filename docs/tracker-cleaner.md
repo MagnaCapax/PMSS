@@ -26,8 +26,9 @@ Paths and behavior (per user):
 - Session files: `/home/<user>/session/*.torrent`
 - Backups: `/home/<user>/session/backups/YYYY-mm-dd_HHMM/<file>.torrent`
 - Change log: `/home/<user>/.trackerCleaner.log`
-- Verbose log: `/home/<user>/.logs/trackerCleaner.log` (per-torrent details, removals, and backup paths)
+- Verbose log: `/home/<user>/.logs/rTorrent_trackerCleanerJob.log` (per-torrent details, removals, and backup paths). Older runs wrote `/home/<user>/.logs/trackerCleaner.log`; that file is left in place and no longer written.
 - Opt‑out: create file `/home/<user>/.trackerCleanerDisable`
+- rTorrent switched off: an account with `/home/<user>/.rtorrentDisable` is skipped like an opted-out one (the run records `user_skip reason=rtorrent_disabled` in the verbose log and touches no torrent). Removing the marker lets the cleaner pick the account again.
 
 Scheduling:
 - The cleaner runs from root’s crontab every two hours by default and is staggered to avoid I/O spikes. It’s designed as a slow, incremental background task.
@@ -97,7 +98,7 @@ Re-enabled (functional again) 2025-12-21:
 - Can I still edit trackers?
   - Yes. Use ruTorrent’s Edit plugin to change trackers and comments as usual.
 - How do I disable the cleaner for my account?
-  - Create `/home/<user>/.trackerCleanerDisable`. Remove the file to re‑enable.
+  - Create `/home/<user>/.trackerCleanerDisable`. Remove the file to re‑enable. An account that has switched rTorrent off (`/home/<user>/.rtorrentDisable`) is skipped without this file.
 - How do I revert a change?
   - Copy the original `.torrent` from the timestamped backup directory back into your `session/` folder.
 
