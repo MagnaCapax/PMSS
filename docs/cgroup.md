@@ -154,6 +154,26 @@ Inspect and apply limits per user:
 - `--wipe` reverts the user slice (`systemctl revert user-UID.slice`) and sets MemoryHigh/Max to infinity and resets weights to defaults. It is rejected when mixed with resource, IO, defaults, or respect-existing modifier flags.
 - `--dry-run` prints planned K=V and IO properties without changing the system.
 
+## Direct bandwidth caps (v1)
+
+`cgroup.bandwidthEnforce` in the shipped `cgroup.policy.php` defaults to `false`.
+Setting it to boolean `true` enables explicit account JSON `IOReadBW`/`IOWriteBW`
+caps in the existing `cgroupIopsLimitApply.php` pass (ADR 0345). There is no
+host-local policy override. Mount/profile defaults are not copied into accounts.
+Specs accept `/home:RATE` or `/dev/DEVICE:RATE`, with positive integer bytes/sec
+and optional decimal `K`, `M`, `G`, `T` suffixes (1000-based, matching systemd).
+The existing policy resolver maps `/home` or the named `/sys/block` device to
+major:minor; unresolved explicit devices report an error instead of targeting `/home`.
+
+Only changed values reach `blkio.throttle.{read,write}_bps_device`; successful
+writes join the private cgroup apply audit. `--dry-run` previews changes and
+`--census` never applies bandwidth. Empty, zero, malformed or removed specs leave
+existing caps untouched, as does disabling this switch. Rollback therefore
+requires explicitly clearing the affected device's bandwidth throttle after
+disabling enforcement. Global defaults and existing IOPS behavior are unchanged.
+Task placement and buffered-I/O limitations described below still apply; verify
+process membership and actual throughput on a testing host before activation.
+
 ## Root Slice Safety
 
 - Root slice (user‑0.slice) is never limited. PMSS installs an override and a repair job to enforce this:

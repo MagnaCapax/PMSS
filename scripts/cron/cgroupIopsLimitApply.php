@@ -22,6 +22,8 @@
  * Idempotent: writes only when current kernel value differs from
  * desired. Skips users whose slice doesn't exist yet (new accounts
  * not yet started).
+ * Opt-in cgroup.bandwidthEnforce also applies explicit IOReadBW/IOWriteBW;
+ * empty values leave existing bandwidth throttles unchanged (ADR 0345).
  *
  * @license GPL-3.0-only
  * @author PMSS Team
@@ -35,6 +37,7 @@ require_once __DIR__.'/../lib/cgroup/iopsCensus.php';
 require_once __DIR__.'/../lib/cgroup/dynamicIopsPolicy.php';
 require_once __DIR__.'/../lib/user/iopsLimit.php';
 require_once __DIR__.'/../lib/cgroup/readLimitStatus.php';
+require_once __DIR__.'/../lib/cgroup/directBandwidth.php';
 
 const PMSS_IOPS_USERS_DIR = '/etc/seedbox/config/users';
 
@@ -163,7 +166,8 @@ foreach ($userConfigs as $user => $json) {
             }
         }
     }
-    if ($readIops === null && $writeIops === null && !$CENSUS) {
+    $bandwidthPlan = $CENSUS ? [] : pmssCgroupBandwidthPlan($json, $policy, $majMin);
+    if ($readIops === null && $writeIops === null && $bandwidthPlan === [] && !$CENSUS) {
         continue; // no caps configured or derived for this user
     }
     $total++;
@@ -181,6 +185,7 @@ foreach ($userConfigs as $user => $json) {
         $skippedNoSlice++;
         continue;
     }
+    pmssCgroupBandwidthApply($user, $uid, $bandwidthPlan, $DRY_RUN, $written, $errors);
 
     foreach ([
         ['read', $limits[0], pmssCgroupDirectUserBlkioFilePath($uid, 'blkio.throttle.read_iops_device')],

@@ -5,6 +5,9 @@
 // Guardrails still apply in code: MemoryHigh >= 250MiB; MemoryMax <= 95% of system RAM.
 return [
     'cgroup' => [
+        // Direct per-account IOReadBW/IOWriteBW enforcement on v1 is opt-in (ADR 0345).
+        'bandwidthEnforce' => false,
+
         // Keep account tasks in the user slice where cgroup-v1 read caps act (ADR 0231).
         // Running tasks move at the next user-manager restart or reboot.
         'ioSlicePlacement' => true,
