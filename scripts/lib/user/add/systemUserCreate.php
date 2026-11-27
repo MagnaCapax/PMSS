@@ -22,14 +22,18 @@ require_once dirname(__DIR__, 2).'/update/rootOwnedTree.php';
  */
 function pmssAddUserSystemUserCreate(array $user, string $homePath): void
 {
-    pmssAddUserRunRequiredProvisionStep(
+    $rc = runProvisionStep(
         'Create system user',
-        sprintf('useradd --skel /etc/skel -m %s', escapeshellarg($user['name'])),
-        'Create system user failed; aborting provisioning',
-        'useradd_failed'
+        sprintf('useradd --skel /etc/skel -m %s', escapeshellarg($user['name']))
     );
-    if (function_exists('pmssAddUserFailureRollbackMarkSystemUserCreated')) {
+    // Preflight under the per-user lock proved both absent. An unknown status
+    // cannot certify success, but newly present state still needs rollback.
+    if (($rc === 0 || ($rc === -1 && (pmssUserAccountLookup($user['name']) !== null || is_dir($homePath))))
+        && function_exists('pmssAddUserFailureRollbackMarkSystemUserCreated')) {
         pmssAddUserFailureRollbackMarkSystemUserCreated();
+    }
+    if ($rc !== 0) {
+        pmssAddUserFatalExit('FAIL', 'Create system user failed; aborting provisioning', 'useradd_failed');
     }
     // Creation precedes the store write, so use the parsed policy here.
     if (pmssUserConfigNormaliseToggleValue($user, 'gpuEnabled')) {

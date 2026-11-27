@@ -10,16 +10,16 @@ class GpuEnabledLifecycleTest extends TestCase
     public function testDisabledAccountsAreSkippedEvenWhenAlreadyRenderMembers(): void
     {
         $commands = $messages = [];
-        $ops = self::pmssMakeCallbacks(['intel' => true, 'group' => ['members' => ['alice']],
-            'users' => ['alice', 'bob', 'carol'], 'off' => false, 'path' => '/usr/bin/gpasswd']);
+        $ops = self::pmssMakeCallbacks(['intel' => true, 'group' => ['members' => ['fixtur01']],
+            'users' => ['fixtur01', 'fixtur02', 'fixtur03'], 'off' => false, 'path' => '/usr/bin/gpasswd']);
         $runner = $this->pmssMakeStepRunner($commands);
         $logger = $this->pmssMakeArrayLogger($messages);
-        $this->assertSame('skipped', \pmssEnsureIntelRenderGroupMember('alice', $logger, $ops['intel'], $ops['group'], $runner, $ops['path'], $ops['off']));
-        $this->assertSame('skipped', \pmssEnsureIntelRenderGroupMember('bob', $logger, $ops['intel'], $ops['group'], $runner, $ops['path'], $ops['off']));
+        $this->assertSame('skipped', \pmssEnsureIntelRenderGroupMember('fixtur01', $logger, $ops['intel'], $ops['group'], $runner, $ops['path'], $ops['off']));
+        $this->assertSame('skipped', \pmssEnsureIntelRenderGroupMember('fixtur02', $logger, $ops['intel'], $ops['group'], $runner, $ops['path'], $ops['off']));
         $this->assertSame([], $commands);
-        $enabled = static function ($user): bool { return $user === 'carol'; };
+        $enabled = static function ($user): bool { return $user === 'fixtur03'; };
         \pmssEnsureIntelRenderGroupMembers($logger, $ops['intel'], $ops['group'], $ops['users'], $runner, $ops['path'], $enabled);
-        $this->assertSame([['Adding account to render group', "'/usr/bin/gpasswd' -a 'carol' render"]], $commands);
+        $this->assertSame([['Adding account to render group', "'/usr/bin/gpasswd' -a 'fixtur03' render"]], $commands);
         $this->assertTrue(in_array('Intel render group: 1 added, 0 already members', $messages, true));
     }
 
@@ -28,7 +28,7 @@ class GpuEnabledLifecycleTest extends TestCase
         // Stop at the next account observation, before any home, password or service work.
         $script = <<<'PHP'
 namespace GpuCreationFixture;
-function pmssAddUserRunRequiredProvisionStep($label, $command, $message, $code) { $GLOBALS['steps'][] = $label; }
+function runProvisionStep($label, $command) { $GLOBALS['steps'][] = $label; return 0; }
 function pmssEnsureIntelRenderGroupMember($name, $logger) { $GLOBALS['steps'][] = 'render'; }
 function pmssUserAccountLookup($name) { throw new \RuntimeException('account boundary'); }
 PHP;

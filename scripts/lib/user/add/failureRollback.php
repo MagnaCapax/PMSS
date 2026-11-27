@@ -44,7 +44,7 @@ function pmssAddUserFailureRollbackStateWrite(array $state): void
 }
 
 /**
- * Mark that useradd succeeded and the Unix account now exists.
+ * Mark that useradd succeeded or left partial state after an unknown status.
  */
 function pmssAddUserFailureRollbackMarkSystemUserCreated(): void
 {
