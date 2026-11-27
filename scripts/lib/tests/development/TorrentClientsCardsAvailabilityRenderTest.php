@@ -9,6 +9,38 @@ final class TorrentClientsCardsAvailabilityRenderTest extends TestCase
 {
     use TorrentClientsCardsRenderTrait;
 
+    /** Password lookups must stay unambiguous when version and custom-settings cards coexist. */
+    public function testConfigureIdsAreUniqueAndCustomSettingsReadTheirOwnPassword(): void
+    {
+        $system = $this->entries(array('qbittorrent' => array('system'), 'deluge' => array('system'),
+            'transmission' => array('4.1.3'), 'rtorrent' => array('system')));
+        $switchable = $this->entries(array('qbittorrent' => array('system', '5.2.4-lt2.0'),
+            'deluge' => array('system', '2.2.0'), 'transmission' => array('4.1.3', '4.1.4'),
+            'rtorrent' => array('system', '0.16.25')));
+        foreach (array(null, $system, $switchable) as $entries) {
+            $this->withProjection($entries, function ($page, $home, $path) use ($entries, $switchable): void {
+                // Reuse the isolated projection and process readers, inspecting the entire page here.
+                $result = \pmssCustomerPanelRenderPage($home.'/www', dirname($path).'/php-cli-bootstrap.php',
+                    dirname($home), $home, 'configure.php', array('minBytes' => 4000));
+                $this->assertSame(array(), $result['errors'], implode('; ', $result['errors']));
+                $html = $result['stdout'];
+                preg_match_all('/\sid="([^"]+)"/', $html, $ids);
+                $this->assertTrue(count($ids[1]) > 0, 'Configure renders element IDs');
+                $this->assertSame(count($ids[1]), count(array_unique($ids[1])), 'Every rendered ID is unique');
+                $this->assertStringContainsString('id="configure-rtorrent-custom-password"', $html);
+                if ($entries === $switchable) {
+                    // Ensure the regression case actually includes the competing version-card field.
+                    $this->assertStringContainsString('id="configure-rtorrent-password"', $html);
+                }
+                foreach (array('rtorrentCustom', 'rtorrentRestore') as $action) {
+                    $this->assertSame(1, preg_match('/onclick="[^"]*pmssConfigureSend\(\''.$action
+                        .'\',[^"]*password:document\.getElementById\(\'configure-rtorrent-custom-password\'\)\.value/', $html),
+                        $action.' reads the custom-settings password');
+                }
+            });
+        }
+    }
+
     public function testDeliveredConfigureTreeRendersWithOneUnmodifiedVersionReader(): void
     {
         $this->pmssWithCustomerPanelRender(function ($home, $render, $root): void {
