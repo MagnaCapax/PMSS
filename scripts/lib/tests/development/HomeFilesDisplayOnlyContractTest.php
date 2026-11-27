@@ -53,6 +53,7 @@ class HomeFilesDisplayOnlyContractTest extends TestCase
         'scripts/lib/lighttpd/delugeWebConf.php' => ['.delugeWebPort', '.delugePort'],
         'scripts/lib/lighttpd/userConfigApply.php' => ['.rclonePort', '.qbittorrentPort'],
         'scripts/lib/mediaStackWatchdog.php' => ['.media-stack-status.json'],
+        'scripts/lib/trackerCleaner/run.php' => ['.rtorrentDisable'],
         'scripts/lib/user/add/userConfigApply.php' => ['.delugeWebPort', '.delugePort', '.rclonePort', '.qbittorrentPort'],
         'scripts/lib/user/appSwitch.php' => ['.rtorrentDisable', '.delugeEnable', '.rcloneEnable', '.qbittorrentEnable'],
         'scripts/lib/user/deluge.php' => ['.delugePort', '.delugeEnable'],
