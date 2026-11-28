@@ -143,7 +143,9 @@ class IopsLimitHelpersTest extends TestCase
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/iopsLimitEnforcer.php', [
             "\$clamp = pmssIopsLimitClampApplies(pmssCgroupModeWithDefault('v1'));",
-            '$rc = !$clamp ? 0 : runStep(',
+        ]);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/iopsLimitAction.php', [
+            "if (\$clamp && \$io['run']('Applying monthly IOPS throttle for '",
         ]);
     }
 

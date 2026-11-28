@@ -11,6 +11,9 @@ final class IopsLimitUsagePathTest extends TestCase
     {
         $source = $this->pmssReadRepoFile('scripts/lib/user/iopsLimitEnforcer.php');
         $source = substr($source, strpos($source, 'function pmssIopsLimitBuildThrottleCommand'));
+        // The per-account action (#1307) runs inside the same fixture namespace so runStep stays intercepted.
+        $action = $this->pmssReadRepoFile('scripts/lib/user/iopsLimitAction.php');
+        $source .= "\n".substr($action, strpos($action, 'function pmssIopsLimitApplyPlan'));
         $script = 'namespace IopsLimitUsageFixture; require_once '
             .var_export(dirname(__DIR__, 2).'/user/iopsLimit.php', true).';';
         $script .= <<<'PHP'

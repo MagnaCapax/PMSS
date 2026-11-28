@@ -7,7 +7,7 @@
  */
 
 require_once __DIR__.'/../update/runtime/commands.php';
-pmssRequireRelativeFiles(__DIR__, ['../userLifecycle.php', 'userConfigCli.php', 'userConfigStore.php', 'iopsLimit.php', '../cgroup/dynamicIopsPolicy.php']);
+pmssRequireRelativeFiles(__DIR__, ['../userLifecycle.php', 'userConfigCli.php', 'userConfigStore.php', 'iopsLimit.php', 'iopsLimitAction.php', '../cgroup/dynamicIopsPolicy.php']);
 
 function pmssIopsLimitBuildThrottleCommand(string $username, int $iops): string
 {
@@ -97,38 +97,29 @@ function pmssIopsLimitsRun(): int
         $markerPath = pmssIopsBudgetMarkerPath($user);
         $markerTime = pmssIopsBudgetMarkerTime($markerPath);
         $plan = pmssIopsLimitEnforcementPlan($limit, $usage, $markerTime !== null, $markerTime === null ? 0 : $now - $markerTime);
-
-        if ($plan['action'] === 'enforce') {
-            $throttleIops = 100;
-            $rc = !$clamp ? 0 : runStep(
-                'Applying monthly IOPS throttle for '.$user,
-                pmssIopsLimitBuildThrottleCommand($user, $throttleIops)
-            );
-            if ($rc === 0) {
-                pmssIntegerSettingStorageDirEnsure(dirname($markerPath), 0700)
-                    && function_exists('pmssAtomicWriteFile')
-                    && pmssAtomicWriteFile($markerPath, (string) $now, 0600)
-                    && pmssIntegerSettingPathModeConverge($markerPath, 0600);
-                pmssUserLog($user, pmssIopsLimitLogLine('enforce', $clamp, $limit, $usage, $throttleIops,
-                    $kernelReady ? pmssIopsBudgetReadCap($limit) : null, $now + PMSS_IOPS_BUDGET_HOLD_SECONDS));
-            }
+        if ($plan['action'] === 'none') {
             continue;
         }
 
-        if ($plan['action'] === 'restore') {
-            $payload = $store->applyFallbacks($user, $store->get($user) ?? []);
-            $command = pmssIopsLimitBuildRestoreCommand($user, $payload);
-            if ($command === null) {
-                pmssUserLog($user, '[WARN] IOPS throttle restore skipped: missing RAM baseline');
-                continue;
-            }
-
-            $rc = runStep('Restoring baseline cgroup IOPS for '.$user, $command);
-            if ($rc === 0) {
-                pmssIntegerSettingFileRemove($markerPath);
-                pmssUserLog($user, pmssIopsLimitLogLine('restore', $clamp, $limit, $usage, 0));
-            }
-        }
+        $restoreCommand = $plan['action'] !== 'restore' ? null
+            : pmssIopsLimitBuildRestoreCommand($user, $store->applyFallbacks($user, $store->get($user) ?? []));
+        pmssIopsLimitApplyPlan($user, $plan, $clamp, $kernelReady ? pmssIopsBudgetReadCap($limit) : null, $now, $restoreCommand, [
+            'run' => function ($label, $command) {
+                return runStep($label, $command);
+            },
+            'markerWrite' => function () use ($markerPath, $now) {
+                return pmssIntegerSettingStorageDirEnsure(dirname($markerPath), 0700)
+                    && function_exists('pmssAtomicWriteFile')
+                    && pmssAtomicWriteFile($markerPath, (string) $now, 0600)
+                    && pmssIntegerSettingPathModeConverge($markerPath, 0600);
+            },
+            'markerRemove' => function () use ($markerPath) {
+                return pmssIntegerSettingFileRemove($markerPath);
+            },
+            'log' => function ($line) use ($user) {
+                pmssUserLog($user, $line);
+            },
+        ]);
     }
 
     return 0;
