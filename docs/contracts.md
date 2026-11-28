@@ -648,6 +648,12 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 ## User Environment Orchestration – `scripts/lib/update/users.php` and submodules
 
 - User transfer – `scripts/util/userTransfer.php`
+  - Before the final pass, the target Eternals hold gets at most three attempts
+    with the same expiry. Each failure logs an account-level Eternals listing
+    bounded to 5 seconds (then a 2-second kill grace) and 8192 captured bytes,
+    including the hold and listing exit codes. Listing failure does not prevent
+    retries or replace the hold result. Exhausted retries abort before final
+    copying; existing source-release and target-hold cleanup still applies (#1333).
   - Metadata helpers retain their public names and original includes while
     session decoding, category preservation and aggregate probe interpretation
     live in focused modules (ADR 0223). Bencode retains its nine-digit length

@@ -172,7 +172,7 @@ function pmssUserTransferMain(array $argv): int
                     throw new RuntimeException('Could not hold source Eternals before final transfer', 1);
                 }
                 $targetHeld = true;
-                if (runStep('Holding target Eternals', pmssUserTransferTargetEternalCommand($cfg['localUser'], $holdUntil)) !== 0) {
+                if (pmssUserTransferTargetEternalHold($cfg['localUser'], $holdUntil) !== 0) {
                     throw new RuntimeException('Could not hold target Eternals before final transfer', 1);
                 }
             }
