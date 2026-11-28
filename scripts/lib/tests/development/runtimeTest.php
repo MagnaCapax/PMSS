@@ -11,6 +11,11 @@ class RuntimeTest extends TestCase
     public function testRegularReadPayloadAndMetadataCharacterization(): void
     {
         $path = $this->pmssMakeTempFile('pmss-read-contract-');
+        // A read itself moves atime (relatime sets it to the read's own second on the first read after a write), so the
+        // snapshot taken before the reads can only match the opened inode's snapshot without it.
+        $withoutAtime = static function (?array $stat): ?array {
+            return $stat === null ? null : array_diff_key($stat, ['atime' => true, 8 => true]);
+        };
         foreach (['', '0', " a\r\nb\n", "binary\0bytes", str_repeat('x', 4097)] as $bytes) {
             $this->pmssWriteFile($path, $bytes);
             clearstatcache(true, $path);
@@ -21,7 +26,7 @@ class RuntimeTest extends TestCase
                 $accepted = strlen($bytes) <= $limit;
                 $this->assertSame($accepted ? $bytes : null,
                     \pmssReadRegularFileContentsVerified($path, $before['uid'], $limit, $metadata));
-                $this->assertSame($accepted ? $before : null, $metadata);
+                $this->assertSame($accepted ? $withoutAtime($before) : null, $withoutAtime($metadata));
             }
             $metadata = ['stale' => true];
             $this->assertSame(null, \pmssReadRegularFileContentsVerified($path, $before['uid'] + 1, 8192, $metadata));
