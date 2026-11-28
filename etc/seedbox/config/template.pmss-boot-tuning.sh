@@ -199,10 +199,12 @@ done
 # The /proc/net table modes are per-network-namespace kernel state that resets on reboot, so
 # reapply the root-only mode here.
 for t in tcp tcp6 udp udp6 udplite udplite6 raw raw6 icmp icmp6; do
+	# shellcheck disable=SC2015 # Reason: best effort; a missing table or a failed chmod must never stop boot tuning.
 	[ -e "/proc/net/$t" ] && chmod 0440 "/proc/net/$t" 2>/dev/null || true
 done
 # Stage 2: reload the sock_diag BPF-LSM filter (BPF state does not survive a reboot).
 # The loader fails open, so a missing precondition never blocks boot.
+# shellcheck disable=SC2015 # Reason: fail open; the loader failing or /bin/sh missing must never stop boot.
 [ -x /bin/sh ] && sh /scripts/lib/update/systemPrep/bpf/socket-privacy-load.sh 2>/dev/null || true
 
 # Record the detected host profile and the boot-time tuning targets for audits.

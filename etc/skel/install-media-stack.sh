@@ -387,6 +387,7 @@ media_stack_cloudplow_config_ensure() {
 	timeout 30 "$HOME/.bin/cloudplow/bin/python3" "$HOME/.bin/cloudplow/cloudplow/cloudplow.py" run \
 		--config="$config_tmp/config.json" --loglevel=DEBUG --cachefile="$config_dir/cache.db" \
 		--logfile="$config_dir/cloudplow.log" >/dev/null 2>&1 || true
+	# shellcheck disable=SC2016 # Reason: the single-quoted text is PHP source; the shell must not expand it.
 	if ! php -r '
     $config = json_decode(@file_get_contents($argv[1]));
     if (!is_object($config->core ?? null) || !is_object($config->remotes->google ?? null)) { exit(1); }
@@ -1247,7 +1248,7 @@ lighttpd_media_stack_ports_reconcile() {
 	for app in sabnzbd radarr prowlarr sonarr autobrr jellyfin; do
 		case "$app" in
 		sabnzbd) port=$(existing_port_from_ini "$HOME/.config/sabnzbd/sabnzbd.ini" port) ;;
-		radarr|prowlarr|sonarr) port=$(existing_port_from_xml_tag "$HOME/.config/$app/config.xml" Port) ;;
+		radarr | prowlarr | sonarr) port=$(existing_port_from_xml_tag "$HOME/.config/$app/config.xml" Port) ;;
 		autobrr) port=$(existing_port_from_ini "$HOME/.config/autobrr/config.toml" port) ;;
 		jellyfin)
 			port=$(existing_port_from_xml_tag "$JELLYFIN_CONFIG_DIR/network.xml" InternalHttpPort)
@@ -1256,6 +1257,7 @@ lighttpd_media_stack_ports_reconcile() {
 		esac
 		# Unconfigured or malformed apps cannot supply a replacement proxy port.
 		media_stack_port_is_valid "$port" || continue
+		# shellcheck disable=SC2016 # Reason: the single-quoted sed script keeps \$ and \( literal for sed; the shell must not expand them.
 		if ! sed -i -E '/^\$HTTP\["url"\] =~ "\^\/'"$app"'\(/,/^[[:space:]]*}/ s/("port"[[:space:]]*=>[[:space:]]*)[0-9]+/\1'"$port"'/' "$temp_target"; then
 			rm -f "$temp_target"
 			return 1
