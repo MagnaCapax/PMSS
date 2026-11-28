@@ -96,4 +96,7 @@ through `pmssDynamicIopsKernelReady()`.
   That is the hold working, not a fault. The notice the account gets before the
   hold is the primary channel, and the warm panel still shows the budget text.
 
-Tests: `scripts/lib/tests/development/IopsBudgetHoldTest.php`.
+Tests: `scripts/lib/tests/development/IopsBudgetHoldTest.php`,
+`IopsBudgetReleaseTest.php` and `IopsBudgetCronTest.php`. The cron regression
+carries in-memory kernel and marker state across runs to cover a held cap,
+tighter normal caps, release, unsafe kernels and read-only previews.
