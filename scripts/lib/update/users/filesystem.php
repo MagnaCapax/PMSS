@@ -46,6 +46,7 @@ PHP;
         '.bashrc',
         'install-media-stack.sh',
         'bin/mediaStackProwlarr.sh',
+        'bin/mediaStackRadarr.sh',
         'install-ai-tools.sh',
         'bin/docker-install-lsio',
         'bin/dockerInstallLsio.php',

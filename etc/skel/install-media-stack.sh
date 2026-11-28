@@ -2127,6 +2127,7 @@ servarr_auth_seed() {
 	local datadir="$HOME/.config/${app}"
 	local config_file="$datadir/config.xml"
 	local seed_port session base_url response_json payload_json curl_config put_code unauth_code run_args existing_password key_wait_rc seed_wait_rc seed_log seed_log_offset
+	local radarr_defaults=0
 
 	if servarr_config_auth_configured "$config_file"; then
 		existing_password=$(media_stack_credentials_value "$(media_stack_app_key "$app")_PASSWORD")
@@ -2142,6 +2143,10 @@ servarr_auth_seed() {
 		return $?
 	fi
 
+	# Only an absent database authorizes defaults; existing or failed installs keep customer choices.
+	if [[ "$app" == radarr && ! -e "$datadir/radarr.db" && ! -L "$datadir/radarr.db" ]]; then
+		radarr_defaults=1
+	fi
 	seed_port="$desired_port"
 	session="${app}-auth-seed"
 	base_url=$(servarr_host_config_url "$config_file" "$seed_port" "$api_version")
@@ -2234,6 +2239,15 @@ servarr_auth_seed() {
 		return 1
 	fi
 
+	if [[ "$radarr_defaults" -eq 1 ]]; then
+		if [[ -r "$HOME/bin/mediaStackRadarr.sh" ]]; then
+			# shellcheck source=etc/skel/bin/mediaStackRadarr.sh
+			source "$HOME/bin/mediaStackRadarr.sh"
+			media_stack_radarr_defaults_seed "$base_url" "$curl_config" || log_warn "Radarr movie root not confirmed; add ~/data/Movies in Settings > Media Management"
+		else
+			log_warn "Radarr defaults helper missing; update PMSS or add ~/data/Movies manually"
+		fi
+	fi
 	servarr_auth_seed_cleanup "$session" "$response_json" "$payload_json" "$curl_config" "$config_file" "$desired_port"
 	servarr_config_xml_tag_converge "$config_file" AuthenticationMethod Forms
 	servarr_config_xml_tag_converge "$config_file" AuthenticationRequired Enabled
