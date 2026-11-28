@@ -51,16 +51,17 @@ $pmssBonusDisplayNote = function_exists('pmssCustomerBonusDisplayNoteBuild')
 <style>
 .stats-container {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 24px;
     margin: 20px 0;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 @media (max-width: 1200px) {
-    .stats-container { grid-template-columns: 1fr; }
+    .stats-container { grid-template-columns: minmax(0, 1fr); }
 }
 
 .stats-block {
+    min-width: 0;
     background: #1e1e1e;
     border-radius: 12px;
     padding: 18px;
@@ -165,6 +166,7 @@ pre {
     overflow-y: auto;
     white-space: pre-wrap;
     word-wrap: break-word;
+    overflow-wrap: anywhere;
 }
 .stats-block-base-resources .stats-base-resources-pre {
     max-height: none;

@@ -44,6 +44,16 @@ final class CustomerStatsLayoutTest extends TestCase
         ]);
     }
 
+    public function testStatsGridAndPreformattedBlocksCannotBeWidenedByLongUnbrokenLines(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/www/stats.php', [
+            "grid-template-columns: repeat(2, minmax(0, 1fr));" => 'A bare 1fr track grows to the longest unbroken token (a process line with a long --token value) and pushes the info column off a narrow screen.',
+            ".stats-container { grid-template-columns: minmax(0, 1fr); }" => 'The single-column layout needs the same zero minimum width.',
+            ".stats-block {\n    min-width: 0;" => 'Stats blocks must be allowed to shrink below their content width.',
+            "    word-wrap: break-word;\n    overflow-wrap: anywhere;" => 'Preformatted text must wrap inside its block even without spaces.',
+        ]);
+    }
+
     public function testResourceBasicsRenderAsCompactTopSnapshot(): void
     {
         $welcome = $this->pmssRenderCustomerPanelPage('welcome.php');
