@@ -4,7 +4,10 @@ Date: 2026-11-20
 Category: architecture
 
 ## Status
-Proposed
+Accepted 2026-11-28. Read on two NVMe `/home` hosts running the 2026-11-24 build: the NVMe
+device runs `bfq`, and the weight cron logs `apply cycle ... errors=0` every 5 minutes, with
+per-user weights in place. Both hosts were lightly loaded, so BFQ's CPU cost under heavy NVMe
+seedbox load is still unmeasured. Their I/O and CPU pressure readings are the light-load baseline.
 
 ## Context
 

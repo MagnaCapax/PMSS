@@ -4,7 +4,8 @@ Date: 2026-09-18
 Category: architecture
 
 ## Status
-Proposed
+Proposed. The `nvme*` 128+none branch described in Context is replaced by
+[ADR 0315](0315-bfq-stays-active-on-every-home-device-class-including-nvme.md): NVMe runs `bfq`.
 
 ## Context
 Two shipped units write the same `/sys/block/<dev>/queue/` knobs at every boot.
