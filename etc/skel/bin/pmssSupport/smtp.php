@@ -16,7 +16,7 @@ function pmssSupportMailSendViaSmtp(string $host, int $port, int $timeout, array
     $errno = 0;
     $errstr = '';
     $stream = @stream_socket_client('tcp://'.$host.':'.$port, $errno, $errstr, $timeout);
-    if (!pmssStreamHandleIsOpen($stream)) {
+    if (!pmssSupportLocalStreamHandleIsOpen($stream)) {
         throw new RuntimeException('Support SMTP connection failed: '.$errstr);
     }
 
@@ -56,7 +56,7 @@ function pmssSupportSmtpExpect($stream, array $expectedCodes): void
         }
         $chunk = fgets($stream);
         if (!is_string($chunk)) {
-            $meta = pmssStreamHandleIsOpen($stream) ? stream_get_meta_data($stream) : [];
+            $meta = pmssSupportLocalStreamHandleIsOpen($stream) ? stream_get_meta_data($stream) : [];
             throw new RuntimeException(!empty($meta['timed_out'])
                 ? 'Support SMTP server timed out.' : 'Support SMTP server closed the connection unexpectedly.');
         }

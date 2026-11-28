@@ -8,8 +8,9 @@
 
 require_once __DIR__.'/usageAlerts.php';
 require_once __DIR__.'/userConfigStore.php';
-require_once dirname(__DIR__).'/support/config.php';
-require_once dirname(__DIR__).'/support/mail.php';
+// Read the installed root-owned skeleton, never an account's editable copy.
+require_once dirname(__DIR__, 3).'/etc/skel/bin/pmssSupport/config.php';
+require_once dirname(__DIR__, 3).'/etc/skel/bin/pmssSupport/mail.php';
 
 /** Build a plain-text customer notification without exposing internal paths. */
 function pmssUsageAlertEnvelopeBuild(string $user, string $recipient, array $conditions, string $hostname): array

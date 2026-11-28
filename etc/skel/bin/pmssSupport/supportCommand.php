@@ -11,19 +11,19 @@
  * @author PMSS Team
  */
 
-require_once __DIR__.'/../lib/support/request.php';
-require_once __DIR__.'/../lib/cli/optionParser.php';
+require_once __DIR__.'/request.php';
+require_once __DIR__.'/localProcess.php';
 
 $args = $argv ?? $_SERVER['argv'] ?? [];
 array_shift($args);
 $usage = "Usage: support <message>\n";
 
 if ($args === ['--help'] || $args === ['-h']) {
-    pmssCliExitWithStderr($usage, 0);
+    pmssSupportLocalCliExitWithStderr($usage, 0);
 }
 
 if (count($args) < 1) {
-    pmssCliExitWithStderr($usage, 1);
+    pmssSupportLocalCliExitWithStderr($usage, 1);
 }
 
 try {
@@ -32,5 +32,5 @@ try {
     fwrite(STDOUT, 'Snapshot saved to '.$result['snapshotPath']."\n");
     exit(0);
 } catch (Throwable $exception) {
-    pmssCliExitWithStderr('Support request failed: '.$exception->getMessage()."\n", 1);
+    pmssSupportLocalCliExitWithStderr('Support request failed: '.$exception->getMessage()."\n", 1);
 }

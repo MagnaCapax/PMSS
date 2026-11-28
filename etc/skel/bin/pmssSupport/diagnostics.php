@@ -9,8 +9,8 @@
  * @author PMSS Team
  */
 
-require_once dirname(__DIR__).'/runtime.php';
-pmssRequireRelativeFiles(__DIR__, ['collect.php', 'stream.php', '../lighttpd/userFileWrite.php']);
+require_once __DIR__.'/collect.php';
+require_once __DIR__.'/stream.php';
 
 /**
  * Persist the diagnostics snapshot under the caller's home directory.
@@ -18,18 +18,18 @@ pmssRequireRelativeFiles(__DIR__, ['collect.php', 'stream.php', '../lighttpd/use
 function pmssSupportSnapshotWrite(array $diagnostics, array $config): string
 {
     $home = rtrim((string) ($diagnostics['home'] ?? ''), '/');
-    if ($home === '' || $home[0] !== '/' || !is_dir($home) || !pmssPathTargetIsSafe($home, true)) {
+    if ($home === '' || $home[0] !== '/' || !is_dir($home) || !pmssSupportLocalPathTargetIsSafe($home, true)) {
         throw new RuntimeException('Unable to determine support snapshot home directory.');
     }
 
     $snapshotDir = $home.'/'.trim((string) $config['snapshotDirectory'], '/');
-    if (!pmssPathTargetIsSafe($snapshotDir, true)) {
+    if (!pmssSupportLocalPathTargetIsSafe($snapshotDir, true)) {
         throw new RuntimeException('Support snapshot directory is unsafe.');
     }
-    if (!pmssDirEnsureExists($snapshotDir, 0700)) {
+    if (!pmssSupportLocalDirEnsureExists($snapshotDir, 0700)) {
         throw new RuntimeException('Unable to create support snapshot directory.');
     }
-    if (!is_dir($snapshotDir) || !pmssPathTargetIsSafe($snapshotDir, true)) {
+    if (!is_dir($snapshotDir) || !pmssSupportLocalPathTargetIsSafe($snapshotDir, true)) {
         throw new RuntimeException('Support snapshot directory is unsafe.');
     }
     @chmod($snapshotDir, 0700);
@@ -40,7 +40,7 @@ function pmssSupportSnapshotWrite(array $diagnostics, array $config): string
     }
 
     $path = sprintf('%s/request-%s-%d.txt', $snapshotDir, gmdate('Ymd-His'), getmypid());
-    $handle = pmssFileOpenWithUmask($path, 'x', 0077);
+    $handle = pmssSupportLocalFileOpenWithUmask($path, 'x', 0077);
     if ($handle === false) {
         throw new RuntimeException('Unable to create support snapshot file.');
     }
@@ -63,7 +63,7 @@ function pmssSupportSnapshotWrite(array $diagnostics, array $config): string
         }
     }
 
-    if (!pmssRegularFilePathIsReadable($path) || (function_exists('posix_geteuid') && @fileowner($path) !== posix_geteuid())) {
+    if (!pmssSupportLocalRegularFilePathIsReadable($path) || (function_exists('posix_geteuid') && @fileowner($path) !== posix_geteuid())) {
         @unlink($path);
         throw new RuntimeException('Support snapshot file ownership check failed.');
     }

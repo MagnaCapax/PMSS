@@ -2,7 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once dirname(__DIR__, 2).'/support/mail.php';
+require_once dirname(__DIR__, 4).'/etc/skel/bin/pmssSupport/mail.php';
 
 class SupportMailTest extends TestCase
 {
@@ -54,7 +54,7 @@ class SupportMailTest extends TestCase
 
     public function testMailLoadsStreamWriterWithoutDiagnostics(): void
     {
-        $this->pmssAssertRepoFileContainsAndOmitsStrings('scripts/lib/support/mail.php',
+        $this->pmssAssertRepoFileContainsAndOmitsStrings('etc/skel/bin/pmssSupport/mail.php',
             ["require_once __DIR__.'/stream.php';"], ["require_once __DIR__.'/diagnostics.php';"]);
     }
 

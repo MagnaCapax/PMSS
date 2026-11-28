@@ -69,6 +69,23 @@ Devbox verification is limited to changed-file PHP syntax and symbol/reference
 inspection. No real mail, network probe, dry run or development suite is executed
 there; the lane testing machine and CI execute the characterization fixtures.
 
+## Account delivery amendment (2026-11-23, issue #883)
+
+ADR 0016 also applies to the SSH support command: `/scripts` is not traversable
+by accounts. The command and its support modules now live in
+`etc/skel/bin/pmssSupport/`, delivered before `bin/support` through the existing
+user-file sync. Only the runtime functions actually used are copied into local
+modules with their original guards and origin comments; internal names avoid
+collisions with root's runtime. Public support helpers, diagnostic/envelope/SMTP
+bytes and private snapshot modes stay unchanged. Root usage alerts load the same
+root-owned installed `/etc/skel` copy, never an account copy. The support config
+contract and permission sweep stay unchanged. Delivery coverage checks every file
+and runs the copied wrapper with a loopback SMTP stub as the current unprivileged user;
+that scenario explicitly skips root runners and must run on an unprivileged QA
+worker. The Exim CVE-2023-51766 review above still applies: SMTP framing and reply
+guards are retained, no credential or public endpoint is introduced, and exposed
+snapshots retain the same diagnostic-data blast radius.
+
 ## References
 
 - [Architecture overview](../architecture.md)

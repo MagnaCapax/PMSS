@@ -2,7 +2,7 @@
 /** Local support mail process lifetime. @license GPL-3.0-only */
 require_once __DIR__.'/stream.php';
 require_once __DIR__.'/envelope.php';
-require_once dirname(__DIR__).'/runtime/commandPipes.php';
+require_once __DIR__.'/localProcess.php';
 
 /**
  * Deliver the support message via a local sendmail-compatible binary.
@@ -10,7 +10,7 @@ require_once dirname(__DIR__).'/runtime/commandPipes.php';
 function pmssSupportMailSendViaSendmail(string $sendmailPath, array $envelope): void
 {
     $envelope = pmssSupportMailEnvelopeNormalize($envelope);
-    $spec = pmssProcessPipeDescriptorSpec('w');
+    $spec = pmssSupportLocalProcessPipeDescriptorSpec('w');
     $process = @proc_open(escapeshellarg($sendmailPath).' -t -i', $spec, $pipes);
     if (!is_resource($process)) {
         throw new RuntimeException('Unable to start sendmail transport.');
@@ -18,9 +18,9 @@ function pmssSupportMailSendViaSendmail(string $sendmailPath, array $envelope): 
     try {
         // Own the process and every returned pipe before inspecting the launch result.
         if (!isset($pipes[0], $pipes[1], $pipes[2])
-            || !pmssStreamHandleIsOpen($pipes[0])
-            || !pmssStreamHandleIsOpen($pipes[1])
-            || !pmssStreamHandleIsOpen($pipes[2])) {
+            || !pmssSupportLocalStreamHandleIsOpen($pipes[0])
+            || !pmssSupportLocalStreamHandleIsOpen($pipes[1])
+            || !pmssSupportLocalStreamHandleIsOpen($pipes[2])) {
             throw new RuntimeException('Sendmail transport did not provide usable pipes.');
         }
 
@@ -30,14 +30,14 @@ function pmssSupportMailSendViaSendmail(string $sendmailPath, array $envelope): 
 
         $stderr = (string) stream_get_contents($pipes[2]);
 
-        pmssProcessPipesClose([$pipes[1], $pipes[2]]);
+        pmssSupportLocalProcessPipesClose([$pipes[1], $pipes[2]]);
         unset($pipes[1], $pipes[2]);
 
         $rc = proc_close($process);
         $process = null;
     } finally {
         try {
-            pmssProcessPipesClose($pipes);
+            pmssSupportLocalProcessPipesClose($pipes);
         } finally {
             // A pipe wrapper's close failure must not skip reaping the child.
             if (is_resource($process)) {

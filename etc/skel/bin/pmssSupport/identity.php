@@ -1,6 +1,7 @@
 <?php
 /** Account identity observations for support reports. @license GPL-3.0-only */
-require_once dirname(__DIR__).'/runtime.php';
+require_once __DIR__.'/localPath.php';
+require_once __DIR__.'/localValue.php';
 
 /**
  * Read the caller's own billing marker copy from its home.
@@ -16,9 +17,9 @@ function pmssSupportOwnBillingMarkerRead(string $home, array $fileNames): ?strin
     $home = rtrim($home, '/');
     if ($home === '' || $home[0] !== '/') return null;
     foreach ($fileNames as $fileName) {
-        $raw = pmssReadRegularFileContentsVerified($home.'/'.$fileName, 0, 256);
+        $raw = pmssSupportLocalReadRegularFileContentsVerified($home.'/'.$fileName, 0, 256);
         $digits = is_string($raw) ? trim($raw, " \t\r\n") : '';
-        $id = pmssUnsignedDecimalIntParse($digits);
+        $id = pmssSupportLocalUnsignedDecimalIntParse($digits);
         if ($id !== null && $id > 0) return $digits;
     }
     return null;
@@ -40,7 +41,7 @@ function pmssSupportIdentityRead(): array
         return preg_match('/[[:space:][:cntrl:]]/', $username) !== 1;
     };
 
-    $homeRoot = rtrim(pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home'), '/');
+    $homeRoot = rtrim(pmssSupportLocalResolvePathFromEnv('PMSS_HOME_DIR', '/home'), '/');
     $homeRoot = ($homeRoot !== '' && $homeRoot[0] === '/' && strpos($homeRoot, "\0") === false) ? $homeRoot : '';
     $envUser = getenv('USER');
     $envUser = is_string($envUser) ? trim($envUser) : '';
@@ -63,12 +64,12 @@ function pmssSupportIdentityRead(): array
 
     $expectedHome = ($username !== '' && $homeRoot !== '') ? $homeRoot.'/'.$username : '';
     $home = $expectedHome;
-    if ($expectedHome !== '' && $envHome !== '' && $envHome === $expectedHome && pmssPathTargetIsSafe($envHome, true)) {
+    if ($expectedHome !== '' && $envHome !== '' && $envHome === $expectedHome && pmssSupportLocalPathTargetIsSafe($envHome, true)) {
         $home = $envHome;
     } elseif ($username !== '' && function_exists('posix_getpwnam')) {
         $entry = @posix_getpwnam($username);
         $dir = is_array($entry) && !empty($entry['dir']) ? rtrim((string) $entry['dir'], '/') : '';
-        if ($dir !== '' && pmssPathTargetIsSafe($dir, true)) {
+        if ($dir !== '' && pmssSupportLocalPathTargetIsSafe($dir, true)) {
             $home = $dir;
         }
     }

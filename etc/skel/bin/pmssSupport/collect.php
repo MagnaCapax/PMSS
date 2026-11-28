@@ -1,7 +1,8 @@
 <?php
 /** Support diagnostics collection and text projection. @license GPL-3.0-only */
 require_once __DIR__.'/identity.php';
-require_once dirname(__DIR__).'/user/billingIds.php';
+require_once __DIR__.'/localValue.php';
+require_once __DIR__.'/localProcess.php';
 
 /**
  * Validate and normalize the user-supplied support message.
@@ -31,7 +32,7 @@ function pmssSupportDiagnosticsBuild(string $message, ?callable $runner = null):
     $runner = $runner ?: function (array $argv): array {
         $output = [];
         $rc = 0;
-        exec(pmssCommandArgvShellQuote($argv).' 2>&1', $output, $rc);
+        exec(pmssSupportLocalCommandArgvShellQuote($argv).' 2>&1', $output, $rc);
         return ['rc' => $rc, 'output' => implode("\n", $output)];
     };
 
@@ -40,12 +41,12 @@ function pmssSupportDiagnosticsBuild(string $message, ?callable $runner = null):
     // Build the returned record once; commands and text consume those same observations.
     $diagnostics = ['message' => $message, 'username' => (string) $identity['username'],
         'home' => (string) $identity['home'], 'hostname' => (string) (gethostname() ?: 'unknown-host')];
-    $configDir = pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config');
-    $diagnostics['billingServiceId'] = (int) (pmssUserBillingIdentityRead($diagnostics['username'], 'billingServiceId', $configDir)
+    $configDir = pmssSupportLocalResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config');
+    $diagnostics['billingServiceId'] = (int) (pmssSupportLocalUserBillingIdentityRead($diagnostics['username'], 'billingServiceId', $configDir)
         ?? pmssSupportOwnBillingMarkerRead($diagnostics['home'], ['.billingServiceId', '.billingId']));
-    $diagnostics['billingClientId'] = (int) (pmssUserBillingIdentityRead($diagnostics['username'], 'billingClientId', $configDir)
+    $diagnostics['billingClientId'] = (int) (pmssSupportLocalUserBillingIdentityRead($diagnostics['username'], 'billingClientId', $configDir)
         ?? pmssSupportOwnBillingMarkerRead($diagnostics['home'], ['.billingClientId']));
-    $versionPath = pmssResolvePathFromEnv('PMSS_VERSION_FILE', $configDir.'/version');
+    $versionPath = pmssSupportLocalResolvePathFromEnv('PMSS_VERSION_FILE', $configDir.'/version');
     $diagnostics['pmssVersion'] = is_file($versionPath) ? trim((string) @file_get_contents($versionPath)) : 'unknown';
     $commands = [
         'uptime' => ['uptime'],

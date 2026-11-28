@@ -3,8 +3,9 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 require_once __DIR__.'/../../runtime/filesystemStream.php';
+require_once dirname(__DIR__, 4).'/etc/skel/bin/pmssSupport/localFilesystem.php';
 
-/** Creation faults in user/directories.php and support/diagnostics.php use memory-only I/O. */
+/** Creation faults in user/directories.php and pmssSupport/diagnostics.php use memory-only I/O. */
 class CreationUmaskSafetyTest extends TestCase
 {
     public function testCreationRestoresUmaskBeforeReturningLoggingOrPropagating(): void
@@ -42,6 +43,8 @@ function mkdir($path, $mode) {
 }
 function pmssPathTargetIsSafe(...$arguments) { return true; }
 function pmssDirEnsureExists(...$arguments) { return true; }
+function pmssSupportLocalPathTargetIsSafe(...$arguments) { return pmssPathTargetIsSafe(...$arguments); }
+function pmssSupportLocalDirEnsureExists(...$arguments) { return pmssDirEnsureExists(...$arguments); }
 function chmod($path, $mode) { observe('chmod', [$path, $mode]); return true; }
 function clearstatcache(...$arguments) {}
 function fileperms($path) { return is_dir($path) ? 0700 : 0600; }
@@ -56,11 +59,11 @@ function fopen($path, $mode) {
 function pmssSupportStreamWriteAll($handle, $bytes, $label) { observe('write', [$bytes, $label]); }
 function fflush($handle) { observe('flush'); return true; }
 function fclose($handle) { observe('close'); return \fclose($handle); }
-function pmssRegularFilePathIsReadable($path) { return true; }
+function pmssSupportLocalRegularFilePathIsReadable($path) { return true; }
 PHP;
-        $script .= \pmssTestingFunctionExport('pmssFileOpenWithUmask', 'CreationUmaskFixture');
+        $script .= \pmssTestingFunctionExport('pmssSupportLocalFileOpenWithUmask', 'CreationUmaskFixture');
         $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/user/directories.php', 'CreationUmaskFixture', ['directoryManaged.php']);
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/support/diagnostics.php', 'CreationUmaskFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('etc/skel/bin/pmssSupport/diagnostics.php', 'CreationUmaskFixture');
         $script .= <<<'PHP'
 $results = [];
 foreach (json_decode(getenv('PMSS_TEST_CREATION_UMASK'), true) as [$kind, $initial, $boundary, $fault]) {

@@ -17,8 +17,8 @@ function observe($phase) {
 }
 // Isolate account paths, modes and ownership from the host filesystem.
 function is_dir($path) { return true; }
-function pmssPathTargetIsSafe(...$args) { return true; }
-function pmssDirEnsureExists(...$args) { return true; }
+function pmssSupportLocalPathTargetIsSafe(...$args) { return true; }
+function pmssSupportLocalDirEnsureExists(...$args) { return true; }
 function chmod($path, $mode) { return true; }
 function clearstatcache(...$args) {}
 function fileperms($path) { return substr($path, -4) === '.txt' ? 0600 : 0700; }
@@ -26,7 +26,7 @@ function fileowner($path) { return 4242; }
 function posix_geteuid() { return 4242; }
 function gmdate($format) { return '20010101-000000'; }
 function getmypid() { return 123; }
-function pmssFileOpenWithUmask($path, $mode, $mask) {
+function pmssSupportLocalFileOpenWithUmask($path, $mode, $mask) {
     observe('open');
     $GLOBALS['open'] = [$path, $mode, $mask];
     return $GLOBALS['case'] === 'open-false' ? false : ($GLOBALS['handle'] = \fopen('php://memory', 'w+'));
@@ -47,9 +47,9 @@ function unlink($path) {
     observe('unlink');
     return $GLOBALS['case'] !== 'unlink-false';
 }
-function pmssRegularFilePathIsReadable($path) { observe('verify'); return true; }
+function pmssSupportLocalRegularFilePathIsReadable($path) { observe('verify'); return true; }
 PHP;
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/support/diagnostics.php', 'SupportSnapshotCleanupFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('etc/skel/bin/pmssSupport/diagnostics.php', 'SupportSnapshotCleanupFixture');
         $script .= <<<'PHP'
 $results = [];
 foreach (json_decode(getenv('PMSS_TEST_SUPPORT_SNAPSHOT_CLEANUP'), true) as [$case, $phase, $type, $closeType]) {

@@ -10,7 +10,7 @@
  * @author PMSS Team
  */
 
-require_once dirname(__DIR__).'/runtime.php';
+require_once __DIR__.'/localProcess.php';
 require_once __DIR__.'/stream.php';
 
 require_once __DIR__.'/envelope.php';
@@ -29,7 +29,7 @@ function pmssSupportMailSend(array $config, array $envelope, ?callable $transpor
         return;
     }
 
-    $sendmail = pmssCommandPath('sendmail');
+    $sendmail = pmssSupportLocalCommandPath('sendmail');
     if ($sendmail !== '') {
         pmssSupportMailSendViaSendmail($sendmail, $envelope);
         return;

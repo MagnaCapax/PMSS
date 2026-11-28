@@ -29,7 +29,7 @@ function proc_open($command, $spec, &$pipes) {
     }
     return $GLOBALS['process'] = \fopen('php://memory', 'w+');
 }
-function pmssStreamHandleIsOpen($handle) {
+function pmssSupportLocalStreamHandleIsOpen($handle) {
     $phase = 'validate-'.(++$GLOBALS['checks']);
     if (isset($GLOBALS['faults'][$phase])) observe($phase);
     return is_resource($handle) && get_resource_type($handle) === 'stream';
@@ -51,9 +51,9 @@ function proc_close($process) {
 }
 PHP;
         // Exercise the real pipe cleanup traversal alongside the transport.
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/runtime/commandPipes.php', 'SupportSendmailCleanupFixture');
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/support/envelope.php', 'SupportSendmailCleanupFixture');
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/support/sendmail.php', 'SupportSendmailCleanupFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('etc/skel/bin/pmssSupport/localProcess.php', 'SupportSendmailCleanupFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('etc/skel/bin/pmssSupport/envelope.php', 'SupportSendmailCleanupFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('etc/skel/bin/pmssSupport/sendmail.php', 'SupportSendmailCleanupFixture');
         $script .= <<<'PHP'
 $rows = [];
 foreach (json_decode(getenv('PMSS_TEST_SENDMAIL_CLEANUP'), true) as [$case, $phase, $type, $reapType]) {

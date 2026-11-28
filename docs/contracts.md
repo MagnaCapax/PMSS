@@ -1963,9 +1963,10 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Behavior: Read-only probe of system readiness (binary versions, config presence);
     intended post-provision.
 
-- scripts/util/supportCommand.php <message>
+- ~/bin/support <message> (etc/skel/bin/pmssSupport/supportCommand.php)
   - Behavior: Saves a read-only support snapshot under `/home/<user>/.support/requests/` and submits the same snapshot to the configured support inbox.
-  - Inputs: Reads `/etc/seedbox/config/support.php`, `/etc/seedbox/config/version`, and the optional service and client IDs from the root-owned provisioning store `/etc/seedbox/config/users/<user>.json` (0 when absent or unreadable).
+  - Inputs: Reads `/etc/seedbox/config/support.php`, `/etc/seedbox/config/version`, and the optional service and client IDs from the root-owned provisioning store `/etc/seedbox/config/users/<user>.json`, falling back to the account's own root-owned billing markers (0 when absent or unreadable).
+  - Delivery boundary: All PHP dependencies are delivered in `~/bin/pmssSupport/`; none require `/scripts/`. Root usage alerts share the installed `/etc/skel/bin/pmssSupport/` config and mail code. The existing permission sweep makes `support.php` account-readable (0664, config directory 0775); no config permission change is required.
   - Flags and overrides: `-h`/`--help` prints usage and exits successfully; `PMSS_SUPPORT_CONFIG_PATH` overrides the support config file path before the `PMSS_CONFIG_DIR` default is consulted.
   - Delivery: Prefers a local `sendmail` binary when present, otherwise attempts direct MX SMTP delivery to the configured support inbox.
 

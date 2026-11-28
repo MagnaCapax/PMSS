@@ -2,7 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once dirname(__DIR__, 2).'/support/request.php';
+require_once dirname(__DIR__, 4).'/etc/skel/bin/pmssSupport/request.php';
 require_once dirname(__DIR__, 2).'/update.php';
 require_once dirname(__DIR__, 2).'/update/users.php';
 
@@ -175,7 +175,7 @@ class SupportCommandTest extends TestCase
 
     public function testSnapshotWriteUsesSharedFullWriteGuard(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/support/diagnostics.php', [
+        $this->pmssAssertRepoFileContainsAllStrings('etc/skel/bin/pmssSupport/diagnostics.php', [
             "pmssSupportStreamWriteAll(\$handle, (string) (\$diagnostics['body'] ?? ''), 'support snapshot file');",
             "@fflush(\$handle) !== true", "@chmod(\$snapshotDir, 0700);", "@chmod(\$path, 0600);",
         ]);
@@ -216,14 +216,22 @@ class SupportCommandTest extends TestCase
     public function testApplySkeletonFilesCopiesSupportCommandForExistingUsers(): void
     {
         $this->pmssWriteFile($this->skelDir.'/bin/support', "#!/usr/bin/env bash\necho support\n");
+        $helpers = glob($this->pmssRepoPath('etc/skel/bin/pmssSupport').'/*.php');
+        foreach ($helpers as $helper) {
+            $this->pmssWriteFile($this->skelDir.'/bin/pmssSupport/'.basename($helper), (string) file_get_contents($helper));
+        }
 
         \pmssUserApplySkeletonFiles($this->pmssUserHomeContext($this->homeRoot, $this->user));
 
         $this->assertTrue(is_file($this->homeRoot.'/'.$this->user.'/bin/support'));
+        foreach ($helpers as $helper) {
+            $target = $this->homeRoot.'/'.$this->user.'/bin/pmssSupport/'.basename($helper);
+            $this->assertSame(file_get_contents($helper), file_get_contents($target), basename($helper));
+        }
     }
 
-    public function testShippedSkeletonSupportWrapperTargetsUtility(): void
+    public function testShippedSkeletonSupportWrapperTargetsAccountCopy(): void
     {
-        $this->pmssAssertRepoFileContainsString('etc/skel/bin/support', 'php /scripts/util/supportCommand.php');
+        $this->pmssAssertRepoFileContainsString('etc/skel/bin/support', '/pmssSupport/supportCommand.php" "$@"');
     }
 }

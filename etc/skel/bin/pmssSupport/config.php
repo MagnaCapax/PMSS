@@ -9,7 +9,8 @@
  * @author PMSS Team
  */
 
-require_once dirname(__DIR__).'/runtime.php';
+require_once __DIR__.'/localPath.php';
+require_once __DIR__.'/localValue.php';
 
 /**
  * Normalize an optional SMTP relay host from support configuration.
@@ -26,7 +27,7 @@ function pmssSupportRelayHostNormalize($relayHost): string
     }
 
     $relayHost = trim((string) $relayHost);
-    if ($relayHost !== '' && !pmssHostnameIsValid($relayHost)) {
+    if ($relayHost !== '' && !pmssSupportLocalHostnameIsValid($relayHost)) {
         throw new RuntimeException('Support relay host is invalid.');
     }
 
@@ -55,8 +56,8 @@ function pmssSupportConfigScalarValue(array $config, string $key, $default, stri
  */
 function pmssSupportConfigRead(): array
 {
-    $path = pmssResolvePathFromEnv('PMSS_SUPPORT_CONFIG_PATH', pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config').'/support.php');
-    if (!pmssRegularFilePathIsReadable($path) || !is_readable($path)) {
+    $path = pmssSupportLocalResolvePathFromEnv('PMSS_SUPPORT_CONFIG_PATH', pmssSupportLocalResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config').'/support.php');
+    if (!pmssSupportLocalRegularFilePathIsReadable($path) || !is_readable($path)) {
         throw new RuntimeException('Support command config is missing or unreadable.');
     }
 
@@ -71,7 +72,7 @@ function pmssSupportConfigRead(): array
     }
 
     $snapshotDirectory = trim((string) pmssSupportConfigScalarValue($config, 'snapshotDirectory', '.support/requests', 'Support snapshot directory must be a safe relative path.'));
-    if (!pmssPathRelativeStringIsSafe($snapshotDirectory, ['allowEmptySegments' => true, 'allowDotSegments' => true, 'allowControlChars' => true, 'rejectDotDotSubstring' => true])) {
+    if (!pmssSupportLocalPathRelativeStringIsSafe($snapshotDirectory, ['allowEmptySegments' => true, 'allowDotSegments' => true, 'allowControlChars' => true, 'rejectDotDotSubstring' => true])) {
         throw new RuntimeException('Support snapshot directory must be a safe relative path.');
     }
 

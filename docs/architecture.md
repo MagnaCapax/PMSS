@@ -79,8 +79,12 @@ Keep the canonical installer/update details under `docs/install.md` and
   throws. Existing enumeration refusals, JSON output and exit codes remain intact.
   `RtorrentReservationPreflightSafetyTest` covers cleanup and downstream ordering
   with in-memory handles; execution stays on testing machines.
-- **scripts/lib/support/diagnostics.php** retains the support snapshot writer and
-  original include. `identity.php` resolves account identity; `collect.php` builds
+- **etc/skel/bin/pmssSupport/diagnostics.php** owns the support snapshot writer.
+  The account's `bin/support` executes its delivered `pmssSupport/supportCommand.php`;
+  the full dependency set is synced before the wrapper by the user-file updater.
+  Small `local*.php` helpers preserve only the required runtime primitives without
+  loading operator code. Root usage alerts load config/mail from the installed
+  `/etc/skel/bin/pmssSupport/` copy. `identity.php` resolves identity; `collect.php` builds
   diagnostics directly in the returned record. `mail.php` selects the transport,
   `envelope.php` owns message bytes, and `sendmail.php` and `smtp.php` own their
   transport lifetimes. SMTP commands, body and quit share one ordered exchange

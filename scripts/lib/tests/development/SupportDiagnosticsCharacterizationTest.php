@@ -3,7 +3,7 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 
-/** Lock support/collect.php bytes and observation order without reading account files. */
+/** Lock pmssSupport/collect.php bytes and observation order without reading account files. */
 class SupportDiagnosticsCharacterizationTest extends TestCase
 {
     public function testIdentitySelectionRetainsEnvironmentPasswdAndFallbackPrecedence(): void
@@ -11,7 +11,7 @@ class SupportDiagnosticsCharacterizationTest extends TestCase
         $script = <<<'PHP'
 namespace SupportIdentityFixture;
 function function_exists($name) { return true; }
-function pmssResolvePathFromEnv($key, $default) { return $GLOBALS['root']; }
+function pmssSupportLocalResolvePathFromEnv($key, $default) { return $GLOBALS['root']; }
 function getenv($name) { return $GLOBALS['env'][$name] ?? false; }
 function posix_geteuid() { return 4242; }
 function posix_getpwuid($uid) {
@@ -19,12 +19,12 @@ function posix_getpwuid($uid) {
     return ['name' => $GLOBALS['case'] === 'invalid-passwd' ? '../invalid' : 'fixtur02'];
 }
 function posix_getpwnam($user) { $GLOBALS['events'][] = ['name', $user]; return ['dir' => '/passwd/home/']; }
-function pmssPathTargetIsSafe($path, $directory) {
+function pmssSupportLocalPathTargetIsSafe($path, $directory) {
     $GLOBALS['events'][] = ['safe', $path, $directory];
     return $GLOBALS['case'] !== 'unsafe-all' && ($GLOBALS['case'] !== 'unsafe-home' || $path === '/passwd/home');
 }
 PHP;
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/support/identity.php', 'SupportIdentityFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('etc/skel/bin/pmssSupport/identity.php', 'SupportIdentityFixture');
         $script .= <<<'PHP'
 $rows = [];
 foreach (['environment', 'unsafe-home', 'mismatched-home', 'unsafe-user', 'invalid-passwd', 'invalid-root', 'unsafe-all'] as $case) {
@@ -62,11 +62,11 @@ function pmssSupportIdentityRead() {
     return ['username' => 'fixtur01', 'home' => '/fixture/fixtur01'];
 }
 function gethostname() { return 'fixture.invalid'; }
-function pmssResolvePathFromEnv($key, $default) {
+function pmssSupportLocalResolvePathFromEnv($key, $default) {
     $GLOBALS['events'][] = [$key, $default];
     return $key === 'PMSS_CONFIG_DIR' ? '/fixture/config' : '/fixture/version';
 }
-function pmssUserBillingIdentityRead($user, $key, $config) {
+function pmssSupportLocalUserBillingIdentityRead($user, $key, $config) {
     $GLOBALS['events'][] = ['store', $user, $key, $config];
     return $GLOBALS['case'] === 'stored' ? ($key === 'billingServiceId' ? '42' : '99') : null;
 }
@@ -78,7 +78,7 @@ function is_file($path) { return $GLOBALS['case'] !== 'absent'; }
 function file_get_contents($path) { $GLOBALS['events'][] = ['read', $path]; return "  git/main@fixture\n"; }
 function gmdate($format) { return '2001-02-03T04:05:06+00:00'; }
 PHP;
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/support/collect.php', 'SupportCollectFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('etc/skel/bin/pmssSupport/collect.php', 'SupportCollectFixture');
         $script .= <<<'PHP'
 $results = [];
 foreach (['stored', 'markers', 'absent'] as $case) {
@@ -129,7 +129,7 @@ PHP;
 
     public function testEnvelopeBytesAndFallbacksStayTransportIndependent(): void
     {
-        require_once dirname(__DIR__, 2).'/support/mail.php';
+        require_once dirname(__DIR__, 4).'/etc/skel/bin/pmssSupport/mail.php';
         $envelope = \pmssSupportMailEnvelopeBuild(['username' => 'fixtur01', 'hostname' => 'fixture.invalid',
             'billingServiceId' => '007', 'billingClientId' => 9, 'body' => "first\n.second\r\nlast"],
             ['targetEmail' => 'support@example.invalid'], '/fixture/request.txt');
@@ -150,7 +150,7 @@ PHP;
 
     public function testMessageRefusalsKeepTheirExactBoundaries(): void
     {
-        require_once dirname(__DIR__, 2).'/support/collect.php';
+        require_once dirname(__DIR__, 4).'/etc/skel/bin/pmssSupport/collect.php';
         $this->assertSame(str_repeat('x', 5000), \pmssSupportMessageNormalize(' '.str_repeat('x', 5000).' '));
         foreach ([[" \r\n ", 'Support message is required.'],
             ["hello\0there", 'Support message contains unsupported control characters.'],

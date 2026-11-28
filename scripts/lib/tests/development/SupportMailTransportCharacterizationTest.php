@@ -3,7 +3,7 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 
-/** Memory-only transport traces for support/smtp.php and support/sendmail.php. */
+/** Memory-only transport traces for pmssSupport/smtp.php and pmssSupport/sendmail.php. */
 class SupportMailTransportCharacterizationTest extends TestCase
 {
     public function testSmtpWireBytesReplyBoundariesAndCleanup(): void
@@ -16,7 +16,7 @@ function stream_socket_client($address, &$errno, &$error, $timeout) {
     $error = 'fixture failure';
     return $GLOBALS['case'] === 'connect' ? false : ($GLOBALS['stream'] = \fopen('php://memory', 'w+'));
 }
-function pmssStreamHandleIsOpen($stream) { return is_resource($stream); }
+function pmssSupportLocalStreamHandleIsOpen($stream) { return is_resource($stream); }
 function stream_set_timeout($stream, $timeout) { $GLOBALS['timeout'] = $timeout; }
 function gethostname() { return 'fixture.invalid'; }
 function fgets($stream) {
@@ -38,8 +38,8 @@ function fclose($stream) {
     if ($GLOBALS['case'] === 'close-throw') throw $GLOBALS['fault'];
 }
 PHP;
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/support/envelope.php', 'SupportSmtpFixture');
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/support/smtp.php', 'SupportSmtpFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('etc/skel/bin/pmssSupport/envelope.php', 'SupportSmtpFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('etc/skel/bin/pmssSupport/smtp.php', 'SupportSmtpFixture');
         $script .= <<<'PHP'
 $rows = [];
 foreach (['ok', 'forwarded', 'multiline', 'host', 'connect', 'invalid', 'greeting', 'recipient', 'body', 'quit',
@@ -102,8 +102,8 @@ PHP;
         $script = <<<'PHP'
 namespace SupportSendmailFixture;
 class RuntimeException extends \RuntimeException {}
-function pmssProcessPipeDescriptorSpec($mode) { return ['fixture', $mode]; }
-function pmssStreamHandleIsOpen($handle) { return is_resource($handle); }
+function pmssSupportLocalProcessPipeDescriptorSpec($mode) { return ['fixture', $mode]; }
+function pmssSupportLocalStreamHandleIsOpen($handle) { return is_resource($handle); }
 function proc_open($command, $spec, &$pipes) {
     $GLOBALS['command'] = [$command, $spec];
     if ($GLOBALS['case'] === 'open') return false;
@@ -115,7 +115,7 @@ function proc_open($command, $spec, &$pipes) {
     return $GLOBALS['process'] = \fopen('php://memory', 'w+');
 }
 function fclose($handle) { $GLOBALS['events'][] = 'close '.$GLOBALS['handles'][(int) $handle]; \fclose($handle); }
-function pmssProcessPipesClose($pipes) { foreach ($pipes as $pipe) if (is_resource($pipe)) fclose($pipe); }
+function pmssSupportLocalProcessPipesClose($pipes) { foreach ($pipes as $pipe) if (is_resource($pipe)) fclose($pipe); }
 function proc_close($process) { $GLOBALS['events'][] = 'reap'; \fclose($process); return $GLOBALS['case'] === 'exit' ? 1 : 0; }
 function pmssSupportStreamWriteAll($stream, $bytes, $context) {
     $GLOBALS['events'][] = ['write', $bytes, $context];
@@ -127,8 +127,8 @@ function stream_get_contents($stream) {
     return $GLOBALS['case'] === 'read-false' ? false : " diagnostic \n";
 }
 PHP;
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/support/envelope.php', 'SupportSendmailFixture');
-        $script .= $this->pmssInlinePhpLibraryInNamespace('scripts/lib/support/sendmail.php', 'SupportSendmailFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('etc/skel/bin/pmssSupport/envelope.php', 'SupportSendmailFixture');
+        $script .= $this->pmssInlinePhpLibraryInNamespace('etc/skel/bin/pmssSupport/sendmail.php', 'SupportSendmailFixture');
         $script .= <<<'PHP'
 $rows = [];
 foreach (['ok', 'open', 'exit', 'write', 'read', 'read-false'] as $case) {
