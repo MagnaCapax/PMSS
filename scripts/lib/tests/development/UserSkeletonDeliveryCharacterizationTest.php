@@ -26,11 +26,12 @@ class UserSkeletonDeliveryCharacterizationTest extends TestCase
     public function testUpdaterPreservesCompleteManifestAndMaintenanceOrder(): void
     {
         $result = $this->trace('pmssUserApplySkeletonFiles', 'pmssUserApplySkeletonFiles(["user" => "fixtur01", "home" => "/fixture/home/fixtur01"]);');
-        // Pin the Prowlarr helper separately; the digest covers the other 161 entries, including the 16 account-local support files.
-        $this->assertSame(162, count($result['files']));
+        // Pin the Prowlarr and Radarr helpers separately; the digest covers the other 161 entries, including the 16 account-local support files.
+        $this->assertSame(163, count($result['files']));
         $this->assertSame('bin/mediaStackProwlarr.sh', $result['files'][5]);
+        $this->assertSame('bin/mediaStackRadarr.sh', $result['files'][6]);
         $legacyFiles = $result['files'];
-        array_splice($legacyFiles, 5, 1);
+        array_splice($legacyFiles, 5, 2);
         $this->assertSame('b68307caf292a15ed59d04a4b075bbfc0c9e9516c8944750d6eeba1dac835b89',
             hash('sha256', implode("\n", $legacyFiles)."\n"));
         $this->assertSame(['traffic', 'panel', 'links', 'migration', 'cleanup', 'delete', 'delete', 'delete',
