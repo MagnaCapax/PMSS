@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Strict mode: shellcheck and shfmt findings fail this check (and CI); new warnings must be fixed or
+# disabled inline with a '# Reason:' comment, never masked.
 set -euo pipefail
 
 # shellcheck source=scripts/testing/testingPaths.sh
@@ -11,7 +13,7 @@ pmss_testing_run_bash_file_tool "$ROOT_DIR" -n1 bash -n
 if command -v shellcheck >/dev/null 2>&1; then
 	echo "[shellcheck]" >&2
 	# Exclude vendor and frozen skel/www content per AGENTS.md
-	pmss_testing_run_bash_file_tool "$ROOT_DIR" shellcheck || true
+	pmss_testing_run_bash_file_tool "$ROOT_DIR" shellcheck
 else
 	echo "(shellcheck not installed; skipping)" >&2
 fi
@@ -25,7 +27,7 @@ echo "[timeout audit]" >&2
 if command -v shfmt >/dev/null 2>&1; then
 	echo "[shfmt check]" >&2
 	# Check only filtered files, not entire tree
-	pmss_testing_run_bash_file_tool "$ROOT_DIR" shfmt -d || true
+	pmss_testing_run_bash_file_tool "$ROOT_DIR" shfmt -d
 else
 	echo "(shfmt not installed; skipping)" >&2
 fi

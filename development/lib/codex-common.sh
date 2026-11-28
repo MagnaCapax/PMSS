@@ -73,7 +73,7 @@ codex_agentic_bootstrap_self() {
 # step backwards made durations negative and the event writer rejects them (CI flake).
 codex_now_ms() {
 	local now up _
-	if read -r up _ < "${PMSS_CODEX_UPTIME_FILE:-/proc/uptime}" 2>/dev/null && [[ "$up" =~ ^([0-9]+)\.([0-9]{2})$ ]]; then
+	if read -r up _ <"${PMSS_CODEX_UPTIME_FILE:-/proc/uptime}" 2>/dev/null && [[ "$up" =~ ^([0-9]+)\.([0-9]{2})$ ]]; then
 		printf "%s\n" "$((10#${BASH_REMATCH[1]} * 1000 + 10#${BASH_REMATCH[2]} * 10))"
 		return 0
 	fi

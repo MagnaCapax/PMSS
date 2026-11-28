@@ -2,7 +2,7 @@
 set -euo pipefail
 # Sanitize external data for safe inclusion in prompts/logs.
 # Wraps content and calls externalDataCheck.sh to flag risks.
-# shellcheck disable=SC2317
+# shellcheck disable=SC2317,SC2329 # Reason: called from the sourced externalData helpers, which shellcheck does not follow.
 usage() { echo "Usage: externalDataSanitize.sh [--label TEXT] [--encode] [--raw] [--ignore NAME] [--strict] [--warn-only]" >&2; }
 # shellcheck disable=SC2317
 external_data_die() {

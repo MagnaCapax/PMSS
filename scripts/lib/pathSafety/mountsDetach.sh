@@ -20,27 +20,27 @@ mountTargetDecode() {
 targets=()
 rows=0
 while IFS= read -r mount_row; do
-	read -r mount_id parent_id device mount_root encoded_target details <<< "$mount_row"
+	read -r mount_id parent_id device mount_root encoded_target details <<<"$mount_row"
 	[[ "$mount_id" =~ ^[0-9]+$ && "$encoded_target" == /* && "$details" == *" - "* ]] || exit 1
 	# A plausible target cannot certify a row with corrupt fixed kernel fields.
 	# Refuse the snapshot before queued detaches or a no-mount purge can proceed.
 	[[ "$parent_id" =~ ^[0-9]+$ && "$device" =~ ^[0-9]+:[0-9]+$ && "$mount_root" == /* ]] || exit 1
 	# The separator alone cannot certify a complete row. Require all three
 	# post-separator fields before any queued detach or no-mount purge proceeds.
-	read -r filesystem source super_options extra <<< "${details#* - }"
+	read -r filesystem source super_options extra <<<"${details#* - }"
 	[[ -n "$filesystem" && -n "$source" && -n "$super_options" && -z "$extra" ]] || exit 1
 	rows=$((rows + 1))
 	mountTargetDecode "$encoded_target"
 	# Prefix selection is safe only for canonical kernel targets. Never resolve
 	# malformed paths here: that could select a mount outside the pinned root.
 	case "$target" in
-		*/./* | */. | */../* | */.. | *//*) exit 1 ;;
+	*/./* | */. | */../* | */.. | *//*) exit 1 ;;
 	esac
 	[[ "$target" == / || "$target" != */ ]] || exit 1
 	if [[ "$target" == "$purge_root/"* ]]; then
 		targets+=("$encoded_target")
 	fi
-done < "$mountinfo"
+done <"$mountinfo"
 # read leaves an unterminated final row in mount_row even though it returns failure.
 # Refuse that incomplete snapshot before any unmount or recursive purge work.
 [[ -z "$mount_row" ]] || exit 1
@@ -54,4 +54,4 @@ while IFS= read -r encoded_target; do
 	mountTargetDecode "$encoded_target"
 	# Kernel paths are already canonical. Avoid FUSE stat calls and helper hooks.
 	timeout --kill-after=5s 45s umount --internal-only --no-canonicalize --lazy -- "$target"
-done <<< "$sorted"
+done <<<"$sorted"

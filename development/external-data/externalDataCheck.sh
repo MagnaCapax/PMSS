@@ -2,9 +2,9 @@
 set -euo pipefail
 # Heuristic scanner for untrusted external data (pass-through).
 # Use --ignore to mute signals that are expected for a source.
-# shellcheck disable=SC2317
+# shellcheck disable=SC2317,SC2329 # Reason: called from the sourced externalData helpers, which shellcheck does not follow.
 usage() { echo "Usage: externalDataCheck.sh [--ignore NAME] [--strict] [--warn-only]" >&2; }
-# shellcheck disable=SC2317
+# shellcheck disable=SC2317,SC2329 # Reason: called from the sourced externalData helpers, which shellcheck does not follow.
 external_data_die() {
 	echo "[externalDataCheck] $*" >&2
 	exit 2
@@ -19,7 +19,7 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$script_dir/externalDataArgs.sh"
 external_data_parse_check_args "$@"
 
-# shellcheck disable=SC2317
+# shellcheck disable=SC2317,SC2329 # Reason: called from the sourced externalData helpers, which shellcheck does not follow.
 ignored() {
 	local n
 	for n in "${ignore[@]:-}"; do [[ "$n" == "$1" ]] && return 0; done
@@ -27,7 +27,7 @@ ignored() {
 }
 signals=()
 score=0
-# shellcheck disable=SC2317
+# shellcheck disable=SC2317,SC2329 # Reason: called from the sourced externalData helpers, which shellcheck does not follow.
 add_signal() {
 	local n="$1" w="$2"
 	ignored "$n" && return

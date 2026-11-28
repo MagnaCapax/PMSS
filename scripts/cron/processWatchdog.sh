@@ -51,6 +51,7 @@ list_processes() {
 }
 
 if command -v flock >/dev/null 2>&1; then
+	# shellcheck disable=SC2174 # Reason: only the lock directory is private; /run/pmss is shared state and must stay traversable.
 	mkdir -p -m 0700 "$(dirname "$LOCK_PATH")" 2>/dev/null || true
 	exec 9>"$LOCK_PATH" || exit 0
 	flock -n 9 || exit 0
