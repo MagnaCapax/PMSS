@@ -1,7 +1,7 @@
 #!/usr/bin/env php
 <?php
 /**
- * Nightly quota refresher.
+ * Per-minute quota refresher.
  *
  * - Requires `quota` utilities and filesystem support for per-user quotas.
  * - Runs `quota -u <user> -v -s` for every tenant, storing the human-readable output

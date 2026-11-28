@@ -428,7 +428,8 @@ echo pmssCustomerHtmlAttr($ip !== false ? trim($ip) : 'unknown');
     <pre><?php
     if (is_string($content = pmssCustomerFileRead('../.quota', true))) {
         echo $content;
-        $mtime = filemtime('../.quota');
+        $mtime = function_exists('pmssStatsQuotaRefreshTime')
+            ? pmssStatsQuotaRefreshTime('../.quota', $content) : filemtime('../.quota');
         echo "\nUpdated: " . date('Y-m-d H:i:s', $mtime) . "\n";
 
         $lines = preg_split('/\r?\n/', trim($content));

@@ -1705,6 +1705,14 @@ Automation often invokes these utilities; below are expected inputs and effects.
     root-copy failure still permits display publication. Event fields, account-log
     messages, fallback bytes and exception propagation retain their previous behavior.
     See ADR 0254 and `QuotaSnapshotRefreshCharacterizationTest`.
+  - Identical root-owned display snapshots with the expected account group and
+    mode retain their inode and mtime. Refresh time is the mtime of an atomic
+    root-owned, account-group-readable digest under `/var/run/pmss/quota-refresh/`;
+    stats uses it only when its digest matches the displayed bytes, falling back
+    to the display mtime after reboot or a runtime-write failure. Reports with
+    `*` still publish each minute because welcome uses mtime for grace deadlines.
+    Cron cadence, private root-copy publication and kernel enforcement are unchanged.
+    Verify reduced `/home` write operations on a host after deployment (#1126).
   - The per-account refresher rechecks the existing managed-username validator
     before constructing paths or launching a probe (ADR 0005). Invalid names log
     one fixed refusal without echoing the input or opening account logs, then

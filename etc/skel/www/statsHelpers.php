@@ -24,3 +24,17 @@ if (function_exists('pmssWelcomeRequireLocalHelpers')) {
     }
 }
 unset($pmssStatsFiles, $pmssStatsFile, $pmssStatsPath);
+
+/** Read the refresh stamp only when it describes these exact display bytes. */
+function pmssStatsQuotaRefreshTime(string $path, string $content, string $runtimeDir = '/var/run/pmss/quota-refresh'): int
+{
+    $mtime = (int) @filemtime($path);
+    $home = realpath(dirname($path));
+    if ($home === false) return $mtime;
+    $stamp = rtrim($runtimeDir, '/').'/'.basename($home);
+    $metadata = @lstat($stamp);
+    if (!is_array($metadata) || ($metadata['mode'] & 0170000) !== 0100000
+        || $metadata['uid'] !== 0 || ($metadata['mode'] & 0022) !== 0
+        || pmssCustomerFileRead($stamp) !== hash('sha256', $content)."\n") return $mtime;
+    return max($mtime, (int) $metadata['mtime']);
+}
